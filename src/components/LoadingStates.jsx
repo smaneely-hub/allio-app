@@ -1,14 +1,20 @@
 // Empty state component for pages with no data yet
-export function EmptyState({ emoji, headline, body, ctaLabel, ctaLink }) {
+export function EmptyState({ emoji, headline, body, ctaLabel, ctaLink, onCtaClick }) {
   return (
     <div className="card text-center py-12">
       <div className="text-6xl mb-6">{emoji}</div>
       <h2 className="font-display text-2xl text-warm-900 mb-3">{headline}</h2>
       <p className="text-warm-700 max-w-md mx-auto mb-6">{body}</p>
-      {ctaLabel && ctaLink && (
-        <a href={ctaLink} className="btn-primary inline-block">
-          {ctaLabel}
-        </a>
+      {ctaLabel && (ctaLink || onCtaClick) && (
+        ctaLink ? (
+          <a href={ctaLink} className="btn-primary inline-block">
+            {ctaLabel}
+          </a>
+        ) : (
+          <button onClick={onCtaClick} className="btn-primary">
+            {ctaLabel}
+          </button>
+        )
       )}
     </div>
   )

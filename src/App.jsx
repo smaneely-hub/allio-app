@@ -13,9 +13,9 @@ import { SettingsPage } from './pages/SettingsPage'
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <div className="min-h-screen bg-stone-100">
+    <BrowserRouter>
+      <AuthProvider>
+        <div className="min-h-screen bg-warm-50">
           <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
             <NavBar />
             <Routes>
@@ -65,7 +65,7 @@ export default function App() {
           </div>
         </div>
         <Toaster position="top-right" />
-      </BrowserRouter>
-    </AuthProvider>
+      </AuthProvider>
+    </BrowserRouter>
   )
 }

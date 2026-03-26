@@ -33,6 +33,8 @@ export function useSchedule() {
 
     try {
       const weekStartDate = getWeekStartDate()
+      console.log('[useSchedule] Loading for user:', user.id, 'week:', weekStartDate)
+      
       const { data: scheduleData, error: scheduleError } = await supabase
         .from('weekly_schedules')
         .select('*')
@@ -41,7 +43,12 @@ export function useSchedule() {
         .limit(1)
         .maybeSingle()
 
-      if (scheduleError) throw scheduleError
+      if (scheduleError) {
+        console.error('[useSchedule] ERROR loading schedule:', scheduleError)
+        throw scheduleError
+      }
+      
+      console.log('[useSchedule] Loaded schedule:', scheduleData?.id)
       setSchedule(scheduleData)
 
       if (scheduleData?.id) {
@@ -49,14 +56,19 @@ export function useSchedule() {
           .from('schedule_slots')
           .select('*')
           .eq('schedule_id', scheduleData.id)
-          .order('day_of_week', { ascending: true })
+          .order('day', { ascending: true })
 
-        if (slotsError) throw slotsError
+        if (slotsError) {
+          console.error('[useSchedule] ERROR loading slots:', slotsError)
+          throw slotsError
+        }
+        console.log('[useSchedule] Loaded slots:', slotData?.length)
         setSlots(slotData ?? [])
       } else {
         setSlots([])
       }
     } catch (err) {
+      console.error('[useSchedule] CRITICAL ERROR:', err)
       setError(err)
       toast.error("Couldn't load your data. Give it another shot.")
     } finally {
@@ -77,53 +89,86 @@ export function useSchedule() {
 
       try {
         const payload = {
-          id: schedule?.id,
           user_id: user.id,
-          household_id: householdId,
+          household_id: householdId,  // Add household_id
           week_start_date: getWeekStartDate(),
           shopping_day: shoppingDay,
-          week_notes: weekNotes,
           status: 'draft',
         }
 
+        console.log('[useSchedule] Saving schedule payload:', payload)
+
+        // Use UPSERT to handle existing schedules
         const { data: savedSchedule, error: saveError } = await supabase
           .from('weekly_schedules')
-          .upsert(payload, { onConflict: 'id' })
+          .upsert(payload, { onConflict: 'user_id,week_start_date' })
           .select()
           .single()
 
-        if (saveError) throw saveError
+        if (saveError) {
+          console.error('[useSchedule] ERROR upserting schedule:', JSON.stringify(saveError))
+          console.error('[useSchedule] Full error details:', saveError)
+          throw saveError
+        }
 
+        console.log('[useSchedule.saveSchedule] schedule payload', savedSchedule)
+
+        // Delete existing slots
         const { error: deleteError } = await supabase
           .from('schedule_slots')
           .delete()
           .eq('schedule_id', savedSchedule.id)
 
-        if (deleteError) throw deleteError
+        if (deleteError) {
+          console.error('[useSchedule] ERROR deleting slots:', deleteError)
+          // Non-critical, continue
+        }
 
-        const preparedSlots = activeSlots.map((slot) => ({
-          user_id: user.id,
-          schedule_id: savedSchedule.id,
-          day_of_week: slot.day_of_week,
-          meal_type: slot.meal_type,
-          attendees: slot.attendees,
-          attendees_count: slot.attendees.length,
-          is_leftover: slot.is_leftover,
-          leftover_source: slot.leftover_source,
-          effort_level: slot.effort_level,
-          planning_notes: slot.planning_notes,
-          active: true,
-        }))
+        const preparedSlots = activeSlots.map((slot, index) => {
+          // Normalize field names - support both old and new naming
+          const day = slot.day ?? slot.day_of_week
+          const meal = slot.meal ?? slot.meal_type
+          
+          // Add validation
+          if (!day || !meal) {
+            const errMsg = `Invalid schedule slot at index ${index}: missing day or meal (${JSON.stringify(slot)})`
+            console.error('[useSchedule]', errMsg)
+            throw new Error(errMsg)
+          }
+          
+          const slotPayload = {
+            user_id: user.id,
+            household_id: householdId,  // Add household_id to slots too
+            schedule_id: savedSchedule.id,
+            day: day,
+            meal: meal,
+            attendees: slot.attendees || [],
+            is_leftover: slot.is_leftover || false,
+            leftover_source: slot.leftover_source || '',
+            effort_level: slot.effort_level || 'medium',
+            planning_notes: slot.planning_notes || '',
+          }
+          
+          console.log('[useSchedule.saveSchedule] slot payload', slotPayload)
+          return slotPayload
+        })
+
+        console.log('[useSchedule] Inserting slots:', preparedSlots.length)
 
         if (preparedSlots.length > 0) {
           const { error: insertError } = await supabase.from('schedule_slots').insert(preparedSlots)
-          if (insertError) throw insertError
+          if (insertError) {
+            console.error('[useSchedule] ERROR inserting slots:', JSON.stringify(insertError, null, 2))
+            console.error('[useSchedule] Slot insert error details:', insertError)
+            throw insertError
+          }
         }
 
         setSchedule(savedSchedule)
         setSlots(preparedSlots)
         return savedSchedule
       } catch (err) {
+        console.error('[useSchedule] CRITICAL ERROR in saveSchedule:', err)
         setError(err)
         toast.error("Couldn't save your changes. Give it another shot.")
         throw err
@@ -131,7 +176,7 @@ export function useSchedule() {
         setLoading(false)
       }
     },
-    [schedule?.id, user],
+    [user],
   )
 
   return {

@@ -10,13 +10,17 @@ const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Prep Block']
 
 export function SchedulePage() {
   const navigate = useNavigate()
-  const { household, members } = useHousehold()
-  const { schedule, slots, loading, saveSchedule } = useSchedule()
+  const { household, members, repairMembers, loading: householdLoading, reloadHousehold } = useHousehold()
+  const { schedule, slots, loading: scheduleLoading, saveSchedule } = useSchedule()
   const [shoppingDay, setShoppingDay] = useState('Sunday')
   const [weekNotes, setWeekNotes] = useState('')
   const [editorKey, setEditorKey] = useState(null)
   const [slotState, setSlotState] = useState({})
   const [saving, setSaving] = useState(false)
+  const [repairing, setRepairing] = useState(false)
+
+  // Check if we have a recovery situation: household exists but no members
+  const needsMemberRepair = household && members.length === 0
 
   useEffect(() => {
     if (!schedule) return
@@ -27,10 +31,10 @@ export function SchedulePage() {
   useEffect(() => {
     const nextState = {}
     slots.forEach((slot) => {
-      const key = `${slot.day_of_week}-${slot.meal_type}`
+      const key = `${slot.day}-${slot.meal}`
       nextState[key] = {
-        day_of_week: slot.day_of_week,
-        meal_type: slot.meal_type,
+        day_of_week: slot.day,
+        meal_type: slot.meal,
         active: true,
         attendees: slot.attendees || [],
         is_leftover: slot.is_leftover || false,
@@ -43,7 +47,13 @@ export function SchedulePage() {
   }, [slots])
 
   const memberOptions = useMemo(
-    () => members.map((member, index) => ({ id: member.id || `member-${index}`, label: member.name || member.label || `Member ${index + 1}` })),
+    () => {
+      console.log('[SchedulePage] Building memberOptions, members:', members.length)
+      return members.map((member, index) => ({ 
+        id: member.id || `member-${index}`, 
+        label: member.name || member.label || `Member ${index + 1}` 
+      }))
+    },
     [members],
   )
 
@@ -84,16 +94,51 @@ export function SchedulePage() {
     })
   }
 
+  // Recovery handler: create default members if none exist
+  const handleMemberRepair = async () => {
+    setRepairing(true)
+    try {
+      console.log('[SchedulePage] Calling repairMembers()...')
+      // repairMembers() now creates defaults based on household.total_people
+      await repairMembers()
+      toast.success('Default household members restored')
+      await reloadHousehold()
+    } catch (err) {
+      console.error('[SchedulePage] restore members failed', err)
+      toast.error(err.message || 'Failed to restore members')
+    } finally {
+      setRepairing(false)
+    }
+  }
+
+  // Block save if members are missing
   const handleSaveSchedule = async () => {
+    // Check for missing members first
+    if (!members || members.length === 0) {
+      toast.error('You need at least one household member before saving a schedule')
+      return
+    }
+
+    console.log('[SchedulePage] Save clicked, household:', household?.id, 'members:', members.length, 'slots:', Object.keys(slotState).length)
+    
     if (!household?.id) {
-      toast.error('Please complete onboarding before building a schedule.')
+      toast.error('Household not loaded. Please refresh the page.')
+      return
+    }
+
+    const activeSlots = Object.values(slotState).filter((slot) => slot.active && slot.attendees?.length > 0)
+    console.log('[SchedulePage] Active slots:', activeSlots.length)
+    
+    if (activeSlots.length === 0) {
+      toast.error('Please add at least one meal slot. Click a slot to add meals.')
       return
     }
 
     setSaving(true)
 
     try {
-      const activeSlots = Object.values(slotState).filter((slot) => slot.active && slot.attendees.length > 0)
+      console.log('[SchedulePage] Saving schedule...')
+      
       const savedSchedule = await saveSchedule({
         householdId: household.id,
         shoppingDay,
@@ -101,14 +146,48 @@ export function SchedulePage() {
         slots: activeSlots,
       })
 
+      console.log('[SchedulePage] Schedule saved:', savedSchedule?.id)
       toast.success('Schedule saved successfully.')
       navigate(`/plan?schedule_id=${savedSchedule.id}`, { replace: true })
     } catch (error) {
+      console.error('[SchedulePage] Save failed:', error)
       toast.error(error.message || 'Unable to save schedule. Please try again.')
     } finally {
       setSaving(false)
     }
   }
+
+  // Show member repair UI if needed
+  if (needsMemberRepair) {
+    return (
+      <div className="space-y-6">
+        <div className="card">
+          <h1 className="font-display text-3xl text-warm-900">Weekly Schedule</h1>
+          <p className="mt-2 text-sm text-warm-700">Your household exists but we couldn't find your members. Let's fix that.</p>
+        </div>
+        
+        <div className="card text-center py-12">
+          <div className="text-6xl mb-6">🔧</div>
+          <h2 className="font-display text-2xl text-warm-900 mb-3">Missing Household Members</h2>
+          <p className="text-warm-700 max-w-md mx-auto mb-6">
+            Your household is set up but we don't have any members saved. This might be from a previous issue.
+          </p>
+          <button 
+            onClick={handleMemberRepair} 
+            disabled={repairing}
+            className="btn-primary"
+          >
+            {repairing ? 'Restoring...' : 'Restore Default Members'}
+          </button>
+          <p className="text-xs text-warm-500 mt-4">
+            After restoring, you'll be able to edit members in Settings.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  const loading = householdLoading || scheduleLoading
 
   return (
     <div className="space-y-6">
@@ -140,7 +219,10 @@ export function SchedulePage() {
           headline="Let's map out your week"
           body="Tell Allio which meals you want to plan and who's eating. It only takes a minute."
           ctaLabel="Start building your schedule"
-          ctaLink="#"
+          ctaLink={null}
+          onCtaClick={() => {
+            openSlotEditor('Monday', 'Dinner')
+          }}
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-7">
@@ -187,18 +269,22 @@ export function SchedulePage() {
           <div className="space-y-5">
             <div>
               <div className="mb-3 text-sm font-medium text-slate-700">Attendees</div>
-              <div className="grid gap-3 md:grid-cols-2">
-                {memberOptions.map((member) => (
-                  <label key={member.id} className="flex items-center gap-3 rounded-xl border border-stone-200 p-3 text-sm text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={(slotState[editorKey]?.attendees || []).includes(member.id)}
-                      onChange={() => toggleAttendee(editorKey, member.id)}
-                    />
-                    {member.label}
-                  </label>
-                ))}
-              </div>
+              {memberOptions.length === 0 ? (
+                <p className="text-sm text-red-500">No members found. Go to Settings to add members.</p>
+              ) : (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {memberOptions.map((member) => (
+                    <label key={member.id} className="flex items-center gap-3 rounded-xl border border-stone-200 p-3 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={(slotState[editorKey]?.attendees || []).includes(member.id)}
+                        onChange={() => toggleAttendee(editorKey, member.id)}
+                      />
+                      {member.label}
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
 
             <label className="flex items-center gap-3 text-sm text-slate-700">
@@ -245,7 +331,7 @@ export function SchedulePage() {
         <button
           type="button"
           onClick={handleSaveSchedule}
-          disabled={saving}
+          disabled={saving || members.length === 0}
           className="btn-primary"
         >
           {saving ? 'Saving…' : 'Generate Meal Plan'}

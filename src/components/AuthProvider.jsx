@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
@@ -9,6 +9,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
+  const prevUserRef = useRef(null)
 
   useEffect(() => {
     let mounted = true
@@ -17,6 +18,7 @@ export function AuthProvider({ children }) {
       const { data } = await supabase.auth.getSession()
       if (!mounted) return
       setUser(data.session?.user ?? null)
+      prevUserRef.current = data.session?.user ?? null
       setLoading(false)
     }
 
@@ -27,12 +29,13 @@ export function AuthProvider({ children }) {
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!mounted) return
       
-      // Handle session expiry
-      if (!session && user) {
+      // Handle session expiry - compare with ref, not state
+      if (!session && prevUserRef.current) {
         toast.error('Your session expired. Please log in again.')
         navigate('/login')
       }
       
+      prevUserRef.current = session?.user ?? null
       setUser(session?.user ?? null)
       setLoading(false)
     })
@@ -41,7 +44,7 @@ export function AuthProvider({ children }) {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [navigate, user])
+  }, [navigate])
 
   const value = useMemo(
     () => ({
