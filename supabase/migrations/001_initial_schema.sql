@@ -1,0 +1,1 @@
+-- Initial schema stub for Allio

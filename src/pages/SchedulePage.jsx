@@ -1,0 +1,258 @@
+import { useEffect, useMemo, useState } from 'react'
+import toast from 'react-hot-toast'
+import { useNavigate } from 'react-router-dom'
+import { useHousehold } from '../hooks/useHousehold'
+import { useSchedule } from '../hooks/useSchedule'
+import { ScheduleSkeleton, EmptyState } from '../components/LoadingStates'
+
+const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Prep Block']
+
+export function SchedulePage() {
+  const navigate = useNavigate()
+  const { household, members } = useHousehold()
+  const { schedule, slots, loading, saveSchedule } = useSchedule()
+  const [shoppingDay, setShoppingDay] = useState('Sunday')
+  const [weekNotes, setWeekNotes] = useState('')
+  const [editorKey, setEditorKey] = useState(null)
+  const [slotState, setSlotState] = useState({})
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!schedule) return
+    setShoppingDay(schedule.shopping_day || 'Sunday')
+    setWeekNotes(schedule.week_notes || '')
+  }, [schedule])
+
+  useEffect(() => {
+    const nextState = {}
+    slots.forEach((slot) => {
+      const key = `${slot.day_of_week}-${slot.meal_type}`
+      nextState[key] = {
+        day_of_week: slot.day_of_week,
+        meal_type: slot.meal_type,
+        active: true,
+        attendees: slot.attendees || [],
+        is_leftover: slot.is_leftover || false,
+        leftover_source: slot.leftover_source || '',
+        effort_level: slot.effort_level || 'medium',
+        planning_notes: slot.planning_notes || '',
+      }
+    })
+    setSlotState(nextState)
+  }, [slots])
+
+  const memberOptions = useMemo(
+    () => members.map((member, index) => ({ id: member.id || `member-${index}`, label: member.name || member.label || `Member ${index + 1}` })),
+    [members],
+  )
+
+  const openSlotEditor = (day, mealType) => {
+    const key = `${day}-${mealType}`
+    setEditorKey(key)
+    setSlotState((current) => ({
+      ...current,
+      [key]: current[key] || {
+        day_of_week: day,
+        meal_type: mealType,
+        active: true,
+        attendees: [],
+        is_leftover: false,
+        leftover_source: '',
+        effort_level: 'medium',
+        planning_notes: '',
+      },
+    }))
+  }
+
+  const updateSlot = (key, patch) => {
+    setSlotState((current) => ({
+      ...current,
+      [key]: {
+        ...current[key],
+        ...patch,
+      },
+    }))
+  }
+
+  const toggleAttendee = (key, attendeeId) => {
+    const currentAttendees = slotState[key]?.attendees || []
+    updateSlot(key, {
+      attendees: currentAttendees.includes(attendeeId)
+        ? currentAttendees.filter((id) => id !== attendeeId)
+        : [...currentAttendees, attendeeId],
+    })
+  }
+
+  const handleSaveSchedule = async () => {
+    if (!household?.id) {
+      toast.error('Please complete onboarding before building a schedule.')
+      return
+    }
+
+    setSaving(true)
+
+    try {
+      const activeSlots = Object.values(slotState).filter((slot) => slot.active && slot.attendees.length > 0)
+      const savedSchedule = await saveSchedule({
+        householdId: household.id,
+        shoppingDay,
+        weekNotes,
+        slots: activeSlots,
+      })
+
+      toast.success('Schedule saved successfully.')
+      navigate(`/plan?schedule_id=${savedSchedule.id}`, { replace: true })
+    } catch (error) {
+      toast.error(error.message || 'Unable to save schedule. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="card">
+        <h1 className="font-display text-3xl text-warm-900">Weekly Schedule</h1>
+        <p className="mt-2 text-sm text-warm-700">Build the week you actually need planned. Activate only the meal slots you want Allio to consider.</p>
+      </div>
+
+      <div className="grid gap-5 rounded-2xl border border-warm-200 bg-white p-6 shadow-sm md:grid-cols-2">
+        <label className="space-y-2">
+          <span className="text-sm font-medium text-slate-700">Shopping Day</span>
+          <select value={shoppingDay} onChange={(e) => setShoppingDay(e.target.value)} className={inputClassName}>
+            {days.map((day) => (
+              <option key={day} value={day}>{day}</option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-2">
+          <span className="text-sm font-medium text-slate-700">Week Notes</span>
+          <input value={weekNotes} onChange={(e) => setWeekNotes(e.target.value)} className={inputClassName} placeholder="Anything special this week?" />
+        </label>
+      </div>
+
+      {loading ? (
+        <ScheduleSkeleton />
+      ) : slots.length === 0 ? (
+        <EmptyState
+          emoji="📅"
+          headline="Let's map out your week"
+          body="Tell Allio which meals you want to plan and who's eating. It only takes a minute."
+          ctaLabel="Start building your schedule"
+          ctaLink="#"
+        />
+      ) : (
+        <div className="grid gap-4 md:grid-cols-7">
+          {days.map((day) => (
+            <div key={day} className="card p-4">
+              <div className="mb-4 text-sm font-semibold text-slate-900">{day}</div>
+              <div className="space-y-3">
+                {mealTypes.map((mealType) => {
+                  const key = `${day}-${mealType}`
+                  const slot = slotState[key]
+                  return (
+                    <button
+                      key={mealType}
+                      type="button"
+                      onClick={() => openSlotEditor(day, mealType)}
+                      className="btn-primary w-full text-left hover:border-warm-300"
+                    >
+                      <div className="text-sm font-medium text-slate-800">{mealType}</div>
+                      {slot?.active ? (
+                        <div className="mt-2 space-y-1 text-xs text-slate-500">
+                          <div>{slot.attendees.length} attendee(s)</div>
+                          <div>{slot.effort_level} effort</div>
+                          {slot.planning_notes ? <div>{slot.planning_notes}</div> : null}
+                        </div>
+                      ) : (
+                        <div className="mt-2 text-xs text-slate-400">Empty slot</div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {editorKey && slotState[editorKey] ? (
+        <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-slate-900">Edit {editorKey.replace('-', ' · ')}</h2>
+            <button type="button" onClick={() => setEditorKey(null)} className="text-sm text-slate-500">Close</button>
+          </div>
+
+          <div className="space-y-5">
+            <div>
+              <div className="mb-3 text-sm font-medium text-slate-700">Attendees</div>
+              <div className="grid gap-3 md:grid-cols-2">
+                {memberOptions.map((member) => (
+                  <label key={member.id} className="flex items-center gap-3 rounded-xl border border-stone-200 p-3 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={(slotState[editorKey]?.attendees || []).includes(member.id)}
+                      onChange={() => toggleAttendee(editorKey, member.id)}
+                    />
+                    {member.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <label className="flex items-center gap-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={slotState[editorKey]?.is_leftover || false}
+                onChange={(e) => updateSlot(editorKey, { is_leftover: e.target.checked, leftover_source: e.target.checked ? slotState[editorKey]?.leftover_source || '' : '' })}
+              />
+              Is leftover?
+            </label>
+
+            {slotState[editorKey]?.is_leftover ? (
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-slate-700">Source meal</span>
+                <select value={slotState[editorKey]?.leftover_source || ''} onChange={(e) => updateSlot(editorKey, { leftover_source: e.target.value })} className={inputClassName}>
+                  <option value="">Select source meal</option>
+                  {Object.values(slotState).map((slot) => (
+                    <option key={`${slot.day_of_week}-${slot.meal_type}`} value={`${slot.day_of_week} ${slot.meal_type}`}>
+                      {slot.day_of_week} {slot.meal_type}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-slate-700">Effort level</span>
+              <select value={slotState[editorKey]?.effort_level || 'medium'} onChange={(e) => updateSlot(editorKey, { effort_level: e.target.value })} className={inputClassName}>
+                <option value="low">low</option>
+                <option value="medium">medium</option>
+                <option value="full">full</option>
+              </select>
+            </label>
+
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-slate-700">Planning notes</span>
+              <input value={slotState[editorKey]?.planning_notes || ''} onChange={(e) => updateSlot(editorKey, { planning_notes: e.target.value, active: true })} className={inputClassName} placeholder="Quick notes for this slot" />
+            </label>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={handleSaveSchedule}
+          disabled={saving}
+          className="btn-primary"
+        >
+          {saving ? 'Saving…' : 'Generate Meal Plan'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const inputClassName = 'input'

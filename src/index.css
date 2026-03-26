@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@theme {
+  /* Fonts */
+  --font-display: 'DM Serif Display', Georgia, serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
+
+  /* Primary colors */
+  --color-primary-50: #E8F5EE;
+  --color-primary-100: #C6E7D3;
+  --color-primary-200: #9AD4B3;
+  --color-primary-400: #4A9B6E;
+  --color-primary-500: #4A9B6E;
+  --color-primary-600: #367A52;
+  --color-primary-700: #2A6040;
+
+  /* Accent colors */
+  --color-accent-orange: #F97316;
+  --color-accent-red: #EF4444;
+
+  /* Warm neutrals */
+  --color-warm-50: #FAFAF8;
+  --color-warm-100: #F5F3EF;
+  --color-warm-200: #E8E5DF;
+  --color-warm-400: #9C9589;
+  --color-warm-700: #5C564E;
+  --color-warm-900: #2D2A26;
+
+  /* Category colors */
+  --color-category-produce: #4A9B6E;
+  --color-category-protein: #D97B5A;
+  --color-category-dairy: #6B9ED6;
+  --color-category-pantry: #C4976B;
+  --color-category-frozen: #8BBDD4;
+  --color-category-bakery: #D4A85B;
+}
+
+body {
+  @apply bg-warm-50 text-warm-900 font-body;
+}
+
+/* Typography defaults */
+h1, h2, h3, h4 {
+  @apply font-display;
+}
+
+/* Card component style */
+.card {
+  @apply bg-white rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow duration-200;
+}
+
+/* Button styles */
+.btn-primary {
+  @apply bg-primary-400 hover:bg-primary-600 text-white font-body font-semibold px-6 py-3 rounded-xl transition-colors shadow-sm;
+}
+
+.btn-secondary {
+  @apply border-2 border-primary-400 text-primary-400 hover:bg-primary-50 font-semibold px-6 py-3 rounded-xl transition-colors;
+}
+
+.btn-ghost {
+  @apply text-warm-400 hover:text-warm-700 hover:bg-warm-100 px-4 py-2 rounded-lg transition-colors;
+}
+
+/* Input styles */
+.input {
+  @apply w-full px-4 py-3 rounded-xl bg-warm-50 border border-warm-200 focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 outline-none transition-colors;
+}
