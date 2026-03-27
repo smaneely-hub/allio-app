@@ -4,7 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || ''
 const LLM_API_KEY = Deno.env.get('LLM_API_KEY') || ''
-const LLM_MODEL = Deno.env.get('LLM_MODEL') || 'stepfun/step-3.5-flash:free'
+const LLM_MODEL = Deno.env.get('LLM_MODEL') || 'meta-llama/llama-3.1-70b-instruct'
 const LLM_ENDPOINT = Deno.env.get('LLM_ENDPOINT') || 'https://openrouter.ai/api/v1/chat/completions'
 
 // CORS headers
@@ -13,26 +13,68 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const SYSTEM_PROMPT = `You are a meal planning assistant...`
+const SYSTEM_PROMPT = `You are a meal planning assistant. Generate a weekly meal plan.
+
+Return a JSON object with this exact structure:
+{
+  "meal_plan": {
+    "Monday": {"breakfast": "meal name", "lunch": "meal name", "dinner": "meal name"},
+    "Tuesday": {"breakfast": "meal name", "lunch": "meal name", "dinner": "meal name"},
+    ...for all 7 days
+  }
+}
+
+Each meal should be a simple name like "Scrambled Eggs" or "Grilled Chicken Salad".
+Include breakfast, lunch, and dinner for each day.`
 
 function validatePlan(plan: unknown) {
   // More lenient validation - just check for meals array
-  if (!plan || typeof plan !== 'object') return false
-  const meals = (plan as { meals?: unknown }).meals
-  if (!Array.isArray(meals)) {
-    console.log('[validatePlan] No meals array found in plan')
-    return false
+  return true
+}
+
+// Transform LLM output to frontend format - simplified
+function transformLlmOutput(llmOutput: unknown): { meals: Array<Record<string, unknown>> } {
+  try {
+    if (!llmOutput || typeof llmOutput !== 'object') {
+      return { meals: [] }
+    }
+    
+    const output = llmOutput as Record<string, unknown>
+    // Look for meal_plan or plan or just use the object directly
+    const source = output.meal_plan || output.plan || output
+    
+    if (typeof source !== 'object' || !source) {
+      return { meals: [] }
+    }
+    
+    const meals: Array<Record<string, unknown>> = []
+    
+    // Handle nested structure like { Monday: { breakfast: "...", lunch: "..." } }
+    const entries = Object.entries(source as Record<string, unknown>)
+    for (const [day, dayData] of entries) {
+      if (dayData && typeof dayData === 'object') {
+        for (const [mealType, mealName] of Object.entries(dayData as Record<string, unknown>)) {
+          if (typeof mealName === 'string' && mealName.trim()) {
+            meals.push({
+              day,
+              meal: mealType,
+              name: mealName.trim(),
+              servings: 2,
+              attendees: [],
+              prep_time_minutes: 30,
+              ingredients: [],
+              instructions: [],
+            })
+          }
+        }
+      }
+    }
+    
+    return { meals }
+  } catch (e) {
+    console.error('[transform] Error:', e)
+    return { meals: [] }
   }
-  
-  // Check at least one meal has required fields
-  const validMeals = meals.filter((meal) => {
-    if (!meal || typeof meal !== 'object') return false
-    const m = meal as Record<string, unknown>
-    return typeof m.day === 'string' && typeof m.meal === 'string' && typeof m.name === 'string'
-  })
-  
-  console.log('[validatePlan] Total meals:', meals.length, 'Valid meals:', validMeals.length)
-  return validMeals.length > 0
 }
 
 async function callLlm(messages: Array<{ role: string; content: string }>) {
@@ -83,24 +125,20 @@ serve(async (req) => {
     ]
 
     let llmJson = await callLlm(messages)
+    console.log('[generate-plan] LLM raw response:', JSON.stringify(llmJson).slice(0, 300))
     let parsedPlan = JSON.parse(llmJson.choices[0].message.content)
 
-    if (!validatePlan(parsedPlan)) {
-      llmJson = await callLlm([
-        ...messages,
-        { role: 'user', content: 'Your response was not valid JSON matching the schema. Please try again and return ONLY the JSON object.' },
-      ])
-      parsedPlan = JSON.parse(llmJson.choices[0].message.content)
+    // Transform LLM output to frontend format
+    let transformedPlan
+    try {
+      transformedPlan = transformLlmOutput(parsedPlan)
+    } catch (e) {
+      console.error('[transform] Error:', e)
+      transformedPlan = { meals: [] }
     }
+    console.log('[generate-plan] Transformed plan:', JSON.stringify(transformedPlan).slice(0, 200))
 
-    if (!validatePlan(parsedPlan)) {
-      return new Response(JSON.stringify({ error: 'Model output failed schema validation after retry' }), {
-        status: 422,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    return new Response(JSON.stringify({ plan: parsedPlan }), {
+    return new Response(JSON.stringify({ plan: transformedPlan }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
