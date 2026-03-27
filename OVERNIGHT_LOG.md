@@ -23,10 +23,13 @@
 
 ### Task 3: End-to-End Flow Smoke Test
 
-- Status: PENDING
-- What was done: None yet
-- What failed (if anything): N/A
-- What needs manual attention: Write test script
+- Status: COMPLETE
+- What was done:
+  - Created tests/e2e.test.js with automated checks
+  - Run: node tests/e2e.test.js
+  - Verified: landing page (200), login page (200), edge function (21 meals), DB accessible
+- What failed (if anything): None
+- What needs manual attention: Full user flow needs manual browser test
 
 ### Task 4: Grocery List Feature
 
@@ -46,11 +49,12 @@
 - What failed (if anything): None
 - What needs manual attention: None
 
----
+## Summary
 
-### Summary
-
-- Total tasks completed: 1
-- Total tasks pending: 4
-- Current state of allio.life: 200 OK, meal generation working
-- What the owner needs to do manually: Test Generate button in app
+- Total tasks completed: 4
+- Total tasks skipped: 0  
+- Total tasks partial: 1 (RLS policies need manual SQL)
+- Current state of allio.life: 200 OK, meal generation working (21 meals returned)
+- What the owner needs to do manually:
+  1. Run supabase/migrations/rls_policies.sql in Supabase SQL Editor
+  2. Test full flow in browser: login → onboarding → schedule → generate
