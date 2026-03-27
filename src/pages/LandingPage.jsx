@@ -2,25 +2,25 @@ import { Link } from 'react-router-dom'
 
 export function LandingPage() {
   return (
-    <div className="flex min-h-[80vh] flex-col items-center justify-center px-6 py-12 text-center">
+    <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 py-6 text-center pb-32 overflow-hidden md:pb-8 md:overflow-visible">
       {/* Hero emoji */}
-      <div className="mb-8 inline-flex items-center justify-center rounded-2xl bg-primary-50 p-5 shadow-sm">
-        <span className="text-5xl">🥑</span>
+      <div className="mb-4 md:mb-6 inline-flex items-center justify-center rounded-2xl bg-primary-50 p-3 md:p-5 shadow-sm">
+        <span className="text-4xl md:text-5xl">🥑</span>
       </div>
 
       {/* Hero headline - DM Serif Display */}
-      <h1 className="mb-6 font-display text-5xl font-normal tracking-tight text-warm-900 md:text-6xl">
+      <h1 className="mb-3 md:mb-4 font-display text-3xl md:text-5xl lg:text-6xl font-normal tracking-tight text-warm-900 leading-tight">
         Eat better with <span className="text-primary-400">less effort</span>.
       </h1>
 
-      <p className="mb-10 max-w-2xl text-lg text-warm-700 md:text-xl">
+      <p className="mb-6 md:mb-8 max-w-xl text-sm md:text-lg text-warm-700 leading-relaxed">
         Allio turns household chaos into a simple weekly plan. From allergies to leftovers, 
         we handle the logic so you just handle the cooking.
       </p>
       
-      {/* CTA buttons */}
-      <div className="mb-16 flex flex-col gap-4 sm:flex-row">
-        <Link to="/login" className="btn-primary text-lg">
+      {/* CTA buttons - more spacing on mobile */}
+      <div className="mb-16 md:mb-12 flex flex-col gap-3 w-full max-w-xs mx-auto sm:flex-row sm:max-w-none sm:gap-4">
+        <Link to="/login" className="btn-primary text-base py-3">
           Get Started
         </Link>
         <a href="#features" className="btn-secondary text-lg">
@@ -28,15 +28,15 @@ export function LandingPage() {
         </a>
       </div>
 
-      {/* 3-step flow strip */}
-      <div className="mb-16 flex items-center gap-4 text-warm-400">
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 text-primary-600 font-semibold">1</span>
+      {/* 3-step flow strip - wrap on mobile */}
+      <div className="mb-10 flex flex-wrap items-center justify-center gap-2 text-warm-400 text-sm md:text-base">
+        <span className="flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full bg-primary-100 text-primary-600 font-semibold text-sm">1</span>
         <span className="font-medium">Plan</span>
-        <span className="h-px w-8 bg-warm-200"></span>
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 text-primary-600 font-semibold">2</span>
+        <span className="hidden md:inline h-px w-8 bg-warm-200"></span>
+        <span className="flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full bg-primary-100 text-primary-600 font-semibold text-sm">2</span>
         <span className="font-medium">Shop</span>
-        <span className="h-px w-8 bg-warm-200"></span>
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 text-primary-600 font-semibold">3</span>
+        <span className="hidden md:inline h-px w-8 bg-warm-200"></span>
+        <span className="flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full bg-primary-100 text-primary-600 font-semibold text-sm">3</span>
         <span className="font-medium">Cook</span>
       </div>
 

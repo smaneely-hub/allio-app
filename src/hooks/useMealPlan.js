@@ -164,8 +164,14 @@ export function useMealPlan(scheduleId) {
         locked_meals: lockedMeals,
       }
 
+      console.log('[useMealPlan] Calling generate-plan with payload:', JSON.stringify(payload).slice(0, 500))
+      
       const { data: generated, error: functionError } = await supabase.functions.invoke('generate-plan', { body: payload })
-      if (functionError) throw functionError
+      console.log('[useMealPlan] Function response:', { data: generated, error: functionError })
+      if (functionError) {
+        console.error('[useMealPlan] Function error:', JSON.stringify(functionError))
+        throw functionError
+      }
 
       const nextPlan = withMealDefaults(generated.plan)
       const mergedPlan = {

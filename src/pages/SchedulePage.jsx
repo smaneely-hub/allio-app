@@ -160,7 +160,7 @@ export function SchedulePage() {
   // Show member repair UI if needed
   if (needsMemberRepair) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 pb-24">
         <div className="card">
           <h1 className="font-display text-3xl text-warm-900">Weekly Schedule</h1>
           <p className="mt-2 text-sm text-warm-700">Your household exists but we couldn't find your members. Let's fix that.</p>
@@ -190,7 +190,7 @@ export function SchedulePage() {
   const loading = householdLoading || scheduleLoading
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       <div className="card">
         <h1 className="font-display text-3xl text-warm-900">Weekly Schedule</h1>
         <p className="mt-2 text-sm text-warm-700">Build the week you actually need planned. Activate only the meal slots you want Allio to consider.</p>

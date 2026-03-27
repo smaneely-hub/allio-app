@@ -62,28 +62,58 @@ export function NavBar() {
         </div>
       </header>
 
+      {/* Mobile header with user status */}
+      <header className="md:hidden border-b border-warm-200 bg-white px-4 py-3">
+        <div className="flex items-center justify-between">
+          <Link to="/" className="font-display text-xl text-warm-900">
+            Allio
+          </Link>
+          {user && (
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="text-xs font-medium text-warm-400"
+            >
+              Sign Out
+            </button>
+          )}
+        </div>
+      </header>
+
       {/* Mobile bottom tab bar */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-warm-200 bg-white md:hidden">
         <div className="flex items-center justify-around py-2">
-          {links.map((link) => (
+          {user ? (
+            <>
+              {links.map((link) => (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  className={`flex flex-col items-center gap-1 px-3 py-2 transition-colors duration-150 ${
+                    isActive(link.to)
+                      ? 'text-primary-400'
+                      : 'text-warm-400'
+                  }`}
+                >
+                  <span className="text-xl">{link.icon}</span>
+                  <span className="text-xs font-medium">{link.label}</span>
+                </Link>
+              ))}
+            </>
+          ) : (
             <Link
-              key={link.to}
-              to={link.to}
-              className={`flex flex-col items-center gap-1 px-3 py-2 transition-colors duration-150 ${
-                isActive(link.to)
-                  ? 'text-primary-400'
-                  : 'text-warm-400'
-              }`}
+              to="/login"
+              className="flex flex-col items-center gap-1 px-3 py-2 text-warm-400"
             >
-              <span className="text-xl">{link.icon}</span>
-              <span className="text-xs font-medium">{link.label}</span>
+              <span className="text-xl">🔑</span>
+              <span className="text-xs font-medium">Log In</span>
             </Link>
-          ))}
+          )}
         </div>
       </nav>
 
-      {/* Spacer for mobile bottom bar */}
-      <div className="h-16 md:hidden"></div>
+      {/* Spacer for mobile bottom bar and header */}
+      <div className="h-32 md:hidden"></div>
     </>
   )
 }

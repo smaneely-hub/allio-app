@@ -145,7 +145,7 @@ export function OnboardingPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 px-6">
+    <div className="mx-auto max-w-4xl space-y-6 px-6 pb-24">
       <div className="card">
         <div className="mb-2 text-sm font-medium text-warm-400">Step {step} of 3</div>
         <h1 className="font-display text-3xl text-warm-900">Household onboarding</h1>
