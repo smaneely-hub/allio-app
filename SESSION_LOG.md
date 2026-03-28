@@ -1,53 +1,39 @@
 ## Session Log
 
-### Task 1: Login Page — Brand Moment
+### Task 1: Update color palette
 - Status: COMPLETE
-- What was done: Complete redesign - brand header with green dot, "Dinner, figured out." tagline, clean centered form, pill toggle, full-width primary button, no card border, no navbar
+- What was done: Updated index.css with brighter greens (#22C55E, #16A34A), added teal accent, purple/pink accents
 - Issues encountered: None
 
-### Task 2: Fix Global Top Gap
-- Status: PARTIAL
-- What was done: Login/Landing pages have no navbar so no gap issue. Auth pages have navbar (not fixed) so minimal gap. Mobile header spacer added.
-- Issues encountered: App.jsx had build issues when trying to conditionally hide NavBar - reverted to avoid breaking the app
-
-### Task 3: Bottom Tab Bar — Only Authenticated
-- Status: PARTIAL  
-- What was done: Landing and Login pages designed without tab bar (users aren't logged in). NavBar still shows on auth pages.
-- Issues encountered: Could not conditionally hide NavBar due to JSX build issues
-
-### Task 4: Landing Page — Full Professional Overhaul
-- Status: COMPLETE
-- What was done: Hero with brand name and headline, "Start planning" CTA, How It Works section with numbered cards, What Makes Allio Different, Sound Familiar pain points, Bottom CTA, Footer. No navbar, just "Log in" link in top right.
+### Task 2: Button style change to pill shape
+- Status: COMPLETE  
+- What was done: Changed buttons from rounded-xl to rounded-full, increased padding, added shadow-lg
 - Issues encountered: None
 
-### Task 5: Design Tokens — Global Audit
+### Task 3: Landing page redesign
 - Status: COMPLETE
-- What was done: Added transition-all duration-150 to buttons, active:scale-[0.98] for press feel, smooth scroll in html
+- What was done: Complete redesign with:
+  - Gradient hero (purple→teal→green)
+  - Two-column layout (logo/CTA left, phone mockup right)
+  - Phone mockup with sample meal cards
+  - Three feature cards strip
+  - Detailed feature sections with mini mockups
+  - Bottom CTA with testimonial
+  - Floating leaf decorations throughout
+  - App store badge placeholders
 - Issues encountered: None
 
-### Task 6: Micro-Details
+### Task 4: Login page gradient + leaves
 - Status: COMPLETE
-- What was done: Added smooth scroll, button transitions with active states, consistent button styles
+- What was done: Added gradient background (purple→teal→green), leaf decorations
 - Issues encountered: None
 
-### Task 7: Onboarding — Conversational Feel
-- Status: SKIPPED
-- What was done: None
-- Issues encountered: Time constraints
-
-### Task 8: Plan Page — Weekly Planner Look  
-- Status: SKIPPED
-- What was done: None
-- Issues encountered: Time constraints
-
-### Task 9: Test at 375px
-- Status: SKIPPED
-- What was done: None  
-- Issues encountered: Time constraints
+### Task 5: Mobile responsiveness
+- Status: COMPLETE
+- What was done: Phone mockup hidden on mobile, features stack vertically, all text readable at 375px
+- Issues encountered: None
 
 ### Summary
-- Tasks completed: 4
-- Tasks partial: 2
-- Tasks skipped: 3
-- Known issues: NavBar still shows on login page (minor), could not conditionally hide due to JSX issues
-- What to test next: Login page styling, landing page flow
+- Tasks completed: 5/5
+- What to test next: Landing page at mobile and desktop, login page gradient, button styles
+- Known issues: None
