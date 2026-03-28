@@ -17,6 +17,7 @@ export function OnboardingPage() {
     budget_sensitivity: 'moderate',
     diet_focus: 'balanced',
     custom_diet_focus: '',
+    cooking_comfort: 'simple meals',
     low_prep_nights_needed: '1',
     repeat_meal_tolerance: 'moderate',
     leftovers_for_lunch: 'sometimes',
@@ -36,6 +37,7 @@ export function OnboardingPage() {
       meal_sharing: household.meal_sharing || cur.meal_sharing,
       budget_sensitivity: household.budget_sensitivity || cur.budget_sensitivity,
       diet_focus: household.diet_focus || cur.diet_focus,
+      cooking_comfort: household.cooking_comfort || cur.cooking_comfort,
       low_prep_nights_needed: household.low_prep_nights_needed?.toString?.() || cur.low_prep_nights_needed,
       repeat_meal_tolerance: household.repeat_meal_tolerance || cur.repeat_meal_tolerance,
       leftovers_for_lunch: household.leftovers_for_lunch || cur.leftovers_for_lunch,
@@ -60,6 +62,9 @@ export function OnboardingPage() {
         gender: m.gender || '',
         restrictions: m.restrictions || '',
         preferences: m.preferences || '',
+        dietary_restrictions: m.dietary_restrictions || [],
+        food_preferences: m.food_preferences || [],
+        health_considerations: m.health_considerations || [],
       }
     })
     setMembers(list)
@@ -78,6 +83,18 @@ export function OnboardingPage() {
   const updateForm = (k, v) => setForm((cur) => ({ ...cur, [k]: v }))
   const updateMember = (idx, k, v) => {
     setMembers((cur) => cur.map((mm, i) => i === idx ? { ...mm, [k]: v } : mm))
+  }
+  
+  // Toggle array item for member chip selectors
+  const toggleMemberChip = (idx, field, value) => {
+    setMembers((cur) => cur.map((mm, i) => {
+      if (i !== idx) return mm
+      const arr = mm[field] || []
+      const newArr = arr.includes(value) 
+        ? arr.filter((v) => v !== value)
+        : [...arr, value]
+      return { ...mm, [field]: newArr }
+    }))
   }
 
   const togglePriority = (p) => {
@@ -199,6 +216,14 @@ export function OnboardingPage() {
                   ))}
                 </select>
               </div>
+              <div>
+                <div className="text-sm font-medium text-warm-700 mb-2">Typical weeknight dinner</div>
+                <select value={form.cooking_comfort} onChange={(e) => updateForm('cooking_comfort', e.target.value)} className="input">
+                  {['takeout or frozen','simple meals','cook from scratch','love cooking'].map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
         )}
@@ -220,6 +245,37 @@ export function OnboardingPage() {
                     <div className="text-sm font-medium text-warm-700 mb-1">Age</div>
                     <input className="input" value={m.age} onChange={(e) => updateMember(idx, 'age', e.target.value)} />
                   </div>
+                </div>
+                
+                {/* Dietary restrictions */}
+                <div className="mt-4">
+                  <div className="text-xs font-medium text-warm-600 mb-2">Dietary restrictions (optional)</div>
+                  <div className="flex flex-wrap gap-2">
+                    {['vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'nut allergy', 'shellfish allergy', 'egg allergy', 'soy allergy', 'kosher', 'halal'].map((opt) => (
+                      <button key={opt} type="button" onClick={() => toggleMemberChip(idx, 'dietary_restrictions', opt)} className={`rounded-full border px-3 py-1 text-xs ${(m.dietary_restrictions || []).includes(opt) ? 'bg-primary-50 border-primary-400 text-primary-700' : 'border-warm-200 text-warm-700'}`}>{opt}</button>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Food preferences */}
+                <div className="mt-3">
+                  <div className="text-xs font-medium text-warm-600 mb-2">Food preferences (optional)</div>
+                  <div className="flex flex-wrap gap-2">
+                    {['loves spicy', 'prefers mild', 'picky eater', 'adventurous', 'comfort food lover'].map((opt) => (
+                      <button key={opt} type="button" onClick={() => toggleMemberChip(idx, 'food_preferences', opt)} className={`rounded-full border px-3 py-1 text-xs ${(m.food_preferences || []).includes(opt) ? 'bg-primary-50 border-primary-400 text-primary-700' : 'border-warm-200 text-warm-700'}`}>{opt}</button>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Health considerations */}
+                <div className="mt-3">
+                  <div className="text-xs font-medium text-warm-600 mb-2">Health considerations (optional)</div>
+                  <div className="flex flex-wrap gap-2">
+                    {['low sodium', 'low sugar', 'heart-healthy', 'high protein', 'low carb', 'anti-inflammatory', 'pregnancy-safe'].map((opt) => (
+                      <button key={opt} type="button" onClick={() => toggleMemberChip(idx, 'health_considerations', opt)} className={`rounded-full border px-3 py-1 text-xs ${(m.health_considerations || []).includes(opt) ? 'bg-primary-50 border-primary-400 text-primary-700' : 'border-warm-200 text-warm-700'}`}>{opt}</button>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-warm-400">Health info is optional and helps us suggest better meals. Not medical advice.</p>
                 </div>
               </div>
             ))}

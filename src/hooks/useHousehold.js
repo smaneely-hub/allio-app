@@ -98,6 +98,7 @@ export function useHousehold() {
           adventurousness: data.adventurousness,
           staples_on_hand: data.staples_on_hand,
           planning_priorities: data.planning_priorities,
+          cooking_comfort: data.cooking_comfort,
         }
 
         console.log('[useHousehold] saveHousehold payload:', payload)
@@ -207,6 +208,9 @@ export function useHousehold() {
           gender: member.gender || '',
           restrictions: member.restrictions || '',
           preferences: member.preferences || '',
+          dietary_restrictions: member.dietary_restrictions || [],
+          food_preferences: member.food_preferences || [],
+          health_considerations: member.health_considerations || [],
         }))
 
         console.log('[useHousehold.saveMembers] FINAL payload', preparedMembers)
