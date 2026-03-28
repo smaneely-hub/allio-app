@@ -53,11 +53,17 @@ Example of GOOD instructions for Baked Salmon with Asparagus:
 
 3. PREP TIME & COOK TIME: Realistic times that match the recipe complexity
 4. DIFFICULTY: Easy, Medium, or Hard based on complexity
+5. NOTES: One sentence explaining why this meal fits this slot. Examples: "Quick and mild — smaller household tonight", "Uses leftover chicken", "Full family dinner"
+
+IMPORTANT RESTRICTIONS:
+- Do NOT include basic staples in the ingredients: salt, pepper, olive oil, garlic powder, cooking spray. Assume the household has these.
+- Ingredient quantities must be specific: "1 lb chicken thighs" not just "chicken"
+- Minimum 4 instruction steps, maximum 8
 
 Return JSON with this structure:
 {
   "meal_plan": {
-    "Monday": {"dinner": {"name": "Grilled Salmon", "ingredients": [{"item": "salmon", "quantity": 2, "unit": "fillets", "category": "seafood"}], "instructions": ["step 1", "step 2", ...], "prep_time_minutes": 15, "cook_time_minutes": 20, "difficulty": "Easy"}}
+    "Monday": {"dinner": {"name": "Grilled Salmon", "ingredients": [{"item": "salmon", "quantity": 2, "unit": "fillets", "category": "seafood"}], "instructions": ["step 1", "step 2", ...], "prep_time_minutes": 15, "cook_time_minutes": 20, "difficulty": "Easy", "notes": "Quick weeknight dinner"}}
   }
 }
 
