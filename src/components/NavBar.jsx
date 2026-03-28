@@ -81,7 +81,8 @@ export function NavBar() {
         </div>
       </header>
 
-      {/* Mobile header with user status */}
+      {/* Mobile header - only show if user is logged in */}
+      {user && (
       <header className="md:hidden border-b border-warm-200 bg-white px-4 py-3">
         <div className="flex items-center justify-between">
           <Link to="/" className="font-display text-xl text-warm-900">
@@ -98,8 +99,10 @@ export function NavBar() {
           )}
         </div>
       </header>
+      )}
 
-      {/* Mobile bottom tab bar */}
+      {/* Mobile bottom tab bar - only show if user is logged in */}
+      {user && (
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-warm-200 bg-white md:hidden">
         <div className="flex items-center justify-around py-2">
           {user ? (
@@ -130,6 +133,7 @@ export function NavBar() {
           )}
         </div>
       </nav>
+      )}
 
       {/* Spacer for mobile bottom bar and header */}
       <div className="h-32 md:hidden"></div>
