@@ -18,6 +18,7 @@ export function SchedulePage() {
   const [slotState, setSlotState] = useState({})
   const [saving, setSaving] = useState(false)
   const [repairing, setRepairing] = useState(false)
+  const [expandedDays, setExpandedDays] = useState({})
 
   // Check if we have a recovery situation: household exists but no members
   const needsMemberRepair = household && members.length === 0
@@ -232,10 +233,21 @@ export function SchedulePage() {
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-7">
-          {days.map((day) => (
+          {days.map((day) => {
+            const isExpanded = expandedDays[day] !== false
+            const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+            return (
             <div key={day} className="card p-4">
-              <div className="mb-4 text-sm font-semibold text-slate-900">{day}</div>
-              <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setExpandedDays(prev => ({ ...prev, [day]: !prev[day] }))}
+                onMouseEnter={() => !isMobile && setExpandedDays(prev => ({ ...prev, [day]: true }))}
+                className="mb-4 flex w-full items-center justify-between text-left text-sm font-semibold text-slate-900 md:cursor-default"
+              >
+                {day}
+                <span className="md:hidden text-warm-400 text-xs">{isExpanded ? '▼' : '▶'}</span>
+              </button>
+              <div className={`space-y-3 ${!isExpanded && 'hidden md:block'}`}>
                 {mealTypes.map((mealType) => {
                   const key = `${day}-${mealType}`
                   const slot = slotState[key]
@@ -261,7 +273,7 @@ export function SchedulePage() {
                 })}
               </div>
             </div>
-          ))}
+          )})}
         </div>
       )}
 

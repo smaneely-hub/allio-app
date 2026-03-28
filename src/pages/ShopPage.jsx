@@ -104,7 +104,7 @@ export function ShopPage() {
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-4 px-3 md:px-6">
+    <div className="mx-auto max-w-xl space-y-4 px-3 md:px-6 pb-28 md:pb-6">
       <div className="card">
         <div className="flex items-center justify-between">
           <div>
