@@ -1,9 +1,19 @@
 import { useState } from 'react'
 
+const mealTypeStyles = {
+  breakfast: { emoji: '🌅', gradient: 'from-yellow-50 to-orange-100' },
+  lunch: { emoji: '☀️', gradient: 'from-green-50 to-emerald-100' },
+  dinner: { emoji: '🍽️', gradient: 'from-primary-50 to-primary-100' },
+  snack: { emoji: '🍎', gradient: 'from-rose-50 to-orange-100' },
+}
+
 export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
   const [expanded, setExpanded] = useState(false)
   const [note, setNote] = useState(meal.user_note || '')
   const [savingNote, setSavingNote] = useState(false)
+
+  const mealType = (meal.meal || '').toLowerCase()
+  const style = mealTypeStyles[mealType] || mealTypeStyles.dinner
 
   const handleSaveNote = async () => {
     setSavingNote(true)
@@ -14,15 +24,28 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
     }
   }
 
+  // Extract dietary tags from meal metadata
+  const dietaryTags = []
+  if (meal.vegetarian) dietaryTags.push({ label: 'Vegetarian', color: 'bg-green-100 text-green-700' })
+  if (meal.gluten_free) dietaryTags.push({ label: 'GF', color: 'bg-amber-100 text-amber-700' })
+  if (meal.dairy_free) dietaryTags.push({ label: 'DF', color: 'bg-blue-100 text-blue-700' })
+
   return (
     <div className={`rounded-2xl border p-4 shadow-sm transition-all duration-200 hover:shadow-md ${meal.locked ? 'border-primary-300 bg-primary-50' : meal.is_leftover ? 'border-dashed border-warm-200 bg-warm-50' : 'border-warm-200 bg-white'}`}>
-      <div className="h-36 -mx-4 -mt-4 mb-4 flex items-center justify-center rounded-t-2xl bg-gradient-to-br from-primary-50 to-primary-100">
-        <span className="text-5xl">🍽️</span>
+      <div className={`h-36 -mx-4 -mt-4 mb-4 flex items-center justify-center rounded-t-2xl bg-gradient-to-br ${style.gradient}`}>
+        <span className="text-5xl">{style.emoji}</span>
       </div>
         <button type="button" onClick={() => setExpanded(!expanded)} className="w-full text-left">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="font-display text-lg text-warm-900">{meal.name}</div>
+            {dietaryTags.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {dietaryTags.map((tag, i) => (
+                  <span key={i} className={`rounded-full px-2 py-0.5 text-xs font-medium ${tag.color}`}>{tag.label}</span>
+                ))}
+              </div>
+            )}
             <div className="mt-1 text-sm text-warm-400">{meal.servings} servings · prep {meal.prep_time_minutes} min</div>
           </div>
           <div className="text-xs font-medium text-warm-400">{expanded ? 'Collapse' : 'Expand'}</div>
@@ -41,51 +64,16 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
         </button>
       </div>
 
-      <div className="mt-4 space-y-2">
-        <label className="text-xs font-medium uppercase tracking-wide text-warm-400">Meal note</label>
-        <div className="flex gap-2">
-          <input
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            placeholder="Add a note for this meal"
-            className="input text-sm"
-          />
-          <button type="button" onClick={handleSaveNote} disabled={savingNote} className="btn-primary text-sm px-3">
-            {savingNote ? '...' : 'Save'}
-          </button>
-        </div>
-      </div>
-
-      {expanded ? (
-        <div className="mt-4 space-y-4 border-t border-warm-200 pt-4 text-sm text-warm-700">
-          {/* Recipe Details */}
-          <div className="flex gap-4 text-sm">
-            <div className="flex-1 rounded-lg bg-warm-50 p-3 text-center">
-              <div className="text-xs uppercase tracking-wide text-warm-500">Difficulty</div>
-              <div className="font-medium text-warm-900">{meal.difficulty || 'Easy'}</div>
-            </div>
-            <div className="flex-1 rounded-lg bg-warm-50 p-3 text-center">
-              <div className="text-xs uppercase tracking-wide text-warm-500">Prep</div>
-              <div className="font-medium text-warm-900">{meal.prep_time_minutes || 20} min</div>
-            </div>
-            <div className="flex-1 rounded-lg bg-warm-50 p-3 text-center">
-              <div className="text-xs uppercase tracking-wide text-warm-500">Cook</div>
-              <div className="font-medium text-warm-900">{meal.cook_time_minutes || 15} min</div>
-            </div>
-          </div>
-
-          {/* Servings */}
-          <div>
-            <div className="mb-2 font-medium text-warm-900">Serves {meal.servings || 2} people</div>
-          </div>
-
+      {expanded && (
+        <div className="mt-4 space-y-4 border-t border-warm-100 pt-4">
           {/* Ingredients */}
           <div>
-            <div className="mb-2 font-medium text-warm-900">Ingredients</div>
-            <ul className="list-disc space-y-1 pl-5">
-              {(meal.ingredients || []).map((ingredient, index) => (
-                <li key={`${meal.id}-ingredient-${index}`}>
-                  {ingredient.quantity} {ingredient.unit} {ingredient.item}
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-warm-500">Ingredients</div>
+            <ul className="space-y-1 text-sm text-warm-700">
+              {(meal.ingredients || []).map((ing, i) => (
+                <li key={i} className="flex justify-between">
+                  <span>{ing.item}</span>
+                  <span className="text-warm-400">{ing.quantity} {ing.unit}</span>
                 </li>
               ))}
             </ul>
@@ -93,24 +81,40 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
 
           {/* Instructions */}
           <div>
-            <div className="mb-2 font-medium text-warm-900">Instructions</div>
-            <ol className="list-decimal space-y-1 pl-5">
-              {(meal.instructions || []).map((step, index) => (
-                <li key={`${meal.id}-step-${index}`}>{step}</li>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-warm-500">Instructions</div>
+            <ol className="space-y-2 text-sm text-warm-700">
+              {(meal.instructions || []).map((step, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="text-primary-400 font-medium">{i + 1}.</span>
+                  <span>{step}</span>
+                </li>
               ))}
             </ol>
           </div>
-          <div>
-            <div className="font-medium text-warm-900">AI notes</div>
-            <div>{meal.notes || 'No notes.'}</div>
-          </div>
-          {meal.swapped ? (
-            <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-700">
-              Swapped from: {meal.original_name}
+
+          {/* Why this meal - styled as pull quote */}
+          {meal.notes && (
+            <div className="border-l-2 border-primary-300 pl-3 italic text-warm-600 text-sm">
+              <span className="font-medium not-italic text-warm-700">Why this meal:</span> {meal.notes}
             </div>
-          ) : null}
+          )}
+
+          {/* User note */}
+          <div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-warm-500">Your note</div>
+            <textarea
+              className="input w-full text-sm"
+              rows={2}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Add a personal note..."
+            />
+            <button type="button" onClick={handleSaveNote} disabled={savingNote} className="btn-secondary mt-2 text-xs">
+              {savingNote ? 'Saving...' : 'Save note'}
+            </button>
+          </div>
         </div>
-      ) : null}
+      )}
     </div>
   )
 }

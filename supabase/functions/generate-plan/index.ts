@@ -14,7 +14,18 @@ const corsHeaders = {
 }
 
 // Build dynamic system prompt based on scheduled slots
-function buildSystemPrompt(slots: Array<{ day: string; meal: string; is_leftover?: boolean }>, members: Array<{ restrictions?: string; preferences?: string }>, suggestion?: string) {
+function buildSystemPrompt(
+  slots: Array<{ day: string; meal: string; is_leftover?: boolean }>, 
+  members: Array<{ 
+    restrictions?: string; 
+    preferences?: string;
+    dietary_restrictions?: string[];
+    food_preferences?: string[];
+    health_considerations?: string[];
+  }>, 
+  household: { cooking_comfort?: string },
+  suggestion?: string
+) {
   const slotDescriptions = slots
     .filter((s) => s.meal !== 'prep_block' && s.meal !== 'prep')
     .map((s) => {
@@ -29,10 +40,20 @@ function buildSystemPrompt(slots: Array<{ day: string; meal: string; is_leftover
     })
     .join(', ')
   
-  const restrictions = members
-    .map((m) => m.restrictions || m.preferences || '')
-    .filter(Boolean)
-    .join(', ')
+  // Extract dietary restrictions from members
+  const allDietary = members.flatMap(m => m.dietary_restrictions || []).filter(Boolean)
+  const allFoodPrefs = members.flatMap(m => m.food_preferences || []).filter(Boolean)
+  const allHealth = members.flatMap(m => m.health_considerations || []).filter(Boolean)
+  const restrictions = members.map((m) => m.restrictions || m.preferences || '').filter(Boolean).join(', ')
+  
+  // Determine cooking complexity from comfort level
+  const cookingComplexity: Record<string, string> = {
+    'takeout or frozen': 'MAXIMUM 3 ingredients, 15 minutes or less, very simple',
+    'simple meals': 'Straightforward recipes under 30 minutes, basic techniques',
+    'cook from scratch': 'Standard home cooking, moderate prep and cook times',
+    'love cooking': 'Complex techniques, longer prep, impressive meals OK',
+  }
+  const complexity = household?.cooking_comfort ? cookingComplexity[household.cooking_comfort] || '' : ''
   
   let userWants = ''
   if (suggestion) {
@@ -44,21 +65,24 @@ function buildSystemPrompt(slots: Array<{ day: string; meal: string; is_leftover
 ${userWants}
 IMPORTANT: Only generate meals for these SPECIFIC slots: ${slotDescriptions || 'none'}
 
+CRITICAL RULES FOR DIETARY RESTRICTIONS AND HEALTH:
+${allDietary.length > 0 ? `- Allergies and strict restrictions: ${[...new Set(allDietary)].join(', ')}. These MUST be completely avoided in ALL meals.` : '- No allergies or strict restrictions detected.'}
+${allFoodPrefs.length > 0 ? `- Food preferences: ${[...new Set(allFoodPrefs)].join(', ')}. Adjust meal selection accordingly.` : ''}
+${allHealth.length > 0 ? `- Health considerations: ${[...new Set(allHealth)].join(', ')}. Prefer healthier options when possible.` : ''}
+
+COOKING COMPLEXITY: ${complexity || 'Standard home cooking'}
+
 For each meal, you MUST provide:
 1. INGREDIENTS: Specific quantities (e.g., "1 tbsp olive oil", "2 salmon fillets", "1/2 tsp salt")
-2. INSTRUCTIONS: 4-8 detailed steps with temperatures, times, and techniques. NEVER use generic placeholders like "Cook according to recipe" or "Prepare ingredients". 
+2. INGREDIENTS: Do NOT include basic staples: salt, pepper, olive oil, garlic powder, cooking spray. Assume the household has these.
+3. INSTRUCTIONS: 4-8 detailed steps with temperatures, times, and techniques. NEVER use generic placeholders like "Cook according to recipe" or "Prepare ingredients". 
 
 Example of GOOD instructions for Baked Salmon with Asparagus:
 ["Preheat oven to 425°F.", "Cut salmon into 4 portions, pat dry with paper towels.", "Toss asparagus and Brussels sprouts with 1 tbsp olive oil, 1/2 tsp salt, and pepper on a sheet pan.", "Place salmon on same pan, drizzle with remaining olive oil.", "Roast for 18-22 minutes until salmon flakes easily.", "Let rest 2 minutes before serving."]
 
-3. PREP TIME & COOK TIME: Realistic times that match the recipe complexity
-4. DIFFICULTY: Easy, Medium, or Hard based on complexity
-5. NOTES: One sentence explaining why this meal fits this slot. Examples: "Quick and mild — smaller household tonight", "Uses leftover chicken", "Full family dinner"
-
-IMPORTANT RESTRICTIONS:
-- Do NOT include basic staples in the ingredients: salt, pepper, olive oil, garlic powder, cooking spray. Assume the household has these.
-- Ingredient quantities must be specific: "1 lb chicken thighs" not just "chicken"
-- Minimum 4 instruction steps, maximum 8
+4. PREP TIME & COOK TIME: Realistic times that match the recipe complexity
+5. DIFFICULTY: Easy, Medium, or Hard based on complexity
+6. NOTES: One sentence explaining why this meal fits this slot. Examples: "Quick and mild — smaller household tonight", "Uses leftover chicken", "Full family dinner"
 
 Return JSON with this structure:
 {
@@ -211,7 +235,7 @@ serve(async (req) => {
     }
 
     const messages = [
-      { role: 'system', content: buildSystemPrompt(payload.slots, payload.members, payload.replace_slot?.suggestion) },
+      { role: 'system', content: buildSystemPrompt(payload.slots, payload.members, payload.household, payload.replace_slot?.suggestion) },
       { role: 'user', content: JSON.stringify(payload) },
     ]
 

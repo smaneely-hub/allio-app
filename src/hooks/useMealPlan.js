@@ -162,6 +162,7 @@ export function useMealPlan(scheduleId) {
           adventurousness: household.adventurousness,
           staples_on_hand: household.staples_on_hand,
           planning_priorities: household.planning_priorities,
+          cooking_comfort: household.cooking_comfort,
         },
         members: members.map((member) => ({
           label: member.name || member.label,
@@ -169,6 +170,9 @@ export function useMealPlan(scheduleId) {
           age: member.age,
           restrictions: member.restrictions,
           preferences: member.preferences,
+          dietary_restrictions: member.dietary_restrictions || [],
+          food_preferences: member.food_preferences || [],
+          health_considerations: member.health_considerations || [],
         })),
         slots: slots.map((slot) => ({
           day: String(slot.day_of_week || slot.day || '').slice(0, 3).toLowerCase(),

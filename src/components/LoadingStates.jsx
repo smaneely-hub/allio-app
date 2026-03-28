@@ -120,12 +120,48 @@ export function ShopSkeleton() {
 }
 
 // Plan generation loading state - different from skeleton
+import { useState, useEffect } from 'react'
+
+const loadingMessages = [
+  "Planning your week...",
+  "Finding meals your family will love...",
+  "Matching recipes to your schedule...",
+  "Almost there...",
+]
+
 export function PlanGenerationLoading() {
+  const [messageIndex, setMessageIndex] = useState(0)
+  const [showLongWait, setShowLongWait] = useState(false)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMessageIndex((i) => (i + 1) % loadingMessages.length)
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowLongWait(true), 30000)
+    return () => clearTimeout(timer)
+  }, [])
+
   return (
-    <div className="card text-center py-16">
-      <div className="text-6xl mb-6 animate-pulse">🧑‍🍳</div>
-      <h2 className="font-display text-2xl text-warm-900 mb-3">Planning your week...</h2>
-      <p className="text-warm-700 mb-6">This usually takes 5-15 seconds</p>
+    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+      <div className="relative mb-8">
+        <span className="text-7xl animate-pulse">🧑‍🍳</span>
+        <div className="absolute -bottom-2 -right-2 w-6 h-6 bg-primary-400 rounded-full flex items-center justify-center">
+          <span className="text-xl">✨</span>
+        </div>
+      </div>
+      
+      <h2 className="font-display text-2xl md:text-3xl text-warm-900 mb-2">
+        {loadingMessages[messageIndex]}
+      </h2>
+      
+      {showLongWait && (
+        <p className="text-amber-600 text-sm mb-4">This is taking longer than usual. Hang tight...</p>
+      )}
+      
       <div className="flex justify-center gap-2">
         <span className="w-3 h-3 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
         <span className="w-3 h-3 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
