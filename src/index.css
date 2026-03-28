@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+html {
+  scroll-behavior: smooth;
+}
+
 @theme {
   /* Fonts */
   --font-display: 'DM Serif Display', Georgia, serif;
@@ -51,20 +55,20 @@ h1, h2, h3, h4 {
 
 /* Button styles */
 .btn-primary {
-  @apply bg-primary-400 hover:bg-primary-600 text-white font-body font-semibold px-6 py-3 rounded-xl transition-colors shadow-sm;
+  @apply bg-primary-400 hover:bg-primary-600 text-white font-body font-semibold px-6 py-3 rounded-xl transition-all duration-150 shadow-sm active:scale-[0.98];
 }
 
 .btn-secondary {
-  @apply border-2 border-primary-400 text-primary-400 hover:bg-primary-50 font-semibold px-6 py-3 rounded-xl transition-colors;
+  @apply border-2 border-primary-400 text-primary-400 hover:bg-primary-50 font-semibold px-6 py-3 rounded-xl transition-all duration-150 active:scale-[0.98];
 }
 
 .btn-ghost {
-  @apply text-warm-400 hover:text-warm-700 hover:bg-warm-100 px-4 py-2 rounded-lg transition-colors;
+  @apply text-warm-400 hover:text-warm-700 hover:bg-warm-100 px-4 py-2 rounded-lg transition-all duration-150 active:scale-[0.98];
 }
 
 /* Input styles */
 .input {
-  @apply w-full px-4 py-3 rounded-xl bg-warm-50 border border-warm-200 focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 outline-none transition-colors;
+  @apply w-full px-4 py-3 rounded-xl bg-warm-50 border border-warm-200 focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 outline-none transition-all duration-150;
 }
 /* Dark Mode */
 .dark {
