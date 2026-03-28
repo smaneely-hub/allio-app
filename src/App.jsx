@@ -13,6 +13,38 @@ import { SchedulePage } from './pages/SchedulePage'
 import { PlanPage } from './pages/PlanPage'
 import { ShopPage } from './pages/ShopPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { NotFoundPage } from './pages/NotFoundPage'
+
+// Connection check component
+function ConnectionCheck({ children }) {
+  const [error, setError] = useState(null)
+  
+  useEffect(() => {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+    
+    if (!supabaseUrl || !supabaseKey || !supabaseUrl.includes('supabase.co')) {
+      setError('Allio can\'t connect right now. Please try again in a moment.')
+    }
+  }, [])
+  
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 bg-warm-50">
+        <div className="text-center">
+          <div className="text-5xl mb-4">🔌</div>
+          <h1 className="font-display text-xl text-warm-900 mb-2">Connection Issue</h1>
+          <p className="text-warm-600">{error}</p>
+          <button onClick={() => window.location.reload()} className="btn-primary mt-4">
+            Try again
+          </button>
+        </div>
+      </div>
+    )
+  }
+  
+  return children
+}
 
 // Redirect logged-in users from home to schedule
 function HomePage() {
@@ -43,8 +75,9 @@ function HomePage() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <ErrorBoundary>
+      <ConnectionCheck>
+        <AuthProvider>
+          <ErrorBoundary>
           <div className="min-h-screen bg-warm-50">
             <div className="mx-auto flex max-w-6xl flex-col">
             <NavBar />
@@ -96,7 +129,8 @@ export default function App() {
         </div>
         <Toaster position="top-right" />
         </ErrorBoundary>
-      </AuthProvider>
+        </AuthProvider>
+      </ConnectionCheck>
     </BrowserRouter>
   )
 }

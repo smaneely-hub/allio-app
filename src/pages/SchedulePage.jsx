@@ -128,7 +128,9 @@ export function SchedulePage() {
     }
 
     const activeSlots = Object.values(slotState).filter((slot) => slot.active && slot.attendees?.length > 0)
-    console.log('[SchedulePage] Active slots:', activeSlots.length)
+    const activeSlotCount = activeSlots.length
+
+    console.log('[SchedulePage] Active slots:', activeSlotCount)
     
     if (activeSlots.length === 0) {
       toast.error('Please select at least one person for a meal slot.')
@@ -260,10 +262,15 @@ export function SchedulePage() {
                     >
                       <div className="text-sm font-medium text-slate-800">{mealType}</div>
                       {slot?.active ? (
-                        <div className="mt-2 space-y-1 text-xs text-slate-500">
-                          <div>{slot.attendees.length} attendee(s)</div>
-                          <div>{slot.effort_level} effort</div>
-                          {slot.planning_notes ? <div>{slot.planning_notes}</div> : null}
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                          <span>{slot.attendees.length} attendee{slot.attendees.length !== 1 ? 's' : ''}</span>
+                          <span className={`px-2 py-0.5 rounded-full ${
+                            slot.effort_level === 'low' ? 'bg-green-100 text-green-700' :
+                            slot.effort_level === 'medium' ? 'bg-amber-100 text-amber-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {slot.effort_level === 'low' ? 'Quick' : slot.effort_level === 'medium' ? 'Standard' : 'Full'}
+                          </span>
                         </div>
                       ) : (
                         <div className="mt-2 text-xs text-slate-400">Empty slot</div>
@@ -351,10 +358,10 @@ export function SchedulePage() {
         <button
           type="button"
           onClick={handleSaveSchedule}
-          disabled={saving || members.length === 0}
+          disabled={saving || members.length === 0 || activeSlotCount === 0}
           className="btn-primary"
         >
-          {saving ? 'Saving…' : 'Generate Meal Plan'}
+          {saving ? 'Saving…' : `Generate plan (${activeSlotCount} meal${activeSlotCount !== 1 ? 's' : ''})`}
         </button>
       </div>
     </div>
