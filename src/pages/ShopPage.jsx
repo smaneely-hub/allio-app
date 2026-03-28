@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { shareListAsText } from '../lib/aggregateShoppingList'
+import { formatShoppingListEmail } from '../lib/formatShoppingListEmail'
 import { EmptyState } from '../components/LoadingStates'
 
 const categoryColors = {
@@ -23,6 +24,7 @@ export function ShopPage() {
   const [shoppingList, setShoppingList] = useState(null)
   const [loading, setLoading] = useState(true)
   const [openCategories, setOpenCategories] = useState({})
+  const [emailing, setEmailing] = useState(false)
 
   useEffect(() => {
     async function loadShoppingList() {
@@ -109,6 +111,38 @@ export function ShopPage() {
     toast.success('Shopping list copied!')
   }
 
+  const handleEmailShop = async () => {
+    setEmailing(true)
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (!authUser?.email) {
+        toast.error('Could not find your email')
+        return
+      }
+      
+      const weekLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      const itemCount = shoppingList?.items?.length || 0
+      const html = formatShoppingListEmail(shoppingList?.items || [], weekLabel, 'My Household')
+      
+      const { error } = await supabase.functions.invoke('send-email', {
+        body: { to: authUser.email, subject: `Your Allio shopping list — ${itemCount} items`, html }
+      })
+      
+      if (error?.message?.includes('404') || error?.status === 404) {
+        toast.error('Email feature coming soon!')
+      } else if (error) {
+        throw error
+      } else {
+        toast.success(`Shopping list sent to ${authUser.email}!`)
+      }
+    } catch (err) {
+      console.error('[ShopPage] Email error:', err)
+      toast.error('Couldn\'t send email. Try again.')
+    } finally {
+      setEmailing(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="px-3 pb-24 md:px-0">
@@ -144,8 +178,15 @@ export function ShopPage() {
     <div className="px-3 pb-24 md:px-0">
       {/* Header */}
       <div className="mb-4">
-        <h1 className="font-display text-2xl md:text-3xl text-warm-900">Shopping List</h1>
-        <p className="text-sm text-warm-500">Week of {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-display text-2xl md:text-3xl text-warm-900">Shopping List</h1>
+            <p className="text-sm text-warm-500">Week of {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+          </div>
+          <button type="button" onClick={handleEmailShop} disabled={emailing} className="btn-ghost text-sm">
+            {emailing ? 'Sending...' : '📧 Email'}
+          </button>
+        </div>
       </div>
 
       {/* Progress bar */}

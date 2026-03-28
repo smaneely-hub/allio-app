@@ -7,6 +7,7 @@ import { useSchedule } from '../hooks/useSchedule'
 import { useAuth } from '../hooks/useAuth'
 import { MealCard } from '../components/plan/MealCard'
 import { aggregateShoppingList } from '../lib/aggregateShoppingList'
+import { formatMealPlanEmail } from '../lib/formatMealPlanEmail'
 import { supabase } from '../lib/supabase'
 import { PlanSkeleton, EmptyState, PlanGenerationLoading, MealCardSkeleton } from '../components/LoadingStates'
 
@@ -108,6 +109,43 @@ export function PlanPage() {
     }
   }
 
+  // Email sending
+  const [emailing, setEmailing] = useState(false)
+  
+  const handleEmailPlan = async () => {
+    setEmailing(true)
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (!authUser?.email) {
+        toast.error('Could not find your email')
+        return
+      }
+      
+      const meals = mealPlan?.draft_plan?.meals || mealPlan?.plan?.meals || []
+      const weekLabel = schedule?.week_start 
+        ? `Week of ${new Date(schedule.week_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` 
+        : 'This Week'
+      const html = formatMealPlanEmail({ meals }, household?.household_name || household?.name || 'My Household', weekLabel)
+      
+      const { error } = await supabase.functions.invoke('send-email', {
+        body: { to: authUser.email, subject: `Your Allio Meal Plan — ${weekLabel}`, html }
+      })
+      
+      if (error?.message?.includes('404') || error?.status === 404) {
+        toast.error('Email feature coming soon!')
+      } else if (error) {
+        throw error
+      } else {
+        toast.success(`Meal plan sent to ${authUser.email}!`)
+      }
+    } catch (err) {
+      console.error('[PlanPage] Email error:', err)
+      toast.error('Couldn\'t send email. Try again.')
+    } finally {
+      setEmailing(false)
+    }
+  }
+
   return (
     <div className="pb-24">
       {/* Week context header */}
@@ -197,6 +235,14 @@ export function PlanPage() {
         <div className="card mt-4">
           <button type="button" onClick={() => navigate('/schedule')} className="btn-primary w-full">
             Plan Next Week →
+          </button>
+        </div>
+      )}
+
+      {mealPlan?.status === 'active' && (
+        <div className="card mt-3">
+          <button type="button" onClick={handleEmailPlan} disabled={emailing} className="btn-ghost w-full text-sm">
+            {emailing ? 'Sending...' : '📧 Email my plan'}
           </button>
         </div>
       )}

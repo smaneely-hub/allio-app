@@ -8,8 +8,21 @@ const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [emailUnverified, setEmailUnverified] = useState(false)
   const navigate = useNavigate()
   const prevUserRef = useRef(null)
+
+  // Check if email is verified
+  const isEmailVerified = user?.email_confirmed_at != null
+
+  useEffect(() => {
+    // Show banner if user exists but email is not verified
+    if (user && !isEmailVerified) {
+      setEmailUnverified(true)
+    } else {
+      setEmailUnverified(false)
+    }
+  }, [user, isEmailVerified])
 
   useEffect(() => {
     let mounted = true
@@ -50,11 +63,22 @@ export function AuthProvider({ children }) {
     () => ({
       user,
       loading,
+      emailUnverified,
       signOut: async () => {
         await supabase.auth.signOut()
+        navigate('/login', { replace: true })
+      },
+      resendVerification: async () => {
+        if (!user?.email) return
+        const { error } = await supabase.auth.resend({
+          type: 'signup',
+          email: user.email,
+        })
+        if (error) throw error
+        toast.success('Verification email resent!')
       },
     }),
-    [user, loading],
+    [user, loading, emailUnverified, navigate],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

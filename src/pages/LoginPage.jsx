@@ -10,6 +10,8 @@ export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [confirmationSent, setConfirmationSent] = useState(false)
 
   const isSignup = mode === 'signup'
 
@@ -19,6 +21,24 @@ export function LoginPage() {
     if (password.length < 6) return 'Password must be at least 6 characters.'
     return null
   }, [email, password])
+
+  // Resend verification email
+  const handleResendVerification = async () => {
+    setResending(true)
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+      })
+      if (error) throw error
+      toast.success('Verification email resent!')
+      setConfirmationSent(true)
+    } catch (error) {
+      toast.error(error.message || 'Could not resend email')
+    } finally {
+      setResending(false)
+    }
+  }
 
   // Determine where to redirect after login based on user data
   const determineRedirect = async (userId) => {
@@ -74,9 +94,14 @@ export function LoginPage() {
         if (error) throw error
 
         const userId = data.user?.id
-        if (userId) {
+        if (userId && data.user?.email_confirmed_at) {
+          // Email already confirmed (e.g., auto-confirm is on)
           navigate('/onboarding', { replace: true })
           toast.success('Account created successfully.')
+        } else if (userId) {
+          // Show confirmation screen instead of redirecting
+          setConfirmationSent(true)
+          toast.success('Check your email to activate your account.')
         } else {
           toast.success('Account created. Check your email to confirm your account.')
         }
@@ -129,6 +154,32 @@ export function LoginPage() {
             Sign up
           </button>
         </div>
+
+        {/* Email confirmation screen */}
+        {confirmationSent && (
+          <div className="space-y-6 text-center">
+            <div className="text-5xl">📧</div>
+            <h2 className="font-display text-xl text-warm-900">Check your email!</h2>
+            <p className="text-sm text-warm-600">
+              We sent a verification link to <strong>{email}</strong>. 
+              Click it to activate your account.
+            </p>
+            <button
+              type="button"
+              onClick={handleResendVerification}
+              disabled={resending}
+              className="btn-secondary w-full"
+            >
+              {resending ? 'Sending...' : 'Resend verification email'}
+            </button>
+            <div className="text-sm text-warm-500">
+              Already verified?{' '}
+              <button type="button" onClick={() => { setConfirmationSent(false); setMode('login') }} className="text-primary-400 font-medium">
+                Log in
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Form */}
         <form className="space-y-5" onSubmit={handleSubmit}>

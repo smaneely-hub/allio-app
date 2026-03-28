@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter, Route, Routes, Navigate, useNavigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { EmailVerificationBanner } from './components/EmailVerificationBanner'
 import { AuthProvider } from './components/AuthProvider'
 import { useAuth } from './hooks/useAuth'
 import { ProtectedRoute } from './components/ProtectedRoute'
@@ -81,6 +82,7 @@ export default function App() {
           <div className="min-h-screen bg-warm-50">
             <div className="mx-auto flex max-w-6xl flex-col animate-fadeIn">
             <NavBar />
+            <EmailVerificationBanner />
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/login" element={<LoginPage />} />
