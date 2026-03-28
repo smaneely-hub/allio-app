@@ -1,15 +1,55 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { useHousehold } from '../hooks/useHousehold'
+import { supabase } from '../lib/supabase'
 
 export function SettingsPage() {
-  const { household, members, saveMembers, loading } = useHousehold()
+  const { household, members, saveMembers, saveHousehold, loading } = useHousehold()
   const [editingMembers, setEditingMembers] = useState([])
   const [saving, setSaving] = useState(false)
+  const [editingHousehold, setEditingHousehold] = useState(false)
+  const [householdForm, setHouseholdForm] = useState({
+    name: '',
+    total_people: 2,
+    diet_focus: '',
+    budget_sensitivity: '',
+  })
 
-  // Sync local state when members load
-  if (editingMembers.length === 0 && members.length > 0) {
-    setEditingMembers([...members])
+  // Sync local state when members change from useHousehold
+  useEffect(() => {
+    if (members.length > 0) {
+      setEditingMembers([...members])
+    }
+  }, [members])
+
+  // Sync household form when household loads
+  useEffect(() => {
+    if (household) {
+      setHouseholdForm({
+        name: household.name || '',
+        total_people: household.total_people || 2,
+        diet_focus: household.diet_focus || '',
+        budget_sensitivity: household.budget_sensitivity || '',
+      })
+    }
+  }, [household])
+
+  const handleSaveHousehold = async () => {
+    setSaving(true)
+    try {
+      await saveHousehold({
+        household_name: householdForm.name,
+        total_people: householdForm.total_people,
+        diet_focus: householdForm.diet_focus,
+        budget_sensitivity: householdForm.budget_sensitivity,
+      })
+      setEditingHousehold(false)
+      toast.success('Household updated!')
+    } catch (err) {
+      toast.error('Failed to update household')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleAddMember = () => {
@@ -130,25 +170,90 @@ export function SettingsPage() {
       {/* Household Info Section */}
       {household && (
         <div className="card mt-6">
-          <h2 className="text-xl font-semibold text-warm-900 mb-4">Household Details</h2>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-warm-500">Name:</span>
-              <span className="ml-2 text-warm-900">{household.name}</span>
-            </div>
-            <div>
-              <span className="text-warm-500">People:</span>
-              <span className="ml-2 text-warm-900">{household.total_people}</span>
-            </div>
-            <div>
-              <span className="text-warm-500">Diet Focus:</span>
-              <span className="ml-2 text-warm-900">{household.diet_focus}</span>
-            </div>
-            <div>
-              <span className="text-warm-500">Budget:</span>
-              <span className="ml-2 text-warm-900">{household.budget_sensitivity}</span>
-            </div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-warm-900">Household Details</h2>
+            <button 
+              onClick={() => editingHousehold ? handleSaveHousehold() : setEditingHousehold(true)}
+              disabled={saving}
+              className="btn-secondary text-sm"
+            >
+              {editingHousehold ? 'Save' : 'Edit'}
+            </button>
           </div>
+          
+          {editingHousehold ? (
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm text-warm-500">Name</label>
+                <input
+                  type="text"
+                  value={householdForm.name}
+                  onChange={(e) => setHouseholdForm({...householdForm, name: e.target.value})}
+                  className="w-full p-2 border rounded"
+                  placeholder="Household name"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-warm-500">People</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={householdForm.total_people}
+                  onChange={(e) => setHouseholdForm({...householdForm, total_people: parseInt(e.target.value) || 1})}
+                  className="w-full p-2 border rounded"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-warm-500">Diet Focus</label>
+                <select
+                  value={householdForm.diet_focus}
+                  onChange={(e) => setHouseholdForm({...householdForm, diet_focus: e.target.value})}
+                  className="w-full p-2 border rounded"
+                >
+                  <option value="">Select...</option>
+                  <option value="balanced">Balanced</option>
+                  <option value="low-carb">Low Carb</option>
+                  <option value="high-protein">High Protein</option>
+                  <option value="vegetarian">Vegetarian</option>
+                  <option value="vegan">Vegan</option>
+                  <option value="keto">Keto</option>
+                  <option value="mediterranean">Mediterranean</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm text-warm-500">Budget</label>
+                <select
+                  value={householdForm.budget_sensitivity}
+                  onChange={(e) => setHouseholdForm({...householdForm, budget_sensitivity: e.target.value})}
+                  className="w-full p-2 border rounded"
+                >
+                  <option value="">Select...</option>
+                  <option value="low">Low</option>
+                  <option value="moderate">Moderate</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-warm-500">Name:</span>
+                <span className="ml-2 text-warm-900">{household.name}</span>
+              </div>
+              <div>
+                <span className="text-warm-500">People:</span>
+                <span className="ml-2 text-warm-900">{household.total_people}</span>
+              </div>
+              <div>
+                <span className="text-warm-500">Diet Focus:</span>
+                <span className="ml-2 text-warm-900">{household.diet_focus}</span>
+              </div>
+              <div>
+                <span className="text-warm-500">Budget:</span>
+                <span className="ml-2 text-warm-900">{household.budget_sensitivity}</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

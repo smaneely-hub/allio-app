@@ -81,13 +81,24 @@ export function useSchedule() {
   }, [loadSchedule])
 
   const saveSchedule = useCallback(
-    async ({ householdId, shoppingDay, weekNotes, slots: activeSlots }) => {
+    async ({ householdId, shoppingDay, weekNotes, slots: activeSlots, validMemberIds = [] }) => {
       if (!user) throw new Error('User is required to save a schedule.')
 
       setLoading(true)
       setError(null)
 
       try {
+        // FIXED: Fetch current valid members if not provided
+        let memberIds = validMemberIds
+        if (memberIds.length === 0 && householdId) {
+          const { data: members } = await supabase
+            .from('household_members')
+            .select('id')
+            .eq('household_id', householdId)
+          memberIds = (members || []).map(m => m.id)
+          console.log('[useSchedule] Fetched valid member IDs:', memberIds)
+        }
+
         const payload = {
           user_id: user.id,
           household_id: householdId,
@@ -136,15 +147,26 @@ export function useSchedule() {
           if (!day) { console.warn('[useSchedule] Day missing, using Monday'); day = 'Monday' }
           if (!meal) { console.warn('[useSchedule] Meal missing, using Dinner'); meal = 'Dinner' }
           
+          // FIXED: Filter attendees to only include valid current member IDs
+          // Only filter if we have valid member IDs; otherwise keep existing for backward compatibility
+          let validAttendees = slot.attendees || []
+          if (validMemberIds.length > 0) {
+            validAttendees = validAttendees.filter((id) => validMemberIds.includes(id))
+            // If all were filtered out, keep at least one valid member if available
+            if (validAttendees.length === 0 && validMemberIds.length > 0) {
+              validAttendees = [validMemberIds[0]] // Default to first member
+            }
+          }
+          
           // Add validation with logging
-          console.log('[useSchedule] Slot debug:', JSON.stringify({ slot, day, meal }))
+          console.log('[useSchedule] Slot debug:', JSON.stringify({ slot, day, meal, validAttendees, validMemberIds }))
           
           const slotPayload = {
             user_id: user.id,
             schedule_id: savedSchedule.id,
             day: day,
             meal: meal,
-            attendees: slot.attendees || [],
+            attendees: validAttendees,
             is_leftover: slot.is_leftover || false,
             leftover_source: slot.leftover_source || '',
             effort_level: slot.effort_level || 'medium',

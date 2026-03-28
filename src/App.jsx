@@ -1,4 +1,5 @@
-import { BrowserRouter, Route, Routes, Navigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { BrowserRouter, Route, Routes, Navigate, useNavigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './components/AuthProvider'
 import { useAuth } from './hooks/useAuth'
@@ -15,17 +16,26 @@ import { SettingsPage } from './pages/SettingsPage'
 // Redirect logged-in users from home to schedule
 function HomePage() {
   const { user, loading } = useAuth()
+  const navigate = useNavigate()
+  
+  // Redirect when user is loaded and present
+  useEffect(() => {
+    if (user && !loading) {
+      // Check for last schedule in localStorage
+      const lastScheduleId = localStorage.getItem('last_schedule_id')
+      if (lastScheduleId) {
+        navigate(`/plan?schedule_id=${lastScheduleId}`, { replace: true })
+      } else {
+        navigate('/schedule', { replace: true })
+      }
+    }
+  }, [user, loading, navigate])
   
   if (loading) {
     return <div className="p-6 text-center">Loading...</div>
   }
   
-  // If logged in, redirect to schedule
-  if (user) {
-    return <Navigate to="/schedule" replace />
-  }
-  
-  // If not logged in, show landing page
+  // Show landing page while redirecting (or if not logged in)
   return <LandingPage />
 }
 
@@ -34,7 +44,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <div className="min-h-screen bg-warm-50">
-          <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
+          <div className="mx-auto flex max-w-6xl flex-col">
             <NavBar />
             <Routes>
               <Route path="/" element={<HomePage />} />

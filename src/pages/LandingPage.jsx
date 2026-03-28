@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 
 export function LandingPage() {
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 py-6 text-center pb-32 overflow-hidden md:pb-8 md:overflow-visible">
+    <div className="flex min-h-screen flex-col items-center justify-center px-4 py-6 text-center pb-24 overflow-hidden md:pb-8 md:overflow-visible">
       {/* Hero emoji */}
       <div className="mb-4 md:mb-6 inline-flex items-center justify-center rounded-2xl bg-primary-50 p-3 md:p-5 shadow-sm">
         <span className="text-4xl md:text-5xl">🥑</span>

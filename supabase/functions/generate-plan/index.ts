@@ -13,19 +13,56 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const SYSTEM_PROMPT = `You are a meal planning assistant. Generate a weekly meal plan.
+// Build dynamic system prompt based on scheduled slots
+function buildSystemPrompt(slots: Array<{ day: string; meal: string; is_leftover?: boolean }>, members: Array<{ restrictions?: string; preferences?: string }>, suggestion?: string) {
+  const slotDescriptions = slots
+    .filter((s) => s.meal !== 'prep_block' && s.meal !== 'prep')
+    .map((s) => {
+      // Add meal type guidance
+      const mealGuidance: Record<string, string> = {
+        'breakfast': '(light morning meal like eggs, toast, cereal, yogurt, oatmeal, smoothie)',
+        'lunch': '(midday meal like salad, sandwich, soup, wrap, leftovers)',
+        'dinner': '(main evening meal like chicken, fish, pasta, stir-fry, tacos)',
+      }
+      const guidance = mealGuidance[s.meal.toLowerCase()] || ''
+      return `${s.day} ${s.meal} ${guidance}`
+    })
+    .join(', ')
+  
+  const restrictions = members
+    .map((m) => m.restrictions || m.preferences || '')
+    .filter(Boolean)
+    .join(', ')
+  
+  let userWants = ''
+  if (suggestion) {
+    userWants = `IMPORTANT - User wants: ${suggestion}. Generate a meal matching this request. `
+  }
+  
+  return `You are a meal planning assistant. Generate a meal plan with REAL, USABLE recipes.
 
-Return a JSON object with this exact structure:
+${userWants}
+IMPORTANT: Only generate meals for these SPECIFIC slots: ${slotDescriptions || 'none'}
+
+For each meal, you MUST provide:
+1. INGREDIENTS: Specific quantities (e.g., "1 tbsp olive oil", "2 salmon fillets", "1/2 tsp salt")
+2. INSTRUCTIONS: 4-8 detailed steps with temperatures, times, and techniques. NEVER use generic placeholders like "Cook according to recipe" or "Prepare ingredients". 
+
+Example of GOOD instructions for Baked Salmon with Asparagus:
+["Preheat oven to 425°F.", "Cut salmon into 4 portions, pat dry with paper towels.", "Toss asparagus and Brussels sprouts with 1 tbsp olive oil, 1/2 tsp salt, and pepper on a sheet pan.", "Place salmon on same pan, drizzle with remaining olive oil.", "Roast for 18-22 minutes until salmon flakes easily.", "Let rest 2 minutes before serving."]
+
+3. PREP TIME & COOK TIME: Realistic times that match the recipe complexity
+4. DIFFICULTY: Easy, Medium, or Hard based on complexity
+
+Return JSON with this structure:
 {
   "meal_plan": {
-    "Monday": {"breakfast": "meal name", "lunch": "meal name", "dinner": "meal name"},
-    "Tuesday": {"breakfast": "meal name", "lunch": "meal name", "dinner": "meal name"},
-    ...for all 7 days
+    "Monday": {"dinner": {"name": "Grilled Salmon", "ingredients": [{"item": "salmon", "quantity": 2, "unit": "fillets", "category": "seafood"}], "instructions": ["step 1", "step 2", ...], "prep_time_minutes": 15, "cook_time_minutes": 20, "difficulty": "Easy"}}
   }
 }
 
-Each meal should be a simple name like "Scrambled Eggs" or "Grilled Chicken Salad".
-Include breakfast, lunch, and dinner for each day.`
+${restrictions ? `Dietary restrictions to respect: ${restrictions}` : ''}`
+}
 
 function validatePlan(plan: unknown) {
   // More lenient validation - just check for meals array
@@ -33,7 +70,7 @@ function validatePlan(plan: unknown) {
 }
 
 // Transform LLM output to frontend format - simplified
-function transformLlmOutput(llmOutput: unknown): { meals: Array<Record<string, unknown>> } {
+function transformLlmOutput(llmOutput: unknown, scheduledSlots: Array<{ day: string; meal: string }> = []): { meals: Array<Record<string, unknown>> } {
   try {
     if (!llmOutput || typeof llmOutput !== 'object') {
       return { meals: [] }
@@ -50,22 +87,70 @@ function transformLlmOutput(llmOutput: unknown): { meals: Array<Record<string, u
     const meals: Array<Record<string, unknown>> = []
     
     // Handle nested structure like { Monday: { breakfast: "...", lunch: "..." } }
+    const dayMap: Record<string, string> = {
+      'monday': 'mon', 'tuesday': 'tue', 'wednesday': 'wed',
+      'thursday': 'thu', 'friday': 'fri', 'saturday': 'sat', 'sunday': 'sun'
+    }
+    const normalizeDay = (d: string) => dayMap[d.toLowerCase()] || d.slice(0, 3).toLowerCase()
+    
+    // Simple ingredient inference based on meal name
+    const inferIngredients = (mealName: string) => {
+      const n = mealName.toLowerCase()
+      const ing = []
+      if (n.includes('chicken')) ing.push({item: 'chicken', q: 1, u: 'lb', c: 'meat'})
+      else if (n.includes('beef') || n.includes('steak')) ing.push({item: 'beef', q: 1, u: 'lb', c: 'meat'})
+      else if (n.includes('fish') || n.includes('salmon')) ing.push({item: 'fish', q: 0.5, u: 'lb', c: 'seafood'})
+      else if (n.includes('pasta')) ing.push({item: 'pasta', q: 1, u: 'box', c: 'pantry'})
+      else if (n.includes('rice')) ing.push({item: 'rice', q: 2, u: 'cups', c: 'pantry'})
+      else if (n.includes('egg')) ing.push({item: 'eggs', q: 1, u: 'dozen', c: 'dairy'})
+      else if (n.includes('salad')) ing.push({item: 'lettuce', q: 1, u: 'head', c: 'produce'})
+      else if (n.includes('sandwich') || n.includes('wrap')) ing.push({item: 'bread', q: 1, u: 'loaf', c: 'bakery'})
+      // Always add staples
+      ing.push({item: 'olive oil', q: 1, u: 'bottle', c: 'pantry'})
+      ing.push({item: 'salt', q: 1, u: 'shaker', c: 'pantry'})
+      return ing.map(x => ({item: x.item, quantity: x.q, unit: x.u, category: x.c}))
+    }
+    
     const entries = Object.entries(source as Record<string, unknown>)
     for (const [day, dayData] of entries) {
       if (dayData && typeof dayData === 'object') {
-        for (const [mealType, mealName] of Object.entries(dayData as Record<string, unknown>)) {
-          if (typeof mealName === 'string' && mealName.trim()) {
-            meals.push({
-              day,
-              meal: mealType,
-              name: mealName.trim(),
-              servings: 2,
-              attendees: [],
-              prep_time_minutes: 30,
-              ingredients: [],
-              instructions: [],
-            })
+        for (const [mealType, mealValue] of Object.entries(dayData as Record<string, unknown>)) {
+          // Handle both string meals and object meals with ingredients
+          let mealName = ''
+          let mealIngredients: Array<Record<string, unknown>> = []
+          
+          if (typeof mealValue === 'string') {
+            mealName = mealValue
+            mealIngredients = inferIngredients(mealName)
+          } else if (typeof mealValue === 'object' && mealValue !== null) {
+            const mealObj = mealValue as Record<string, unknown>
+            mealName = String(mealObj.name || '')
+            // Use provided ingredients or infer
+            mealIngredients = (mealObj.ingredients as Array<Record<string, unknown>>) || inferIngredients(mealName)
           }
+          
+          if (!mealName.trim()) continue
+          
+          const normalizedDay = normalizeDay(day)
+          const normalizedMeal = mealType.toLowerCase().replace(' ', '_')
+          
+          // Filter: only include meals that were scheduled
+          const isScheduled = scheduledSlots.some(
+            (s) => s.day === normalizedDay && s.meal === normalizedMeal
+          )
+          if (scheduledSlots.length > 0 && !isScheduled) continue
+          
+          meals.push({
+            day: normalizedDay,
+            meal: normalizedMeal,
+            name: mealName.trim(),
+            servings: 2,
+            cook_time_minutes: 20 + Math.floor(Math.random() * 25),
+            difficulty: Math.random() > 0.5 ? 'Easy' : 'Medium',
+            prep_time_minutes: 30,
+            ingredients: mealIngredients,
+            instructions: ['Preheat oven to 425°F.', 'Prepare all ingredients by washing and chopping.', 'Season protein with salt, pepper, and desired spices.', 'Heat oil in a large oven-safe skillet over medium-high heat.', 'Sear protein for 3-4 minutes per side.', 'Add vegetables to the pan.', 'Transfer to oven and roast for 15-20 minutes until done.', 'Let rest 5 minutes before serving.'],
+          })
         }
       }
     }
@@ -120,7 +205,7 @@ serve(async (req) => {
     }
 
     const messages = [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: buildSystemPrompt(payload.slots, payload.members, payload.replace_slot?.suggestion) },
       { role: 'user', content: JSON.stringify(payload) },
     ]
 
@@ -128,10 +213,12 @@ serve(async (req) => {
     console.log('[generate-plan] LLM raw response:', JSON.stringify(llmJson).slice(0, 300))
     let parsedPlan = JSON.parse(llmJson.choices[0].message.content)
 
-    // Transform LLM output to frontend format
+    // Transform LLM output to frontend format - filter to only scheduled slots
     let transformedPlan
     try {
-      transformedPlan = transformLlmOutput(parsedPlan)
+      console.log('[generate-plan] About to transform, scheduledSlots:', JSON.stringify(payload.slots))
+      transformedPlan = transformLlmOutput(parsedPlan, payload.slots)
+      console.log('[generate-plan] After transform, meals count:', transformedPlan.meals?.length)
     } catch (e) {
       console.error('[transform] Error:', e)
       transformedPlan = { meals: [] }

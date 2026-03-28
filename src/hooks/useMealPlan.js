@@ -70,6 +70,7 @@ export function useMealPlan(scheduleId) {
       }
 
       if ((nextStatus ?? mealPlan.status) === 'active') {
+        console.log('[useMealPlan] Finalizing plan - creating shopping list')
         const { data: household } = await supabase
           .from('households')
           .select('staples_on_hand')
@@ -78,12 +79,20 @@ export function useMealPlan(scheduleId) {
           .single()
 
         const items = aggregateShoppingList(nextPlan, household?.staples_on_hand || '')
-        await supabase.from('shopping_lists').upsert({
+        console.log('[useMealPlan] Generated items:', items?.length || 0)
+        
+        const { error: listError } = await supabase.from('shopping_lists').upsert({
           user_id: user.id,
           meal_plan_id: mealPlan.id,
           items,
           status: 'active',
         })
+        
+        if (listError) {
+          console.error('[useMealPlan] Shopping list error:', listError)
+        } else {
+          console.log('[useMealPlan] Shopping list saved')
+        }
       }
 
       const { data, error: saveError } = await supabase
@@ -133,9 +142,18 @@ export function useMealPlan(scheduleId) {
         .eq('user_id', user.id)
         .eq('schedule_id', scheduleId)
       if (slotsError) throw slotsError
+      
+      console.log('[useMealPlan] Fetched slots from DB:', slots?.length, 'for scheduleId:', scheduleId)
+      console.log('[useMealPlan] Slot details:', JSON.stringify(slots?.slice(0,3)))
 
       const lockedMeals = mealPlan?.draft_plan?.meals?.filter((meal) => meal.locked) || []
-
+      
+      // Only keep locked meals that match current scheduled slots
+      const slotKey = (s) => `${s.day}-${s.meal}`
+      const currentSlotKeys = new Set(slots.map(slotKey))
+      const validLockedMeals = lockedMeals.filter((m) => currentSlotKeys.has(`${m.day}-${m.meal}`))
+      console.log('[useMealPlan] lockedMeals:', lockedMeals.length, 'meals, validLockedMeals:', validLockedMeals.length)
+      
       const payload = {
         household: {
           total_people: household.total_people,
@@ -153,8 +171,8 @@ export function useMealPlan(scheduleId) {
           preferences: member.preferences,
         })),
         slots: slots.map((slot) => ({
-          day: String(slot.day_of_week || '').slice(0, 3).toLowerCase(),
-          meal: String(slot.meal_type || '').toLowerCase().replace(' ', '_'),
+          day: String(slot.day_of_week || slot.day || '').slice(0, 3).toLowerCase(),
+          meal: String(slot.meal_type || slot.meal || '').toLowerCase().replace(' ', '_'),
           attendees: slot.attendees || [],
           effort_level: slot.effort_level,
           planning_notes: slot.planning_notes,
@@ -164,32 +182,56 @@ export function useMealPlan(scheduleId) {
         locked_meals: lockedMeals,
       }
 
+      console.log('[useMealPlan] Payload slots being sent:', JSON.stringify(payload.slots))
+
       console.log('[useMealPlan] Calling generate-plan with payload:', JSON.stringify(payload).slice(0, 500))
       
-      const { data: generated, error: functionError } = await supabase.functions.invoke('generate-plan', { body: payload })
-      console.log('[useMealPlan] Function response:', { data: generated, error: functionError })
+      let { data: generated, error: functionError } = await supabase.functions.invoke('generate-plan', { body: payload })
+      console.log('[useMealPlan] Function response:', { data: generated, error: functionError, mealsCount: generated?.plan?.meals?.length })
       if (functionError) {
-        console.error('[useMealPlan] Function error:', JSON.stringify(functionError))
-        throw functionError
+        console.error('[useMealPlan] Function error details:', functionError)
+        // Fallback: try direct fetch
+        console.log('[useMealPlan] Trying direct fetch fallback...')
+        const response = await fetch('https://rvgtmletsbycrbeycwus.supabase.co/functions/v1/generate-plan', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2Z3RtbGV0c2J5Y3JiZXljd3VzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NDc2NjUsImV4cCI6MjA5MDAyMzY2NX0.yYkUKWodhGEpWEgErBeH5hWt0pGnLmx6kSNdBpLdwxQ'
+          },
+          body: JSON.stringify(payload)
+        })
+        const fallbackData = await response.json()
+        console.log('[useMealPlan] Fallback response:', fallbackData)
+        if (fallbackData.plan) {
+          generated = fallbackData
+        } else {
+          throw functionError
+        }
       }
 
       const nextPlan = withMealDefaults(generated.plan)
+      console.log('[useMealPlan] nextPlan.meals:', nextPlan.meals?.length, 'meals')
+      
       const mergedPlan = {
         ...nextPlan,
         meals: [
-          ...lockedMeals,
+          ...validLockedMeals,
           ...nextPlan.meals.filter(
-            (meal) => !lockedMeals.some((locked) => locked.day === meal.day && locked.meal === meal.meal),
+            (meal) => !validLockedMeals.some((locked) => locked.day === meal.day && locked.meal === meal.meal),
           ),
         ],
       }
 
+      console.log('[useMealPlan] nextPlan has', nextPlan.meals?.length, 'meals, mergedPlan has', mergedPlan.meals?.length, 'meals')
+      
       const { data: savedPlan, error: saveError } = await supabase
         .from('meal_plans')
         .upsert({
-          id: mealPlan?.id,
+          ...(mealPlan?.id ? { id: mealPlan.id } : {}),
           user_id: user.id,
+          household_id: household.id,
           schedule_id: scheduleId,
+          week_of: new Date().toISOString().split('T')[0],
           status: mealPlan?.status || 'draft',
           plan: mergedPlan,
           draft_plan: mergedPlan,
@@ -198,7 +240,11 @@ export function useMealPlan(scheduleId) {
         .select('*')
         .single()
 
-      if (saveError) throw saveError
+      if (saveError) {
+        console.error('[useMealPlan] Save error:', saveError)
+        throw saveError
+      }
+      console.log('[useMealPlan] Saved plan with', savedPlan?.draft_plan?.meals?.length, 'meals')
       setMealPlan({ ...savedPlan, draft_plan: withMealDefaults(savedPlan.draft_plan || savedPlan.plan || {}) })
       return savedPlan
     } catch (err) {
@@ -226,7 +272,7 @@ export function useMealPlan(scheduleId) {
     return persistPlan(nextPlan)
   }, [mealPlan, persistPlan])
 
-  const swapMeal = useCallback(async (mealToReplace) => {
+  const swapMeal = useCallback(async (mealToReplace, suggestion = '') => {
     try {
       const { data: household } = await supabase.from('households').select('*').eq('user_id', user.id).limit(1).single()
       const { data: members } = await supabase.from('household_members').select('*').eq('user_id', user.id).eq('household_id', household.id)
@@ -249,8 +295,8 @@ export function useMealPlan(scheduleId) {
           preferences: member.preferences,
         })),
         slots: slots.map((slot) => ({
-          day: String(slot.day_of_week || '').slice(0, 3).toLowerCase(),
-          meal: String(slot.meal_type || '').toLowerCase().replace(' ', '_'),
+          day: String(slot.day_of_week || slot.day || '').slice(0, 3).toLowerCase(),
+          meal: String(slot.meal_type || slot.meal || '').toLowerCase().replace(' ', '_'),
           attendees: slot.attendees || [],
           effort_level: slot.effort_level,
           planning_notes: slot.planning_notes,
@@ -261,7 +307,8 @@ export function useMealPlan(scheduleId) {
         replace_slot: {
           day: mealToReplace.day,
           meal: mealToReplace.meal,
-          reason: 'user requested swap',
+          suggestion: suggestion,
+          reason: suggestion ? `user wants: ${suggestion}` : 'user requested swap',
         },
       }
 
@@ -296,6 +343,7 @@ export function useMealPlan(scheduleId) {
   }, [mealPlan, persistPlan, scheduleId, user])
 
   const finalizePlan = useCallback(async () => {
+    console.log('[useMealPlan] finalizePlan called, mealPlan.id:', mealPlan?.id, 'status:', mealPlan?.status)
     return persistPlan(mealPlan.draft_plan, 'active')
   }, [mealPlan, persistPlan])
 

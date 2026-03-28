@@ -130,7 +130,7 @@ export function SchedulePage() {
     console.log('[SchedulePage] Active slots:', activeSlots.length)
     
     if (activeSlots.length === 0) {
-      toast.error('Please add at least one meal slot. Click a slot to add meals.')
+      toast.error('Please select at least one person for a meal slot.')
       return
     }
 
@@ -148,7 +148,13 @@ export function SchedulePage() {
 
       console.log('[SchedulePage] Schedule saved:', savedSchedule?.id)
       toast.success('Schedule saved successfully.')
-      navigate(`/plan?schedule_id=${savedSchedule.id}`, { replace: true })
+      
+      // Persist last schedule_id for session restoration
+      localStorage.setItem('last_schedule_id', savedSchedule.id)
+      localStorage.setItem('last_schedule_week', savedSchedule.week_start_date)
+      
+      // Navigate with auto-generate flag
+      navigate(`/plan?schedule_id=${savedSchedule.id}&auto_generate=true`, { replace: true })
     } catch (error) {
       console.error('[SchedulePage] Save failed:', error)
       toast.error(error.message || 'Unable to save schedule. Please try again.')
@@ -160,7 +166,7 @@ export function SchedulePage() {
   // Show member repair UI if needed
   if (needsMemberRepair) {
     return (
-      <div className="space-y-6 pb-24">
+      <div className="space-y-3 md:space-y-6 pb-24">
         <div className="card">
           <h1 className="font-display text-3xl text-warm-900">Weekly Schedule</h1>
           <p className="mt-2 text-sm text-warm-700">Your household exists but we couldn't find your members. Let's fix that.</p>
@@ -190,7 +196,7 @@ export function SchedulePage() {
   const loading = householdLoading || scheduleLoading
 
   return (
-    <div className="space-y-6 pb-24">
+    <div className="space-y-3 md:space-y-6 pb-24">
       <div className="card">
         <h1 className="font-display text-3xl text-warm-900">Weekly Schedule</h1>
         <p className="mt-2 text-sm text-warm-700">Build the week you actually need planned. Activate only the meal slots you want Allio to consider.</p>
@@ -260,7 +266,8 @@ export function SchedulePage() {
       )}
 
       {editorKey && slotState[editorKey] ? (
-        <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setEditorKey(null)}>
+        <div className="max-h-[90vh] w-full max-w-md overflow-auto rounded-2xl border border-stone-200 bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-xl font-semibold text-slate-900">Edit {editorKey.replace('-', ' · ')}</h2>
             <button type="button" onClick={() => setEditorKey(null)} className="text-sm text-slate-500">Close</button>
@@ -324,6 +331,7 @@ export function SchedulePage() {
               <input value={slotState[editorKey]?.planning_notes || ''} onChange={(e) => updateSlot(editorKey, { planning_notes: e.target.value, active: true })} className={inputClassName} placeholder="Quick notes for this slot" />
             </label>
           </div>
+        </div>
         </div>
       ) : null}
 

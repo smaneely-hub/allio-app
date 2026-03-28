@@ -211,6 +211,21 @@ export function useHousehold() {
 
         console.log('[useHousehold.saveMembers] FINAL payload', preparedMembers)
 
+        // FIXED: Delete ALL existing members first, then insert the new list
+        // This ensures we don't have orphan members or sync issues
+        const { error: deleteAllError } = await supabase
+          .from('household_members')
+          .delete()
+          .eq('household_id', effectiveHouseholdId)
+        
+        if (deleteAllError) {
+          console.error('[useHousehold.saveMembers] ERROR deleting old members:', deleteAllError)
+          throw deleteAllError
+        }
+        
+        console.log('[useHousehold.saveMembers] Deleted all existing members')
+
+        // Now insert the new members
         const { error: insertError } = await supabase
           .from('household_members')
           .insert(preparedMembers)
@@ -221,24 +236,24 @@ export function useHousehold() {
         }
 
         console.log('[useHousehold.saveMembers] Members inserted successfully')
-
-        // Delete old members not in the new list (only for non-recovery saves)
-        if (!householdIdOverride && memberList.length > 0) {
-          const idsToKeep = preparedMembers.map((m) => m.id).filter(Boolean)
-          if (idsToKeep.length > 0) {
-            const { error: deleteError } = await supabase
-              .from('household_members')
-              .delete()
-              .eq('household_id', effectiveHouseholdId)
-              .not('id', 'in', `(${idsToKeep.join(',')})`)
-            
-            if (deleteError) {
-              console.error('[useHousehold.saveMembers] ERROR deleting old members:', deleteError)
-            }
-          }
+        
+        // FIXED: Auto-update household total_people to match member count
+        const memberCount = preparedMembers.length
+        const { error: householdUpdateError } = await supabase
+          .from('households')
+          .update({ total_people: memberCount })
+          .eq('id', effectiveHouseholdId)
+        
+        if (householdUpdateError) {
+          console.error('[useHousehold.saveMembers] WARNING: Could not update total_people:', householdUpdateError)
+          // Non-critical, continue
+        } else {
+          console.log('[useHousehold.saveMembers] Updated household total_people to:', memberCount)
+          // Update local state
+          setHousehold(prev => prev ? { ...prev, total_people: memberCount } : null)
         }
-
-        // Refresh members from DB using household_id
+        
+        // Reload members to ensure sync
         const { data: refreshedMembers, error: refreshError } = await supabase
           .from('household_members')
           .select('*')

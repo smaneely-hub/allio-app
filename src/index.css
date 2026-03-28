@@ -66,3 +66,32 @@ h1, h2, h3, h4 {
 .input {
   @apply w-full px-4 py-3 rounded-xl bg-warm-50 border border-warm-200 focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 outline-none transition-colors;
 }
+/* Dark Mode */
+.dark {
+  color-scheme: dark;
+}
+.dark body {
+  background-color: #1a1a1a;
+  color: #e5e5e5;
+}
+.dark .bg-white { background-color: #2a2a2a; }
+.dark .bg-warm-50 { background-color: #252525; }
+.dark .bg-warm-100 { background-color: #333333; }
+.dark .border-warm-200 { border-color: #444; }
+.dark .border-stone-200 { border-color: #444; }
+.dark .text-warm-900 { color: #e5e5e5; }
+.dark .text-warm-700 { color: #ccc; }
+.dark .text-warm-500 { color: #999; }
+.dark .text-warm-400 { color: #777; }
+.dark .input, .dark select {
+  background-color: #333;
+  border-color: #444;
+  color: #e5e5e5;
+}
+.dark .card {
+  background-color: #2a2a2a;
+  border-color: #444;
+}
+.dark .bg-gradient-to-br.from-primary-50.to-primary-100 {
+  background: linear-gradient(to bottom right, #1a3d2a, #1f4a35);
+}

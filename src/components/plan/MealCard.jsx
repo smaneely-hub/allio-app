@@ -31,10 +31,13 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
 
       <div className="mt-4 flex flex-wrap gap-2">
         <button type="button" onClick={() => onToggleLock(meal.id, !meal.locked)} className="btn-ghost text-xs font-medium">
-          {meal.locked ? '🔒 Unlock' : '🔓 Lock / Accept'}
+          {meal.locked ? '🔒 Unlock' : '🔓 Lock'}
         </button>
         <button type="button" onClick={() => onSwap(meal)} className="btn-ghost text-xs font-medium">
           🔄 Swap
+        </button>
+        <button type="button" onClick={() => navigator.clipboard.writeText(meal.name)} className="btn-ghost text-xs font-medium">
+          📋 Copy
         </button>
       </div>
 
@@ -55,10 +58,28 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
 
       {expanded ? (
         <div className="mt-4 space-y-4 border-t border-warm-200 pt-4 text-sm text-warm-700">
-          <div>
-            <div className="mb-2 font-medium text-warm-900">Serves</div>
-            <div>{(meal.attendees || []).join(', ')}</div>
+          {/* Recipe Details */}
+          <div className="flex gap-4 text-sm">
+            <div className="flex-1 rounded-lg bg-warm-50 p-3 text-center">
+              <div className="text-xs uppercase tracking-wide text-warm-500">Difficulty</div>
+              <div className="font-medium text-warm-900">{meal.difficulty || 'Easy'}</div>
+            </div>
+            <div className="flex-1 rounded-lg bg-warm-50 p-3 text-center">
+              <div className="text-xs uppercase tracking-wide text-warm-500">Prep</div>
+              <div className="font-medium text-warm-900">{meal.prep_time_minutes || 20} min</div>
+            </div>
+            <div className="flex-1 rounded-lg bg-warm-50 p-3 text-center">
+              <div className="text-xs uppercase tracking-wide text-warm-500">Cook</div>
+              <div className="font-medium text-warm-900">{meal.cook_time_minutes || 15} min</div>
+            </div>
           </div>
+
+          {/* Servings */}
+          <div>
+            <div className="mb-2 font-medium text-warm-900">Serves {meal.servings || 2} people</div>
+          </div>
+
+          {/* Ingredients */}
           <div>
             <div className="mb-2 font-medium text-warm-900">Ingredients</div>
             <ul className="list-disc space-y-1 pl-5">
@@ -69,6 +90,8 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
               ))}
             </ul>
           </div>
+
+          {/* Instructions */}
           <div>
             <div className="mb-2 font-medium text-warm-900">Instructions</div>
             <ol className="list-decimal space-y-1 pl-5">

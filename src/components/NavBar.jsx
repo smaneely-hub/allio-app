@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 
@@ -12,6 +13,17 @@ export function NavBar() {
   const { user, signOut } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark')
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark')
+      localStorage.setItem('theme', 'dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+      localStorage.setItem('theme', 'light')
+    }
+  }, [darkMode])
 
   const handleSignOut = async () => {
     await signOut()
@@ -52,6 +64,13 @@ export function NavBar() {
                 className="btn-ghost text-sm font-medium"
               >
                 Sign Out
+              </button>
+              <button
+                type="button"
+                onClick={() => setDarkMode(!darkMode)}
+                className="btn-ghost text-sm font-medium"
+              >
+                {darkMode ? '☀️ Light' : '🌙 Dark'}
               </button>
             </div>
           ) : (
