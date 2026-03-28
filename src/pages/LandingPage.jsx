@@ -97,17 +97,18 @@ function MiniShoppingItem({ name, checked }) {
 export function LandingPage() {
   return (
     <div className="min-h-screen bg-warm-50 overflow-x-hidden">
-      {/* Gradient Hero Section */}
-      <div className="relative bg-gradient-to-br from-purple-100 via-teal-50 to-green-100 overflow-hidden">
-        {/* Decorative floating leaves */}
-        <div className="absolute top-20 left-10 opacity-40 rotate-12"><Leaf /></div>
-        <div className="absolute top-40 right-20 opacity-30 -rotate-6"><Leaf /></div>
-        <div className="absolute bottom-40 left-1/4 opacity-40 rotate-45"><Leaf /></div>
-        <div className="absolute top-60 right-1/3 opacity-30"><Leaf /></div>
+      {/* Hero - vibrant gradient matching reference */}
+      <div className="relative bg-gradient-to-br from-blue-400 via-purple-400 via-teal-400 to-green-400 min-h-[70vh] flex items-center overflow-hidden">
+        {/* Frosted glass overlay effect */}
+        <div className="absolute inset-0 bg-white/20 backdrop-blur-sm"></div>
         
-        {/* Gradient orbs for frosted effect */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-purple-200 rounded-full opacity-30 blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-green-200 rounded-full opacity-30 blur-3xl"></div>
+        {/* Colorful orbs for glow effect */}
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden">
+          <div className="absolute top-10 left-10 w-64 h-64 bg-purple-400/50 rounded-full blur-3xl"></div>
+          <div className="absolute top-20 right-20 w-48 h-48 bg-blue-400/50 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-10 left-1/3 w-56 h-56 bg-teal-400/50 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-20 right-10 w-40 h-40 bg-green-400/40 rounded-full blur-3xl"></div>
+        </div>
         
         {/* Top right login link */}
         <div className="relative z-10 container mx-auto px-4 py-4 flex justify-end">
@@ -123,21 +124,21 @@ export function LandingPage() {
             <div className="flex-1 text-center lg:text-left">
               {/* Logo with leaves */}
               <div className="relative inline-block mb-4">
-                <h1 className="font-display text-5xl md:text-6xl lg:text-7xl text-slate-800">
+                <h1 className="font-display text-5xl md:text-6xl lg:text-7xl text-white drop-shadow-md">
                   Allio
                 </h1>
                 <div className="absolute -top-2 -right-8 rotate-12">
-                  <Leaf className="w-8 h-8" />
+                  <Leaf className="w-8 h-8 drop-shadow-sm" />
                 </div>
                 <div className="absolute -bottom-1 -left-6 -rotate-12">
-                  <Leaf className="w-6 h-6" />
+                  <Leaf className="w-6 h-6 drop-shadow-sm" />
                 </div>
               </div>
               
-              <h2 className="font-display text-2xl md:text-3xl lg:text-4xl text-slate-800 mb-4">
+              <h2 className="font-display text-2xl md:text-3xl lg:text-4xl text-white drop-shadow-md mb-4">
                 Everything your household needs. Finally in one place.
               </h2>
-              <p className="text-warm-600 text-lg mb-8 max-w-xl mx-auto lg:mx-0">
+              <p className="text-white/80 text-lg mb-8 max-w-xl mx-auto lg:mx-0 drop-shadow-sm">
                 Plan meals, organize shopping, and coordinate your family's schedule — all in one beautiful app.
               </p>
               
@@ -273,15 +274,16 @@ export function LandingPage() {
       </div>
 
       {/* Bottom CTA with Testimonial */}
-      <div className="relative bg-gradient-to-br from-green-50 via-teal-50 to-purple-50 py-16 px-4">
-        <div className="absolute top-10 right-10 opacity-30"><Leaf /></div>
-        <div className="absolute bottom-10 left-10 opacity-40 rotate-12"><Leaf /></div>
+      <div className="relative bg-gradient-to-br from-blue-400 via-purple-400 to-teal-400 py-16 px-4 overflow-hidden">
+        <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+        <div className="absolute top-10 right-10 opacity-30"><Leaf className="text-white" /></div>
+        <div className="absolute bottom-10 left-10 opacity-40 rotate-12"><Leaf className="text-white" /></div>
         
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="font-display text-3xl md:text-4xl text-warm-900 mb-4">
+        <div className="max-w-4xl mx-auto text-center relative z-10">
+          <h2 className="font-display text-3xl md:text-4xl text-white drop-shadow-md mb-4">
             Try Allio for free today.
           </h2>
-          <p className="text-warm-600 text-lg mb-8">
+          <p className="text-white/80 text-lg mb-8">
             Get your household running smoothly.
           </p>
           
