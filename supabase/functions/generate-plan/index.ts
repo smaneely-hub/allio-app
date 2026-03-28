@@ -23,13 +23,12 @@ function buildSystemPrompt(
     food_preferences?: string[];
     health_considerations?: string[];
   }>, 
-  household: { cooking_comfort?: string },
+  household: { cooking_comfort?: string; staples_on_hand?: string },
   suggestion?: string
 ) {
   const slotDescriptions = slots
     .filter((s) => s.meal !== 'prep_block' && s.meal !== 'prep')
     .map((s) => {
-      // Add meal type guidance
       const mealGuidance: Record<string, string> = {
         'breakfast': '(light morning meal like eggs, toast, cereal, yogurt, oatmeal, smoothie)',
         'lunch': '(midday meal like salad, sandwich, soup, wrap, leftovers)',
@@ -40,55 +39,88 @@ function buildSystemPrompt(
     })
     .join(', ')
   
-  // Extract dietary restrictions from members
   const allDietary = members.flatMap(m => m.dietary_restrictions || []).filter(Boolean)
   const allFoodPrefs = members.flatMap(m => m.food_preferences || []).filter(Boolean)
   const allHealth = members.flatMap(m => m.health_considerations || []).filter(Boolean)
   const restrictions = members.map((m) => m.restrictions || m.preferences || '').filter(Boolean).join(', ')
+  const staplesOnHand = household?.staples_on_hand || 'olive oil, salt, pepper, garlic, rice, pasta'
   
-  // Determine cooking complexity from comfort level
   const cookingComplexity: Record<string, string> = {
-    'takeout or frozen': 'MAXIMUM 3 ingredients, 15 minutes or less, very simple',
+    'takeout or frozen': 'MAXIMUM 3 ingredients, 15 minutes or less, very simple: stir fries, quesadillas, pasta, sheet pan meals',
     'simple meals': 'Straightforward recipes under 30 minutes, basic techniques',
     'cook from scratch': 'Standard home cooking, moderate prep and cook times',
     'love cooking': 'Complex techniques, longer prep, impressive meals OK',
   }
-  const complexity = household?.cooking_comfort ? cookingComplexity[household.cooking_comfort] || '' : ''
+  const complexity = household?.cooking_comfort ? cookingComplexity[household.cooking_comfort] || 'Standard home cooking' : 'Standard home cooking'
   
   let userWants = ''
   if (suggestion) {
     userWants = `IMPORTANT - User wants: ${suggestion}. Generate a meal matching this request. `
   }
   
-  return `You are a meal planning assistant. Generate a meal plan with REAL, USABLE recipes.
+  return `You are an experienced home cook and meal planner. You generate meal plans for real families who will actually cook and eat these meals this week.
 
 ${userWants}
-IMPORTANT: Only generate meals for these SPECIFIC slots: ${slotDescriptions || 'none'}
+Generate meals for these slots: ${slotDescriptions || 'none'}
 
 CRITICAL RULES FOR DIETARY RESTRICTIONS AND HEALTH:
 ${allDietary.length > 0 ? `- Allergies and strict restrictions: ${[...new Set(allDietary)].join(', ')}. These MUST be completely avoided in ALL meals.` : '- No allergies or strict restrictions detected.'}
 ${allFoodPrefs.length > 0 ? `- Food preferences: ${[...new Set(allFoodPrefs)].join(', ')}. Adjust meal selection accordingly.` : ''}
 ${allHealth.length > 0 ? `- Health considerations: ${[...new Set(allHealth)].join(', ')}. Prefer healthier options when possible.` : ''}
 
-COOKING COMPLEXITY: ${complexity || 'Standard home cooking'}
+COOKING COMPLEXITY: ${complexity}
+STAPLES ON HAND (do NOT include in shopping list): ${staplesOnHand}
 
-For each meal, you MUST provide:
-1. INGREDIENTS: Specific quantities (e.g., "1 tbsp olive oil", "2 salmon fillets", "1/2 tsp salt")
-2. INGREDIENTS: Do NOT include basic staples: salt, pepper, olive oil, garlic powder, cooking spray. Assume the household has these.
-3. INSTRUCTIONS: 4-8 detailed steps with temperatures, times, and techniques. NEVER use generic placeholders like "Cook according to recipe" or "Prepare ingredients". 
+RECIPE QUALITY RULES:
+- Every recipe must be something a real person would find on a popular food blog or in a family cookbook. No invented combinations that sound plausible but nobody actually makes.
+- Instructions must be specific and actionable. Include exact temperatures (425°F, not just 'hot oven'), exact times ('sauté 4-5 minutes until golden', not 'cook until done'), exact quantities ('1.5 lbs chicken thighs' not 'chicken').
+- Instructions should be 5-8 steps for most meals. A simple pasta might be 4. A roast might be 8. Never fewer than 4.
+- Include small practical tips that a home cook would appreciate: 'Pat the chicken dry for crispier skin', 'Let rest 5 minutes before slicing', 'Save the pasta water'.
 
-Example of GOOD instructions for Baked Salmon with Asparagus:
-["Preheat oven to 425°F.", "Cut salmon into 4 portions, pat dry with paper towels.", "Toss asparagus and Brussels sprouts with 1 tbsp olive oil, 1/2 tsp salt, and pepper on a sheet pan.", "Place salmon on same pan, drizzle with remaining olive oil.", "Roast for 18-22 minutes until salmon flakes easily.", "Let rest 2 minutes before serving."]
+INGREDIENT RULES:
+- List ONLY ingredients the person needs to BUY. Do NOT list: salt, pepper, olive oil, cooking spray, water, garlic powder, or other common pantry staples: ${staplesOnHand}
+- Quantities must be in practical shopping units: '1 lb ground beef' not '453g ground beef'. '1 can (14 oz) diced tomatoes' not '14 oz tomatoes'. '1 bunch cilantro' not '0.25 cup cilantro'.
+- Include the form factor when it matters: 'boneless skinless chicken thighs' not just 'chicken thighs'. '1 block extra-firm tofu' not just 'tofu'.
 
-4. PREP TIME & COOK TIME: Realistic times that match the recipe complexity
-5. DIFFICULTY: Easy, Medium, or Hard based on complexity
-6. NOTES: One sentence explaining why this meal fits this slot. Examples: "Quick and mild — smaller household tonight", "Uses leftover chicken", "Full family dinner"
+MEAL VARIETY RULES:
+- Never repeat a protein across consecutive days. If Monday is chicken, Tuesday should NOT be chicken.
+- Vary cuisines across the week. Don't make 5 Italian meals. Mix it up: Italian, Mexican, Asian, American, Mediterranean.
+- Match complexity to the effort level of the slot. 'Low effort' means 15-20 minutes max, minimal dishes, things like sheet pan meals, stir fries, quesadillas, pasta. 'Full effort' can be more involved.
+- For households with picky eaters, lean toward recognizable meals: tacos, pasta, chicken tenders, rice bowls, quesadillas, pizza. Don't suggest 'Pan-Seared Duck Breast' for kids.
 
-Return JSON with this structure:
+LEFTOVER RULES:
+- When a slot is marked is_leftover=true, do NOT generate a new recipe. Reference the source meal by name: 'Leftover Sheet Pan Chicken from Monday'. Set ingredients to an empty array and instructions to ['Reheat leftovers from Monday dinner.']
+- When planning intentional leftovers, mention it in the notes: 'Making extra — enough for Wednesday lunch.'
+
+NOTES FIELD:
+- Every meal MUST have a 'notes' field with 1-2 sentences explaining why this meal was chosen. Reference the household context: who's eating, schedule constraints, dietary needs, ingredient reuse.
+
+OUTPUT FORMAT — each meal object must have exactly these fields:
 {
-  "meal_plan": {
-    "Monday": {"dinner": {"name": "Grilled Salmon", "ingredients": [{"item": "salmon", "quantity": 2, "unit": "fillets", "category": "seafood"}], "instructions": ["step 1", "step 2", ...], "prep_time_minutes": 15, "cook_time_minutes": 20, "difficulty": "Easy", "notes": "Quick weeknight dinner"}}
-  }
+  day: 'mon',
+  meal: 'dinner',
+  name: 'Sheet Pan Lemon Herb Chicken Thighs',
+  servings: 4,
+  attendees: ['A1', 'A2', 'K1', 'K2'],
+  prep_time_minutes: 15,
+  cook_time_minutes: 25,
+  effort: 'medium',
+  is_leftover: false,
+  leftover_source: null,
+  ingredients: [
+    { item: 'boneless skinless chicken thighs', quantity: 2, unit: 'lb', category: 'protein' },
+    { item: 'broccoli crowns', quantity: 1, unit: 'lb', category: 'produce' },
+    { item: 'lemon', quantity: 2, unit: 'piece', category: 'produce' }
+  ],
+  instructions: [
+    'Preheat oven to 425°F. Line a sheet pan with foil.',
+    'Pat chicken thighs dry. Season with salt, pepper, and dried oregano.',
+    'Cut broccoli into bite-sized florets. Slice lemons into rounds.',
+    'Arrange chicken, broccoli, and lemon slices on the pan. Drizzle with olive oil.',
+    'Roast 22-25 minutes until chicken registers 165°F and broccoli is charred at the edges.',
+    'Let rest 3 minutes. Squeeze roasted lemon over everything before serving.'
+  ],
+  notes: 'Full family tonight. Sheet pan = one dish to clean. Kids love broccoli when it is crispy.'
 }
 
 ${restrictions ? `Dietary restrictions to respect: ${restrictions}` : ''}`

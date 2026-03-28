@@ -79,7 +79,7 @@ export default function App() {
         <AuthProvider>
           <ErrorBoundary>
           <div className="min-h-screen bg-warm-50">
-            <div className="mx-auto flex max-w-6xl flex-col">
+            <div className="mx-auto flex max-w-6xl flex-col animate-fadeIn">
             <NavBar />
             <Routes>
               <Route path="/" element={<HomePage />} />

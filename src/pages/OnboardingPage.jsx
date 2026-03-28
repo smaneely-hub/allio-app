@@ -8,7 +8,12 @@ import { OnboardingSkeleton, EmptyState } from '../components/LoadingStates'
 export function OnboardingPage() {
   const navigate = useNavigate()
   const { household, members: savedMembers, loading, saveHousehold, saveMembers, reloadHousehold } = useHousehold()
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(() => {
+    // Restore step from localStorage if household has partial data
+    const savedStep = localStorage.getItem('onboarding_step')
+    if (savedStep) return parseInt(savedStep, 10)
+    return 1
+  })
   const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState({
     total_people: '2',
@@ -46,6 +51,19 @@ export function OnboardingPage() {
       planning_priorities: household.planning_priorities || cur.planning_priorities,
     }))
   }, [household])
+
+  // Save step to localStorage
+  useEffect(() => {
+    localStorage.setItem('onboarding_step', step.toString())
+  }, [step])
+
+  // Redirect to schedule if onboarding is already complete
+  useEffect(() => {
+    if (household && savedMembers.length > 0 && !loading) {
+      // Already complete - redirect to schedule
+      navigate('/schedule', { replace: true })
+    }
+  }, [household, savedMembers, loading, navigate])
 
   // derive member rows based on total_people
   useEffect(() => {

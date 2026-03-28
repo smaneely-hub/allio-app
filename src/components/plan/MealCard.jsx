@@ -9,11 +9,14 @@ const mealTypeStyles = {
 
 export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
   const [expanded, setExpanded] = useState(false)
+  const [cookingMode, setCookingMode] = useState(false)
+  const [currentStep, setCurrentStep] = useState(0)
   const [note, setNote] = useState(meal.user_note || '')
   const [savingNote, setSavingNote] = useState(false)
 
   const mealType = (meal.meal || '').toLowerCase()
   const style = mealTypeStyles[mealType] || mealTypeStyles.dinner
+  const totalSteps = meal.instructions?.length || 0
 
   const handleSaveNote = async () => {
     setSavingNote(true)
@@ -24,11 +27,104 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
     }
   }
 
+  const startCooking = () => {
+    setCurrentStep(0)
+    setCookingMode(true)
+  }
+
+  const nextStep = () => {
+    if (currentStep < totalSteps - 1) {
+      setCurrentStep(currentStep + 1)
+    }
+  }
+
+  const prevStep = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1)
+    }
+  }
+
+  const exitCooking = () => {
+    setCookingMode(false)
+  }
+
   // Extract dietary tags from meal metadata
   const dietaryTags = []
   if (meal.vegetarian) dietaryTags.push({ label: 'Vegetarian', color: 'bg-green-100 text-green-700' })
   if (meal.gluten_free) dietaryTags.push({ label: 'GF', color: 'bg-amber-100 text-amber-700' })
   if (meal.dairy_free) dietaryTags.push({ label: 'DF', color: 'bg-blue-100 text-blue-700' })
+
+  // Cooking Mode Overlay
+  if (cookingMode) {
+    return (
+      <div className="fixed inset-0 z-50 bg-warm-900 flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 bg-warm-800">
+          <button onClick={exitCooking} className="text-white font-medium">
+            ← Exit
+          </button>
+          <div className="text-white text-sm">
+            Step {currentStep + 1} of {totalSteps}
+          </div>
+          <div className="w-16"></div>
+        </div>
+
+        {/* Progress bar */}
+        <div className="h-1 bg-warm-700">
+          <div 
+            className="h-full bg-primary-400 transition-all"
+            style={{ width: `${((currentStep + 1) / totalSteps) * 100}%` }}
+          />
+        </div>
+
+        {/* Main content */}
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+          <div className="text-6xl mb-6">👨‍🍳</div>
+          <div className="text-2xl md:text-3xl text-white font-medium leading-relaxed">
+            {meal.instructions?.[currentStep]}
+          </div>
+        </div>
+
+        {/* Ingredient quick reference */}
+        <div className="p-4 bg-warm-800">
+          <div className="text-xs text-warm-400 mb-2 uppercase tracking-wide">Ingredients</div>
+          <div className="flex flex-wrap gap-2">
+            {(meal.ingredients || []).slice(0, 6).map((ing, i) => (
+              <span key={i} className="px-3 py-1 bg-warm-700 text-warm-200 text-sm rounded-full">
+                {ing.quantity} {ing.unit} {ing.item}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Navigation buttons */}
+        <div className="p-4 bg-warm-800 flex gap-4">
+          <button 
+            onClick={prevStep} 
+            disabled={currentStep === 0}
+            className={`flex-1 py-4 rounded-xl text-lg font-medium ${
+              currentStep === 0 
+                ? 'bg-warm-700 text-warm-500' 
+                : 'bg-warm-700 text-white'
+            }`}
+          >
+            ← Previous
+          </button>
+          <button 
+            onClick={nextStep} 
+            disabled={currentStep === totalSteps - 1}
+            className={`flex-1 py-4 rounded-xl text-lg font-medium ${
+              currentStep === totalSteps - 1
+                ? 'bg-warm-700 text-warm-500'
+                : 'bg-primary-500 text-white'
+            }`}
+          >
+            {currentStep === totalSteps - 1 ? 'All done!' : 'Next step →'}
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={`rounded-2xl border p-4 shadow-sm transition-all duration-200 hover:shadow-md ${meal.locked ? 'border-primary-300 bg-primary-50' : meal.is_leftover ? 'border-dashed border-warm-200 bg-warm-50' : 'border-warm-200 bg-white'}`}>
@@ -98,6 +194,15 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
               <span className="font-medium not-italic text-warm-700">Why this meal:</span> {meal.notes}
             </div>
           )}
+
+          {/* Start Cooking Button */}
+          <button 
+            type="button" 
+            onClick={startCooking}
+            className="btn-primary w-full py-3 text-base font-medium"
+          >
+            🍳 Start Cooking
+          </button>
 
           {/* User note */}
           <div>

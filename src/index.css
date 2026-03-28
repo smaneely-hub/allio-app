@@ -95,3 +95,12 @@ h1, h2, h3, h4 {
 .dark .bg-gradient-to-br.from-primary-50.to-primary-100 {
   background: linear-gradient(to bottom right, #1a3d2a, #1f4a35);
 }
+
+/* Page transition */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.15s ease-out;
+}

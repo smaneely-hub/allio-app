@@ -1,8 +1,13 @@
-import { useMemo, useEffect } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useMealPlan } from '../hooks/useMealPlan'
+import { useHousehold } from '../hooks/useHousehold'
+import { useSchedule } from '../hooks/useSchedule'
+import { useAuth } from '../hooks/useAuth'
 import { MealCard } from '../components/plan/MealCard'
+import { aggregateShoppingList } from '../lib/aggregateShoppingList'
+import { supabase } from '../lib/supabase'
 import { PlanSkeleton, EmptyState, PlanGenerationLoading, MealCardSkeleton } from '../components/LoadingStates'
 
 const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
@@ -23,6 +28,10 @@ export function PlanPage() {
     swapMeal,
     finalizePlan,
   } = useMealPlan(scheduleId)
+  
+  const { household } = useHousehold()
+  const { schedule } = useSchedule(scheduleId)
+  const { user } = useAuth()
 
   // Auto-generate on mount if requested
   useEffect(() => {
@@ -72,7 +81,27 @@ export function PlanPage() {
 
   const handleFinalize = async () => {
     try {
+      // Finalize the plan first
       await finalizePlan()
+      
+      // Generate shopping list
+      const meals = mealPlan?.draft_plan?.meals || []
+      const items = aggregateShoppingList({ meals }, household?.staples_on_hand || '')
+      
+      // Save to shopping_lists table
+      const { error: shopError } = await supabase
+        .from('shopping_lists')
+        .upsert({
+          user_id: user.id,
+          schedule_id: scheduleId,
+          status: 'active',
+          items: items,
+        }, { onConflict: 'user_id,schedule_id' })
+      
+      if (shopError) {
+        console.error('[PlanPage] Shopping list save error:', shopError)
+      }
+      
       toast.success('Plan finalized. Shopping list generated.')
     } catch (finalizeError) {
       toast.error(finalizeError.message || 'Unable to finalize plan.')
@@ -81,6 +110,16 @@ export function PlanPage() {
 
   return (
     <div className="pb-24">
+      {/* Week context header */}
+      <div className="mb-3 px-1">
+        <div className="text-sm text-warm-500">
+          {schedule?.week_start ? `Week of ${new Date(schedule.week_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'This week'}
+        </div>
+        <div className="font-display text-2xl md:text-3xl text-warm-900">
+          {household?.household_name || household?.name || 'Meal Plan'}
+        </div>
+      </div>
+      
       {/* Mobile-first header - minimal top gap */}
       <div className="card pt-2 md:pt-3">
         {/* Status badge - own line */}
