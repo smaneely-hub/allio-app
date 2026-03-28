@@ -3,6 +3,16 @@ import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 
+// Leaf decoration
+function Leaf({ className = '' }) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 008 17c8-20 20-8 0-13z" fill="#22C55E" fillOpacity="0.3"/>
+      <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 008 17c8-20 20-8 0-13z" stroke="#16A34A" strokeWidth="1"/>
+    </svg>
+  )
+}
+
 export function LoginPage() {
   const navigate = useNavigate()
   const [mode, setMode] = useState('login')
@@ -86,8 +96,14 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-warm-50 px-4 pt-4">
-      <div className="w-full max-w-sm mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-teal-50 to-green-50 px-4 pt-8 relative overflow-hidden">
+      {/* Decorative leaves */}
+      <div className="absolute top-20 left-10 opacity-30 rotate-12"><Leaf /></div>
+      <div className="absolute top-40 right-20 opacity-20 -rotate-6"><Leaf /></div>
+      <div className="absolute bottom-20 left-1/4 opacity-30 rotate-45"><Leaf /></div>
+      <div className="absolute top-60 right-1/3 opacity-20"><Leaf /></div>
+      
+      <div className="w-full max-w-sm mx-auto relative z-10">
         {/* Brand header */}
         <div className="text-center mb-8">
           <h1 className="font-display text-3xl text-warm-900">

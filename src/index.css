@@ -14,18 +14,21 @@ body {
   --font-display: 'DM Serif Display', Georgia, serif;
   --font-body: 'DM Sans', system-ui, sans-serif;
 
-  /* Primary colors */
-  --color-primary-50: #E8F5EE;
-  --color-primary-100: #C6E7D3;
-  --color-primary-200: #9AD4B3;
-  --color-primary-400: #4A9B6E;
-  --color-primary-500: #4A9B6E;
-  --color-primary-600: #367A52;
-  --color-primary-700: #2A6040;
+  /* Primary colors - brighter green */
+  --color-primary-50: #DCFCE7;
+  --color-primary-100: #BBF7D0;
+  --color-primary-200: #86EFAC;
+  --color-primary-400: #22C55E;
+  --color-primary-500: #16A34A;
+  --color-primary-600: #15803D;
+  --color-primary-700: #166534;
 
-  /* Accent colors */
+  /* Accent colors - teal/blue */
+  --color-accent-teal: #0EA5E9;
   --color-accent-orange: #F97316;
   --color-accent-red: #EF4444;
+  --color-accent-purple: #A855F7;
+  --color-accent-pink: #EC4899;
 
   /* Warm neutrals */
   --color-warm-50: #FAFAF8;
@@ -58,17 +61,17 @@ h1, h2, h3, h4 {
   @apply bg-white rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow duration-200;
 }
 
-/* Button styles */
+/* Button styles - pill shape */
 .btn-primary {
-  @apply bg-primary-400 hover:bg-primary-600 text-white font-body font-semibold px-6 py-3 rounded-xl transition-all duration-150 shadow-sm active:scale-[0.98];
+  @apply bg-primary-400 hover:bg-primary-500 text-white font-body font-bold px-8 py-3 rounded-full transition-all duration-150 shadow-lg active:scale-[0.98];
 }
 
 .btn-secondary {
-  @apply border-2 border-primary-400 text-primary-400 hover:bg-primary-50 font-semibold px-6 py-3 rounded-xl transition-all duration-150 active:scale-[0.98];
+  @apply border-2 border-primary-400 text-primary-400 hover:bg-primary-50 font-semibold px-6 py-3 rounded-full transition-all duration-150 active:scale-[0.98];
 }
 
 .btn-ghost {
-  @apply text-warm-400 hover:text-warm-700 hover:bg-warm-100 px-4 py-2 rounded-lg transition-all duration-150 active:scale-[0.98];
+  @apply text-warm-400 hover:text-warm-700 hover:bg-warm-100 px-4 py-2 rounded-full transition-all duration-150 active:scale-[0.98];
 }
 
 /* Input styles */
