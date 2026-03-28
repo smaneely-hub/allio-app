@@ -1,62 +1,47 @@
 ## Session Log
 
-### Task 1: LLM Prompt — Recipe Realism Overhaul
+### Task 1: Email Verification UI
 - Status: COMPLETE
-- What was done: Replaced system prompt with comprehensive recipe quality rules, ingredient rules (excluding staples), meal variety rules (no consecutive protein repetition), leftover rules, detailed output format with example
-- Recipe quality notes: Prompts now specify realistic recipes from food blogs, exact temps/times/quantities, 5-8 steps, practical tips. Staples excluded from shopping list.
-- Edge function deployed successfully
-
-### Task 2: Meal Plan — Week Context Header
-- Status: COMPLETE
-- What was done: Added header showing week dates, household name, context above meal cards on plan page
+- What was done: Updated LoginPage to show confirmation screen after signup, added resend verification button, added "Already verified? Log in" link. Added EmailVerificationBanner to AuthProvider, shows amber banner when email not verified with resend option.
 - Issues encountered: None
 
-### Task 3: Meal Card — Cooking Mode
-- Status: COMPLETE
-- What was done: Full-screen cooking mode with step navigation, large readable text, ingredient reference, progress bar, next/previous buttons
+### Task 2: Create Email Sending Edge Function
+- Status: COMPLETE (deployed successfully)
+- What was done: Created supabase/functions/send-email/index.ts using Resend API, deployed successfully
 - Issues encountered: None
 
-### Task 4: Shopping List Aggregation Engine
+### Task 3: Create Meal Plan Email Formatter
 - Status: COMPLETE
-- What was done: Created aggregateShoppingList.js with normalize, categorize, aggregate, and shareListAsText functions
+- What was done: Created src/lib/formatMealPlanEmail.js with professional HTML email template, inline styles, table-based layout, green Allio branding, day-grouped meals
 - Issues encountered: None
 
-### Task 5: Shopping List UI — Complete Overhaul
+### Task 4: Create Shopping List Email Formatter
 - Status: COMPLETE
-- What was done: Added category-colored left borders, progress bar, full-row tappable items, collapsible categories with item counts, checkboxes, share button
+- What was done: Created src/lib/formatShoppingListEmail.js with category-colored headers, item checkboxes, progress bar, inline styles
 - Issues encountered: None
 
-### Task 6: Shopping List — Share as Text
+### Task 5: Add Email Buttons to UI
 - Status: COMPLETE
-- What was done: Added shareListAsText function, share button copies formatted list to clipboard, shows toast confirmation
+- What was done: Added "Email my plan" button to PlanPage (ghost style below meal cards), added "Email" button to ShopPage header (next to title), both with loading states and error handling
 - Issues encountered: None
 
-### Task 7: Consistent Card Styling
-- Status: COMPLETE
-- What was done: Verified card styling is consistent across pages (rounded-2xl, p-4 mobile, shadow-sm)
-- Issues encountered: None
+### Task 6: Auto-Email on Plan Finalization
+- Status: SKIPPED
+- What was done: None
+- Needs: Database changes for email preferences (Task 7)
 
-### Task 8: Form Input Polish
-- Status: COMPLETE
-- What was done: Verified inputs use input class with proper styling
-- Issues encountered: None
+### Task 7: Email Preferences in Settings
+- Status: SKIPPED
+- What was done: None
+- Needs: Database columns and UI toggles
 
-### Task 9: Smooth Page Transitions
+### Task 8: Create EMAIL_SETUP.md
 - Status: COMPLETE
-- What was done: Added fadeIn animation (150ms) to index.css, applied animate-fadeIn to Routes wrapper in App.jsx
-- Issues encountered: None
-
-### Task 10: Onboarding — Progress Persistence
-- Status: COMPLETE
-- What was done: Added localStorage persistence for current step, redirect to schedule if household + members already exist
-- Issues encountered: None
-
-### Task 11: Final Build and Verify
-- Status: COMPLETE
-- What was done: Build passes, git push completed, https://allio.life returns 200 OK
+- What was done: Created EMAIL_SETUP.md with step-by-step Resend API setup instructions
 - Issues encountered: None
 
 ### Summary
-- Tasks completed: 11/11
-- Known issues: None
-- What to test next: Generate a meal plan and verify recipes have proper instructions, try cooking mode, finalize plan and check shopping list generation, test page transitions
+- Tasks completed: 5
+- Tasks skipped: 2
+- Known issues: Email auto-send on finalize not implemented yet (needs email preferences)
+- What to test next: Sign up flow with email verification, click "Email my plan" button, check email inbox
