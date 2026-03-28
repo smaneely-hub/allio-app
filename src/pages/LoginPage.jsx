@@ -86,7 +86,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-warm-50 px-4 pt-8">
+    <div className="min-h-screen bg-warm-50 px-4 pt-4">
       <div className="w-full max-w-sm mx-auto">
         {/* Brand header */}
         <div className="text-center mb-8">

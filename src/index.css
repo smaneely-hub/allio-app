@@ -4,6 +4,11 @@ html {
   scroll-behavior: smooth;
 }
 
+body {
+  margin: 0;
+  padding: 0;
+}
+
 @theme {
   /* Fonts */
   --font-display: 'DM Serif Display', Georgia, serif;
