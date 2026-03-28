@@ -153,6 +153,14 @@ export function PlanPage() {
           ))}
         </div>
       )}
+
+      {mealPlan?.status === 'active' && (
+        <div className="card mt-4">
+          <button type="button" onClick={() => navigate('/schedule')} className="btn-primary w-full">
+            Plan Next Week →
+          </button>
+        </div>
+      )}
     </div>
   )
 }
