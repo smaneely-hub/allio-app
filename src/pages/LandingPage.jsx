@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Logo } from '../components/Logo'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 // Step component for How It Works
 function Step({ number, title, description, icon }) {
