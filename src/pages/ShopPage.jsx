@@ -331,6 +331,19 @@ export function ShopPage() {
         </div>
       )}
 
+      {/* Grocery Connect - Partnership Infrastructure */}
+      <div className="mt-6 pt-6 border-t border-divider">
+        <div className="text-center mb-4">
+          <div className="text-sm font-medium text-text-secondary mb-3">Shop these ingredients</div>
+          <div className="flex justify-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">Kroger</div>
+            <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">Instacart</div>
+            <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">Walmart</div>
+          </div>
+        </div>
+        <p className="text-xs text-text-muted text-center">Grocery ordering coming soon</p>
+      </div>
+
       {/* Upgrade Prompt Modal */}
       <UpgradePrompt 
         feature={upgradeFeature} 

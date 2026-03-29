@@ -3,11 +3,13 @@ import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useHousehold } from '../hooks/useHousehold'
 import { useAuth } from '../hooks/useAuth'
+import { useSubscription } from '../hooks/useSubscription'
 import { supabase } from '../lib/supabase'
 
 export function SettingsPage() {
   const { household, members, loading } = useHousehold()
   const { user, signOut } = useAuth()
+  const { isPremium, tier, upgradeToPremium } = useSubscription()
   const navigate = useNavigate()
 
   // Get user initial for avatar
@@ -60,6 +62,40 @@ export function SettingsPage() {
             Edit Household
           </Link>
         </div>
+      </div>
+
+      {/* Premium Plan Card */}
+      <div className="card p-5 shadow-sm hover:shadow-md transition-shadow duration-200">
+        {isPremium ? (
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-green-500 to-teal-500 text-white">
+                  ⭐ Premium
+                </span>
+              </div>
+              <div className="font-display text-lg text-text-primary">Premium Plan</div>
+              <div className="text-sm text-text-secondary">$6.99/month</div>
+              <div className="text-xs text-text-muted mt-1">Manage your subscription</div>
+            </div>
+            <button className="btn-secondary text-sm">
+              Manage
+            </button>
+          </div>
+        ) : (
+          <div>
+            <div className="font-display text-lg text-text-primary mb-2">Free Plan</div>
+            <div className="text-sm text-text-secondary mb-4">
+              1 meal plan per week • Basic shopping list
+            </div>
+            <Link 
+              to="/pricing" 
+              className="block w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-semibold py-2.5 px-4 rounded-full text-center text-sm shadow-md hover:shadow-lg transition-all duration-200"
+            >
+              Upgrade to Premium
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Members List */}

@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { SwapModal } from '../SwapModal'
+import { useSubscription } from '../../hooks/useSubscription'
+import { UpgradePrompt } from '../UpgradePrompt'
 
 // Vibrant gradient backgrounds by meal type
 const mealTypeStyles = {
@@ -10,12 +12,14 @@ const mealTypeStyles = {
 }
 
 export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
+  const { isPremium } = useSubscription()
   const [expanded, setExpanded] = useState(false)
   const [cookingMode, setCookingMode] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
   const [note, setNote] = useState(meal.user_note || '')
   const [savingNote, setSavingNote] = useState(false)
   const [showSwapModal, setShowSwapModal] = useState(false)
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
 
   const mealType = (meal.meal || '').toLowerCase()
   const style = mealTypeStyles[mealType] || mealTypeStyles.dinner
@@ -31,6 +35,10 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
   }
 
   const startCooking = () => {
+    if (!isPremium) {
+      setShowUpgradePrompt(true)
+      return
+    }
     setCurrentStep(0)
     setCookingMode(true)
   }
@@ -201,6 +209,12 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
           </div>
         </div>
       )}
+
+      {/* Upgrade Prompt for Cooking Mode */}
+      <UpgradePrompt 
+        feature="cooking_mode" 
+        onClose={() => setShowUpgradePrompt(false)} 
+      />
     </div>
   )
 }
