@@ -1,10 +1,8 @@
 import { Link } from 'react-router-dom'
 
 export function LandingPage() {
-  // Set document title directly without hook (hooks can sometimes cause issues)
-  if (typeof document !== 'undefined') {
-    document.title = "Allio — Dinner, figured out."
-  }
+  // Immediate render test
+  console.log('LandingPage rendering...')
   
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#fff', padding: '20px' }}>
