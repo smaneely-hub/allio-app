@@ -20,7 +20,7 @@ export function CardSkeleton() {
 
 export function MealCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-warm-200 bg-white p-4">
+    <div className="rounded-2xl border border-divider bg-white p-4">
       <Skeleton className="h-36 w-full mb-4 rounded-xl" />
       <Skeleton className="h-5 w-3/4 mb-2" />
       <Skeleton className="h-3 w-1/2" />

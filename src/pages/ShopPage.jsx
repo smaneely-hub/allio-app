@@ -7,14 +7,15 @@ import { shareListAsText } from '../lib/aggregateShoppingList'
 import { formatShoppingListEmail } from '../lib/formatShoppingListEmail'
 import { EmptyState } from '../components/LoadingStates'
 
+// Bold category colors
 const categoryColors = {
-  produce: { border: '#4A9B6E', bg: 'bg-green-50' },
-  protein: { border: '#D97B5A', bg: 'bg-orange-50' },
-  dairy: { border: '#6B9ED6', bg: 'bg-blue-50' },
-  pantry: { border: '#C4976B', bg: 'bg-amber-50' },
-  frozen: { border: '#8BBDD4', bg: 'bg-sky-50' },
-  bakery: { border: '#D4A85B', bg: 'bg-yellow-50' },
-  other: { border: '#9C9589', bg: 'bg-warm-50' },
+  produce: { border: '#22C55E', bg: 'bg-green-50' },
+  protein: { border: '#F97316', bg: 'bg-orange-50' },
+  dairy: { border: '#3B82F6', bg: 'bg-blue-50' },
+  pantry: { border: '#EAB308', bg: 'bg-yellow-50' },
+  frozen: { border: '#06B6D4', bg: 'bg-cyan-50' },
+  bakery: { border: '#D97706', bg: 'bg-amber-50' },
+  other: { border: '#6B7280', bg: 'bg-gray-50' },
 }
 
 export function ShopPage() {
@@ -48,7 +49,6 @@ export function ShopPage() {
         toast.error(error.message)
       } else {
         setShoppingList(data)
-        // Auto-open first category
         if (data?.items?.length > 0) {
           const firstCat = data.items[0].category || 'other'
           setOpenCategories({ [firstCat]: true })
@@ -145,14 +145,14 @@ export function ShopPage() {
 
   if (loading) {
     return (
-      <div className="px-3 pb-24 md:px-0">
+      <div className="px-3 pb-24 md:px-0 pt-2">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 w-32 bg-warm-200 rounded"></div>
-          <div className="h-4 w-48 bg-warm-200 rounded"></div>
+          <div className="h-8 w-32 bg-primary-100 rounded"></div>
+          <div className="h-4 w-48 bg-primary-100 rounded"></div>
           <div className="card p-4">
-            <div className="h-6 w-24 bg-warm-200 rounded mb-3"></div>
+            <div className="h-6 w-24 bg-primary-100 rounded mb-3"></div>
             {[1,2,3].map(i => (
-              <div key={i} className="h-12 bg-warm-100 rounded mb-2"></div>
+              <div key={i} className="h-12 bg-primary-50 rounded mb-2"></div>
             ))}
           </div>
         </div>
@@ -162,7 +162,7 @@ export function ShopPage() {
 
   if (!shoppingList?.items?.length) {
     return (
-      <div className="px-3 pb-24">
+      <div className="px-3 pb-24 pt-2">
         <EmptyState
           emoji="🛒"
           headline="No shopping list yet"
@@ -175,29 +175,36 @@ export function ShopPage() {
   }
 
   return (
-    <div className="px-3 pb-24 md:px-0">
+    <div className="px-3 pb-24 md:px-0 pt-2">
       {/* Header */}
-      <div className="mb-4">
+      <div className="mb-3">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-display text-2xl md:text-3xl text-warm-900">Shopping List</h1>
-            <p className="text-sm text-warm-500">Week of {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+            {/* Gradient accent bar */}
+            <div className="h-1 w-12 bg-gradient-to-r from-primary-400 via-teal-400 to-purple-400 rounded-full mb-2"></div>
+            <h1 className="font-display text-2xl md:text-3xl text-text-primary">Shopping List</h1>
+            <p className="text-sm text-text-muted">Week of {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
           </div>
-          <button type="button" onClick={handleEmailShop} disabled={emailing} className="btn-ghost text-sm">
-            {emailing ? 'Sending...' : '📧 Email'}
+          <button 
+            type="button" 
+            onClick={handleEmailShop} 
+            disabled={emailing} 
+            className="text-sm text-primary-500 hover:bg-primary-50 rounded-lg px-3 py-1.5 transition-all duration-150 active:scale-[0.97]"
+          >
+            {emailing ? 'Sending...' : 'Share'}
           </button>
         </div>
       </div>
 
       {/* Progress bar */}
-      <div className="card p-4 mb-4">
+      <div className="card p-4 mb-3 shadow-sm hover:shadow-md transition-shadow duration-200">
         <div className="flex justify-between text-sm mb-2">
-          <span className="text-warm-600">{progress.checked} of {progress.total} items</span>
-          <span className="text-warm-500">{progress.percent}%</span>
+          <span className="text-text-secondary font-medium">{progress.checked} of {progress.total} items</span>
+          <span className="text-text-muted">{progress.percent}%</span>
         </div>
-        <div className="h-2 bg-warm-100 rounded-full overflow-hidden">
+        <div className="h-2 bg-primary-100 rounded-full overflow-hidden">
           <div 
-            className="h-full bg-primary-400 transition-all"
+            className="h-full bg-green-500 transition-all duration-300"
             style={{ width: `${progress.percent}%` }}
           />
         </div>
@@ -211,20 +218,20 @@ export function ShopPage() {
         
         return (
           <div key={category} className="mb-3">
-            {/* Category header */}
+            {/* Category header - thicker border, bolder */}
             <button
               type="button"
               onClick={() => setOpenCategories(prev => ({ ...prev, [category]: !prev[category] }))}
-              className="w-full card p-3 flex items-center justify-between"
+              className="w-full card p-3 flex items-center justify-between hover:shadow-md transition-shadow duration-200"
               style={{ borderLeft: `4px solid ${colors.border}` }}
             >
               <div className="flex items-center gap-2">
-                <span className="font-display text-base capitalize text-warm-900">{category}</span>
-                <span className="text-xs bg-warm-100 text-warm-600 px-2 py-0.5 rounded-full">
+                <span className="font-bold text-base capitalize text-text-primary">{category}</span>
+                <span className="bg-green-100 text-green-700 rounded-full px-2 py-0.5 text-xs font-semibold">
                   {items.length}
                 </span>
               </div>
-              <span className="text-warm-400 text-sm">
+              <span className="text-text-muted text-sm font-medium">
                 {checkedCount}/{items.length} ✓
               </span>
             </button>
@@ -239,26 +246,26 @@ export function ShopPage() {
                       key={idx}
                       type="button"
                       onClick={() => toggleItem(item.name)}
-                      className={`w-full flex items-center gap-3 p-3 text-left border-b border-warm-100 last:border-0 transition-opacity ${
-                        item.checked ? 'opacity-50' : 'opacity-100'
+                      className={`w-full flex items-center gap-3 p-3 text-left border-b border-white/50 last:border-0 transition-all duration-150 ${
+                        item.checked ? 'opacity-60' : 'opacity-100'
                       }`}
                     >
-                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                        item.checked ? 'bg-primary-400 border-primary-400' : 'border-warm-300'
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-150 ${
+                        item.checked ? 'bg-green-500 border-green-500 scale-90' : 'border-warm-300'
                       }`}>
                         {item.checked && <span className="text-white text-xs">✓</span>}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className={`text-sm ${item.checked ? 'line-through text-warm-400' : 'text-warm-900'}`}>
+                        <div className={`text-base font-semibold ${item.checked ? 'line-through text-text-muted' : 'text-text-primary'}`}>
                           {item.name}
                         </div>
                         {item.used_in?.length > 0 && (
-                          <div className="text-xs text-warm-400">
+                          <div className="text-xs text-text-muted capitalize">
                             {item.used_in.map(u => u.replace('_', ' ')).join(', ')}
                           </div>
                         )}
                       </div>
-                      <div className="text-sm text-warm-500 flex-shrink-0">
+                      <div className="text-sm text-warm-500 bg-warm-100 rounded-full px-2 flex-shrink-0">
                         {item.quantity} {item.unit}
                       </div>
                     </button>
@@ -270,12 +277,20 @@ export function ShopPage() {
       })}
 
       {/* Bottom actions */}
-      <div className="flex gap-3 mt-6">
-        <button type="button" onClick={clearAllChecks} className="btn-secondary flex-1">
-          Clear checks
+      <div className="flex gap-3 mt-4">
+        <button 
+          type="button" 
+          onClick={clearAllChecks} 
+          className="btn-ghost text-text-muted hover:bg-warm-100 flex-1"
+        >
+          Clear all
         </button>
-        <button type="button" onClick={handleShare} className="btn-primary flex-1">
-          📋 Share list
+        <button 
+          type="button" 
+          onClick={handleShare} 
+          className="btn-primary flex-1"
+        >
+          Copy list
         </button>
       </div>
     </div>

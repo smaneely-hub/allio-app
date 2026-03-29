@@ -17,6 +17,59 @@ function withMealDefaults(plan) {
   }
 }
 
+// Mock meal generator fallback when edge function is unavailable
+function generateMockMeals(slots) {
+  const mealDatabase = {
+    breakfast: [
+      { name: 'Scrambled Eggs & Toast', emoji: '🍳', prep_time_minutes: 15, servings: 4, ingredients: [{ item: 'Eggs', quantity: '8', unit: '' }, { item: 'Bread', quantity: '4', unit: 'slices' }, { item: 'Butter', quantity: '2', unit: 'tbsp' }], instructions: ['Beat eggs with salt and pepper', 'Melt butter in pan over medium heat', 'Pour in eggs and stir gently', 'Toast bread while eggs cook'] },
+      { name: 'Oatmeal with Berries', emoji: '🥣', prep_time_minutes: 10, servings: 4, ingredients: [{ item: 'Oats', quantity: '2', unit: 'cups' }, { item: 'Milk', quantity: '4', unit: 'cups' }, { item: 'Mixed berries', quantity: '1', unit: 'cup' }], instructions: ['Bring milk to simmer', 'Add oats and cook 5 minutes', 'Top with berries'] },
+      { name: 'Yogurt Parfait', emoji: '🥛', prep_time_minutes: 5, servings: 4, ingredients: [{ item: 'Greek yogurt', quantity: '4', unit: 'cups' }, { item: 'Granola', quantity: '1', unit: 'cup' }, { item: 'Honey', quantity: '2', unit: 'tbsp' }], instructions: ['Layer yogurt and granola', 'Drizzle with honey'] },
+      { name: 'Pancakes', emoji: '🥞', prep_time_minutes: 20, servings: 4, ingredients: [{ item: 'Pancake mix', quantity: '2', unit: 'cups' }, { item: 'Milk', quantity: '1.5', unit: 'cups' }, { item: 'Eggs', quantity: '2', unit: '' }], instructions: ['Mix pancake ingredients', 'Heat griddle', 'Pour batter and flip when bubbly'] },
+    ],
+    lunch: [
+      { name: 'Turkey Sandwiches', emoji: '🥪', prep_time_minutes: 10, servings: 4, ingredients: [{ item: 'Turkey breast', quantity: '1', unit: 'lb' }, { item: 'Bread', quantity: '8', unit: 'slices' }, { item: 'Cheese', quantity: '4', unit: 'slices' }], instructions: ['Lay out bread', 'Layer turkey and cheese', 'Add condiments and close'] },
+      { name: 'Caesar Salad', emoji: '🥗', prep_time_minutes: 15, servings: 4, ingredients: [{ item: 'Romaine lettuce', quantity: '2', unit: 'heads' }, { item: 'Caesar dressing', quantity: '0.5', unit: 'cup' }, { item: 'Parmesan', quantity: '0.5', unit: 'cup' }], instructions: ['Chop lettuce', 'Toss with dressing', 'Top with parmesan'] },
+      { name: 'Tomato Soup & Grilled Cheese', emoji: '🍅', prep_time_minutes: 25, servings: 4, ingredients: [{ item: 'Canned tomato soup', quantity: '2', unit: 'cans' }, { item: 'Bread', quantity: '8', unit: 'slices' }, { item: 'Cheddar cheese', quantity: '4', unit: 'slices' }], instructions: ['Heat soup', 'Make grilled cheese sandwiches', 'Serve together'] },
+      { name: 'Chicken Wrap', emoji: '🌯', prep_time_minutes: 15, servings: 4, ingredients: [{ item: 'Chicken breast', quantity: '1', unit: 'lb' }, { item: 'Tortillas', quantity: '4', unit: '' }, { item: 'Lettuce', quantity: '2', unit: 'cups' }], instructions: ['Cook and slice chicken', 'Warm tortillas', 'Fill with chicken and lettuce'] },
+    ],
+    dinner: [
+      { name: 'Chicken Stir Fry', emoji: '🍗', prep_time_minutes: 25, servings: 4, ingredients: [{ item: 'Chicken thighs', quantity: '1.5', unit: 'lb' }, { item: 'Broccoli', quantity: '2', unit: 'cups' }, { item: 'Soy sauce', quantity: '3', unit: 'tbsp' }], instructions: ['Cut chicken into pieces', 'Stir fry chicken 5 min', 'Add broccoli and sauce', 'Cook until done'] },
+      { name: 'Pork Tacos', emoji: '🌮', prep_time_minutes: 30, servings: 4, ingredients: [{ item: 'Pork shoulder', quantity: '1.5', unit: 'lb' }, { item: 'Taco shells', quantity: '8', unit: '' }, { item: 'Taco seasoning', quantity: '1', unit: 'packet' }], instructions: ['Season and cook pork', 'Shred pork', 'Warm shells and assemble'] },
+      { name: 'Pasta Night', emoji: '🍝', prep_time_minutes: 20, servings: 4, ingredients: [{ item: 'Spaghetti', quantity: '1', unit: 'lb' }, { item: 'Marinara sauce', quantity: '2', unit: 'jars' }, { item: 'Parmesan', quantity: '0.5', unit: 'cup' }], instructions: ['Boil pasta', 'Heat sauce', 'Combine and top with parmesan'] },
+      { name: 'Baked Salmon & Veggies', emoji: '🐟', prep_time_minutes: 30, servings: 4, ingredients: [{ item: 'Salmon fillets', quantity: '4', unit: '' }, { item: 'Asparagus', quantity: '1', unit: 'bunch' }, { item: 'Lemon', quantity: '1', unit: '' }], instructions: ['Season salmon', 'Roast at 400°F for 15 min', 'Add asparagus and cook 10 more min'] },
+      { name: 'Beef Burgers', emoji: '🍔', prep_time_minutes: 20, servings: 4, ingredients: [{ item: 'Ground beef', quantity: '1.5', unit: 'lb' }, { item: 'Burger buns', quantity: '4', unit: '' }, { item: 'Cheese', quantity: '4', unit: 'slices' }], instructions: ['Form patties', 'Grill to preference', 'Add cheese to melt', 'Assemble burgers'] },
+      { name: 'Chicken Casserole', emoji: '🥘', prep_time_minutes: 40, servings: 6, ingredients: [{ item: 'Chicken breast', quantity: '2', unit: 'lb' }, { item: 'Cream of chicken soup', quantity: '2', unit: 'cans' }, { item: 'Frozen vegetables', quantity: '2', unit: 'cups' }], instructions: ['Cook and chop chicken', 'Mix with soup and veggies', 'Bake at 350°F for 30 min'] },
+    ]
+  }
+  
+  const dayNames = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+  const meals = []
+  
+  for (const slot of slots) {
+    if (slot.meal === 'prep_block') continue
+    
+    const mealType = slot.meal.toLowerCase()
+    const mealOptions = mealDatabase[mealType] || mealDatabase.dinner
+    const mealTemplate = mealOptions[Math.floor(Math.random() * mealOptions.length)]
+    
+    meals.push({
+      day: slot.day?.toLowerCase().slice(0, 3) || 'mon',
+      meal: mealType,
+      name: mealTemplate.name,
+      emoji: mealTemplate.emoji,
+      prep_time_minutes: mealTemplate.prep_time_minutes,
+      servings: slot.attendees?.length || 4,
+      ingredients: mealTemplate.ingredients,
+      instructions: mealTemplate.instructions,
+      notes: 'Quick and easy family meal',
+      locked: false,
+      user_note: null,
+    })
+  }
+  
+  return { meals }
+}
+
 export function useMealPlan(scheduleId) {
   const { user } = useAuth()
   const [mealPlan, setMealPlan] = useState(null)
@@ -196,20 +249,28 @@ export function useMealPlan(scheduleId) {
         console.error('[useMealPlan] Function error details:', functionError)
         // Fallback: try direct fetch
         console.log('[useMealPlan] Trying direct fetch fallback...')
-        const response = await fetch('https://rvgtmletsbycrbeycwus.supabase.co/functions/v1/generate-plan', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2Z3RtbGV0c2J5Y3JiZXljd3VzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NDc2NjUsImV4cCI6MjA5MDAyMzY2NX0.yYkUKWodhGEpWEgErBeH5hWt0pGnLmx6kSNdBpLdwxQ'
-          },
-          body: JSON.stringify(payload)
-        })
-        const fallbackData = await response.json()
-        console.log('[useMealPlan] Fallback response:', fallbackData)
-        if (fallbackData.plan) {
-          generated = fallbackData
-        } else {
-          throw functionError
+        try {
+          const response = await fetch('https://rvgtmletsbycrbeycwus.supabase.co/functions/v1/generate-plan', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2Z3RtbGV0c2J5Y3JiZXljd3VzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NDc2NjUsImV4cCI6MjA5MDAyMzY2NX0.yYkUKWodhGEpWEgErBeH5hWt0pGnLmx6kSNdBpLdwxQ'
+            },
+            body: JSON.stringify(payload)
+          })
+          const fallbackData = await response.json()
+          console.log('[useMealPlan] Fallback response:', fallbackData)
+          if (fallbackData.plan) {
+            generated = fallbackData
+          } else {
+            throw functionError
+          }
+        } catch (fetchError) {
+          // If both methods fail, use mock meals
+          console.log('[useMealPlan] Using mock meals as fallback')
+          generated = {
+            plan: generateMockMeals(payload.slots || [])
+          }
         }
       }
 

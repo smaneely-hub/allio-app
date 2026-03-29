@@ -3,8 +3,8 @@ export function EmptyState({ emoji, headline, body, ctaLabel, ctaLink, onCtaClic
   return (
     <div className="card text-center py-12">
       <div className="text-6xl mb-6">{emoji}</div>
-      <h2 className="font-display text-2xl text-warm-900 mb-3">{headline}</h2>
-      <p className="text-warm-700 max-w-md mx-auto mb-6">{body}</p>
+      <h2 className="font-display text-2xl text-text-primary mb-3">{headline}</h2>
+      <p className="text-text-primary max-w-md mx-auto mb-6">{body}</p>
       {ctaLabel && (ctaLink || onCtaClick) && (
         ctaLink ? (
           <a href={ctaLink} className="btn-primary inline-block">
@@ -25,28 +25,28 @@ export function OnboardingSkeleton() {
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <div className="h-5 w-32 bg-warm-200 animate-pulse rounded"></div>
+        <div className="h-5 w-32 bg-primary-100 animate-pulse rounded"></div>
         <div className="grid gap-5 md:grid-cols-2">
           <div className="space-y-2">
-            <div className="h-4 w-24 bg-warm-200 animate-pulse rounded"></div>
-            <div className="h-12 w-full bg-warm-200 animate-pulse rounded-xl"></div>
+            <div className="h-4 w-24 bg-primary-100 animate-pulse rounded"></div>
+            <div className="h-12 w-full bg-primary-100 animate-pulse rounded-xl"></div>
           </div>
           <div className="space-y-2">
-            <div className="h-4 w-24 bg-warm-200 animate-pulse rounded"></div>
-            <div className="h-12 w-full bg-warm-200 animate-pulse rounded-xl"></div>
+            <div className="h-4 w-24 bg-primary-100 animate-pulse rounded"></div>
+            <div className="h-12 w-full bg-primary-100 animate-pulse rounded-xl"></div>
           </div>
         </div>
       </div>
       <div className="space-y-4 pt-6">
-        <div className="h-5 w-32 bg-warm-200 animate-pulse rounded"></div>
+        <div className="h-5 w-32 bg-primary-100 animate-pulse rounded"></div>
         <div className="card p-5">
           <div className="flex items-center justify-between mb-4">
-            <div className="h-4 w-24 bg-warm-200 animate-pulse rounded"></div>
-            <div className="h-8 w-24 bg-warm-200 animate-pulse rounded-full"></div>
+            <div className="h-4 w-24 bg-primary-100 animate-pulse rounded"></div>
+            <div className="h-8 w-24 bg-primary-100 animate-pulse rounded-full"></div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="h-10 bg-warm-200 animate-pulse rounded-xl"></div>
-            <div className="h-10 bg-warm-200 animate-pulse rounded-xl"></div>
+            <div className="h-10 bg-primary-100 animate-pulse rounded-xl"></div>
+            <div className="h-10 bg-primary-100 animate-pulse rounded-xl"></div>
           </div>
         </div>
       </div>
@@ -61,10 +61,10 @@ export function ScheduleSkeleton() {
     <div className="grid gap-4 md:grid-cols-7">
       {days.map((day) => (
         <div key={day} className="card p-4">
-          <div className="h-4 w-12 bg-warm-200 animate-pulse rounded mb-4"></div>
+          <div className="h-4 w-12 bg-primary-100 animate-pulse rounded mb-4"></div>
           <div className="space-y-3">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-20 bg-warm-100 animate-pulse rounded-xl"></div>
+              <div key={i} className="h-20 bg-primary-50 animate-pulse rounded-xl"></div>
             ))}
           </div>
         </div>
@@ -76,10 +76,10 @@ export function ScheduleSkeleton() {
 // Skeleton for meal card
 export function MealCardSkeleton() {
   return (
-    <div className="rounded-2xl border border-warm-200 bg-white p-4">
-      <div className="h-36 bg-warm-100 animate-pulse rounded-t-2xl -mx-4 -mt-4 mb-4"></div>
-      <div className="h-5 w-3/4 bg-warm-200 animate-pulse rounded mb-2"></div>
-      <div className="h-3 w-1/2 bg-warm-200 animate-pulse rounded"></div>
+    <div className="rounded-2xl border border-divider bg-white p-4">
+      <div className="h-36 bg-primary-50 animate-pulse rounded-t-2xl -mx-4 -mt-4 mb-4"></div>
+      <div className="h-5 w-3/4 bg-primary-100 animate-pulse rounded mb-2"></div>
+      <div className="h-3 w-1/2 bg-primary-100 animate-pulse rounded"></div>
     </div>
   )
 }
@@ -91,7 +91,7 @@ export function PlanSkeleton() {
     <div className="grid gap-4 md:grid-cols-7">
       {days.map((day) => (
         <div key={day} className="card p-4">
-          <div className="h-4 w-12 bg-warm-200 animate-pulse rounded mb-4"></div>
+          <div className="h-4 w-12 bg-primary-100 animate-pulse rounded mb-4"></div>
           <div className="space-y-3">
             <MealCardSkeleton />
             <MealCardSkeleton />
@@ -108,10 +108,10 @@ export function ShopSkeleton() {
   return (
     <div className="space-y-6">
       <div className="card">
-        <div className="h-6 w-32 bg-warm-200 animate-pulse rounded mb-4"></div>
+        <div className="h-6 w-32 bg-primary-100 animate-pulse rounded mb-4"></div>
         <div className="space-y-3">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-16 bg-warm-100 animate-pulse rounded-xl"></div>
+            <div key={i} className="h-16 bg-primary-50 animate-pulse rounded-xl"></div>
           ))}
         </div>
       </div>
@@ -154,7 +154,7 @@ export function PlanGenerationLoading() {
         </div>
       </div>
       
-      <h2 className="font-display text-2xl md:text-3xl text-warm-900 mb-2">
+      <h2 className="font-display text-2xl md:text-3xl text-text-primary mb-2">
         {loadingMessages[messageIndex]}
       </h2>
       

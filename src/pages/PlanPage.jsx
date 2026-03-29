@@ -34,22 +34,24 @@ export function PlanPage() {
   const { schedule } = useSchedule(scheduleId)
   const { user } = useAuth()
 
-  // Auto-generate on mount if requested
+  const hasMeals = mealPlan?.draft_plan?.meals?.length > 0 || mealPlan?.plan?.meals?.length > 0
   useEffect(() => {
-    if (autoGenerate && !loading && !mealPlan && !generating) {
+    if (autoGenerate && !loading && !hasMeals && !generating) {
       console.log('[PlanPage] Auto-generating meal plan...')
-      generateMealPlan().catch(err => {
-        console.error('[PlanPage] Auto-generate failed:', err)
-      })
+      generateMealPlan()
+        .then(() => console.log('[PlanPage] Auto-generate completed'))
+        .catch(err => {
+          console.error('[PlanPage] Auto-generate failed:', err)
+          toast.error(err.message || 'Failed to generate meal plan')
+        })
     }
-  }, [autoGenerate, loading, mealPlan, generating])
+  }, [autoGenerate, loading, hasMeals, generating])
 
-  // Remove auto_generate from URL after triggering
   useEffect(() => {
-    if (autoGenerate && mealPlan) {
+    if (autoGenerate && hasMeals) {
       navigate(window.location.pathname + '?schedule_id=' + scheduleId, { replace: true })
     }
-  }, [autoGenerate, mealPlan])
+  }, [autoGenerate, hasMeals])
 
   const groupedMeals = useMemo(() => {
     const meals = mealPlan?.draft_plan?.meals || mealPlan?.plan?.meals || []
@@ -59,7 +61,6 @@ export function PlanPage() {
     }, {})
   }, [mealPlan])
 
-  // Only show days that have meals
   const activeDays = useMemo(() => {
     const meals = mealPlan?.draft_plan?.meals || mealPlan?.plan?.meals || []
     const daysWithMeals = [...new Set(meals.map((m) => m.day))]
@@ -82,14 +83,10 @@ export function PlanPage() {
 
   const handleFinalize = async () => {
     try {
-      // Finalize the plan first
       await finalizePlan()
-      
-      // Generate shopping list
       const meals = mealPlan?.draft_plan?.meals || []
       const items = aggregateShoppingList({ meals }, household?.staples_on_hand || '')
       
-      // Save to shopping_lists table
       const { error: shopError } = await supabase
         .from('shopping_lists')
         .upsert({
@@ -109,7 +106,6 @@ export function PlanPage() {
     }
   }
 
-  // Email sending
   const [emailing, setEmailing] = useState(false)
   
   const handleEmailPlan = async () => {
@@ -146,58 +142,75 @@ export function PlanPage() {
     }
   }
 
+  const isDraft = mealPlan?.status !== 'active'
+
   return (
     <div className="pb-24">
       {/* Week context header */}
-      <div className="mb-3 px-1">
-        <div className="text-sm text-warm-500">
+      <div className="mb-3 px-1 pt-2">
+        {/* Gradient accent */}
+        <div className="h-1 w-12 bg-gradient-to-r from-primary-400 via-teal-400 to-purple-400 rounded-full mb-2"></div>
+        <div className="text-sm text-text-muted">
           {schedule?.week_start ? `Week of ${new Date(schedule.week_start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'This week'}
         </div>
-        <div className="font-display text-2xl md:text-3xl text-warm-900">
-          {household?.household_name || household?.name || 'Meal Plan'}
+        <div className="font-display text-2xl md:text-3xl text-text-primary">
+          Your Meal Plan
         </div>
       </div>
       
-      {/* Mobile-first header - minimal top gap */}
-      <div className="card pt-2 md:pt-3">
-        {/* Status badge - own line */}
-        <div className="mb-2 inline-flex rounded-full bg-warm-100 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-warm-700">
+      {/* Action card */}
+      <div className="card pt-3 pb-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+        {/* Status badge */}
+        <div className={`mb-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+          isDraft 
+            ? 'bg-amber-100 text-amber-700' 
+            : 'bg-green-100 text-green-700'
+        }`}>
           {mealPlan?.status || 'draft'}
         </div>
         
-        {/* Heading - smaller on mobile */}
-        <h1 className="font-display text-xl md:text-3xl text-warm-900">Meal Plan</h1>
-        
-        {/* Generate button - full width on mobile */}
-        <button type="button" onClick={handleGenerate} disabled={generating || !scheduleId} className="btn-primary w-full mt-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50">
-          {generating ? 'Planning your meals…' : 'Generate'}
-        </button>
-        
-        {/* Action buttons - side by side on mobile */}
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <button type="button" onClick={handleFinalize} disabled={!mealPlan} className="btn-secondary text-xs font-medium disabled:opacity-50">
-            Finalize Plan
+        {/* Generate button - hero style when no meals */}
+        {!hasMeals ? (
+          <button 
+            type="button" 
+            onClick={handleGenerate} 
+            disabled={generating || !scheduleId} 
+            className="w-full mt-2 bg-gradient-to-r from-green-500 to-teal-500 text-white font-bold py-4 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+          >
+            {generating ? 'Planning your meals…' : '✨ Generate Your Meal Plan'}
           </button>
-          <button type="button" onClick={() => navigate('/shop')} className="btn-secondary text-xs font-medium">
-            View Shopping List
-          </button>
-        </div>
+        ) : (
+          <>
+            <button type="button" onClick={handleGenerate} disabled={generating || !scheduleId} className="btn-primary w-full mt-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+              {generating ? 'Planning your meals…' : 'Generate'}
+            </button>
+            
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <button type="button" onClick={handleFinalize} disabled={!mealPlan} className="btn-secondary text-sm disabled:opacity-50">
+                Finalize
+              </button>
+              <button type="button" onClick={() => navigate('/shop')} className="btn-secondary text-sm">
+                Shopping List
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Meal cards - full width, less padding */}
+      {/* Loading/Error states */}
       {generating ? (
         <PlanGenerationLoading />
       ) : loading ? (
         <PlanSkeleton />
       ) : error ? (
-        <div className="card border-2 border-red-200 bg-red-50 mx-3">
+        <div className="card mt-4 border-2 border-red-200 bg-red-50/50 mx-3">
           <div className="text-sm text-red-700">{error.message || 'Something went wrong while loading the plan.'}</div>
           <button type="button" onClick={handleGenerate} className="mt-4 btn-primary">
             Retry
           </button>
         </div>
       ) : !(mealPlan?.draft_plan?.meals?.length || mealPlan?.plan?.meals?.length) ? (
-        <div className="mx-3">
+        <div className="mx-3 mt-4">
           <EmptyState
             emoji="🍽️"
             headline="Your week is wide open"
@@ -207,10 +220,11 @@ export function PlanPage() {
           />
         </div>
       ) : (
-        <div className="space-y-4 px-3 md:px-0">
+        // Meal cards by day
+        <div className="space-y-4 px-3 md:px-0 mt-4">
           {activeDays.map((day) => (
-            <div key={day} className="card p-3 md:p-4">
-              <div className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-warm-500">{dayLabels[day] || day}</div>
+            <div key={day} className="card p-4 hover:shadow-md transition-shadow duration-200">
+              <div className="mb-3 font-display text-sm font-semibold uppercase tracking-wide text-text-secondary">{dayLabels[day] || day}</div>
               <div className="space-y-3">
                 {groupedMeals[day]?.length ? (
                   groupedMeals[day].map((meal, index) => (
@@ -223,7 +237,7 @@ export function PlanPage() {
                     />
                   ))
                 ) : (
-                  <div className="rounded-xl border border-dashed border-warm-200 p-3 text-xs text-warm-400">No meals yet</div>
+                  <div className="rounded-xl border border-dashed border-divider p-4 text-sm text-text-muted text-center">No meals yet</div>
                 )}
               </div>
             </div>
@@ -231,8 +245,9 @@ export function PlanPage() {
         </div>
       )}
 
+      {/* Bottom actions */}
       {mealPlan?.status === 'active' && (
-        <div className="card mt-4">
+        <div className="card mt-4 mx-3">
           <button type="button" onClick={() => navigate('/schedule')} className="btn-primary w-full">
             Plan Next Week →
           </button>
@@ -240,8 +255,8 @@ export function PlanPage() {
       )}
 
       {mealPlan?.status === 'active' && (
-        <div className="card mt-3">
-          <button type="button" onClick={handleEmailPlan} disabled={emailing} className="btn-ghost w-full text-sm">
+        <div className="card mt-3 mx-3">
+          <button type="button" onClick={handleEmailPlan} disabled={emailing} className="btn-ghost w-full text-sm text-text-secondary">
             {emailing ? 'Sending...' : '📧 Email my plan'}
           </button>
         </div>

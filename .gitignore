@@ -23,3 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# Credentials
+.env.local
+CREDENTIALS.md
+.env.production

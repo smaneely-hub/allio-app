@@ -7,8 +7,8 @@ import { supabase } from '../lib/supabase'
 function Leaf({ className = '' }) {
   return (
     <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 008 17c8-20 20-8 0-13z" fill="#22C55E" fillOpacity="0.3"/>
-      <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 008 17c8-20 20-8 0-13z" stroke="#16A34A" strokeWidth="1"/>
+      <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 008 17c8-20 20-8 0-13z" fill="#5FAF7A" fillOpacity="0.5"/>
+      <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 008 17c8-20 20-8 0-13z" stroke="#5FAF7A" strokeWidth="1"/>
     </svg>
   )
 }
@@ -31,21 +31,8 @@ export function LoginPage() {
     return null
   }, [email, password])
 
-  const handleResendVerification = async () => {
-    setResending(true)
-    try {
-      const { error } = await supabase.auth.resend({ type: 'signup', email })
-      if (error) throw error
-      toast.success('Verification email resent!')
-    } catch (error) {
-      toast.error(error.message || 'Could not resend email')
-    } finally {
-      setResending(false)
-    }
-  }
-
-  const handleSubmit = async (event) => {
-    event.preventDefault()
+  const handleSubmit = async (e) => {
+    e.preventDefault()
     if (validationError) {
       toast.error(validationError)
       return
@@ -54,22 +41,17 @@ export function LoginPage() {
     setLoading(true)
     try {
       if (isSignup) {
-        const { data, error } = await supabase.auth.signUp({ 
-          email, 
+        const { error } = await supabase.auth.signUp({
+          email,
           password,
-          options: { emailRedirectTo: window.location.origin }
+          options: {
+            emailRedirectTo: window.location.origin
+          }
         })
         if (error) throw error
-
-        if (data.user?.id && data.user?.email_confirmed_at) {
-          navigate('/onboarding', { replace: true })
-          toast.success('Account created successfully.')
-        } else if (data.user?.id) {
-          setConfirmationSent(true)
-          toast.success('Check your email to activate your account.')
-        } else {
-          toast.success('Account created. Check your email to confirm.')
-        }
+        
+        setConfirmationSent(true)
+        toast.success('Account created. Check your email to confirm.')
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
@@ -88,129 +70,163 @@ export function LoginPage() {
         }
         toast.success('Welcome back.')
       }
-    } catch (error) {
-      toast.error(error.message || 'Authentication failed.')
+    } catch (err) {
+      toast.error(err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-teal-50 to-green-50 px-4 pt-8 relative overflow-hidden">
-      {/* Decorative leaves */}
-      <div className="absolute top-20 left-10 opacity-30 rotate-12"><Leaf /></div>
-      <div className="absolute top-40 right-20 opacity-20 -rotate-6"><Leaf /></div>
-      <div className="absolute bottom-20 left-1/4 opacity-30 rotate-45"><Leaf /></div>
-      <div className="absolute top-60 right-1/3 opacity-20"><Leaf /></div>
-      
-      <div className="w-full max-w-sm mx-auto relative z-10">
-        {/* Brand header */}
-        <div className="text-center mb-8">
-          <h1 className="font-display text-3xl text-warm-900">
-            Allio <span className="text-primary-400">.</span>
-          </h1>
-          <p className="mt-2 text-warm-400">Dinner, figured out.</p>
-        </div>
+  const handleResendVerification = async () => {
+    setResending(true)
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email
+      })
+      if (error) throw error
+      toast.success('Verification email resent.')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setResending(false)
+    }
+  }
 
-        {/* Email confirmation screen */}
-        {confirmationSent ? (
-          <div className="space-y-6">
-            <div className="text-5xl text-center">📧</div>
-            <h2 className="font-display text-xl text-warm-900 text-center">Check your email!</h2>
-            <p className="text-sm text-warm-600 text-center">
-              We sent a verification link to <strong>{email}</strong>. 
-              Click it to activate your account.
-            </p>
-            <button
-              type="button"
-              onClick={handleResendVerification}
-              disabled={resending}
-              className="btn-primary w-full"
-            >
-              {resending ? 'Sending...' : 'Resend verification email'}
-            </button>
-            <div className="text-center text-sm text-warm-500">
-              Already verified?{' '}
-              <button type="button" onClick={() => { setConfirmationSent(false); setMode('login') }} className="text-primary-400 font-medium hover:underline">
-                Log in
-              </button>
+  return (
+    <div className="min-h-screen bg-bg-primary flex items-center justify-center p-4">
+      {/* Logo with leaf - calm design */}
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <div className="relative inline-block">
+            <h1 className="font-display text-4xl text-text-primary">
+              Allio
+            </h1>
+            <div className="absolute -top-0 -right-5">
+              <Leaf className="w-5 h-5" />
             </div>
           </div>
-        ) : (
-          <>
-            {/* Mode toggle */}
-            <div className="mb-6 grid grid-cols-2 rounded-full bg-warm-100 p-1">
-              <button
-                type="button"
-                onClick={() => setMode('login')}
-                className={`rounded-full py-2 text-sm font-medium transition-all duration-150 ${
-                  !isSignup ? 'bg-white text-warm-900 shadow-sm' : 'text-warm-500'
-                }`}
-              >
-                Log in
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode('signup')}
-                className={`rounded-full py-2 text-sm font-medium transition-all duration-150 ${
-                  isSignup ? 'bg-white text-warm-900 shadow-sm' : 'text-warm-500'
-                }`}
-              >
-                Sign up
-              </button>
-            </div>
+          <p className="text-text-secondary mt-2 text-sm">
+            Your household, simplified.
+          </p>
+        </div>
 
-            {/* Form */}
-            <form className="space-y-4" onSubmit={handleSubmit}>
-              <div>
-                <input
-                  type="email"
-                  placeholder="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="input w-full"
-                  autoComplete="email"
-                />
-              </div>
-              <div>
-                <input
-                  type="password"
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input w-full"
-                  autoComplete={isSignup ? 'new-password' : 'current-password'}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading || !!validationError}
-                className="btn-primary w-full py-3"
+        {/* Card */}
+        <div className="bg-white rounded-2xl shadow-card p-6 md:p-8">
+          {confirmationSent ? (
+            <div className="text-center py-6">
+              <div className="text-4xl mb-4">✉️</div>
+              <h2 className="font-display text-xl text-text-primary mb-2">Check your email!</h2>
+              <p className="text-text-secondary text-sm mb-4">
+                We sent a confirmation link to <span className="font-medium">{email}</span>
+              </p>
+              <button 
+                type="button"
+                onClick={handleResendVerification}
+                disabled={resending}
+                className="text-sm text-primary-400 hover:underline disabled:opacity-50"
               >
-                {loading ? '...' : isSignup ? 'Create account' : 'Log in'}
+                {resending ? 'Sending...' : 'Resend email'}
               </button>
-            </form>
-
-            {/* Bottom link */}
-            <div className="mt-6 text-center text-sm text-warm-400">
-              {isSignup ? (
-                <>
-                  Already have an account?{' '}
-                  <button type="button" onClick={() => setMode('login')} className="text-primary-400 font-medium hover:underline">
-                    Log in
-                  </button>
-                </>
-              ) : (
-                <>
-                  No account?{' '}
-                  <button type="button" onClick={() => setMode('signup')} className="text-primary-400 font-medium hover:underline">
-                    Sign up
-                  </button>
-                </>
-              )}
+              <div className="mt-6 text-sm text-text-muted">
+                Already verified?{' '}
+                <button type="button" onClick={() => { setConfirmationSent(false); setMode('login') }} className="text-primary-400 font-medium hover:underline">
+                  Log in
+                </button>
+              </div>
             </div>
-          </>
-        )}
+          ) : (
+            <>
+              {/* Mode toggle */}
+              <div className="mb-6 grid grid-cols-2 rounded-xl bg-bg-primary p-1">
+                <button
+                  type="button"
+                  onClick={() => setMode('login')}
+                  className={`rounded-lg py-2 text-sm font-medium transition-all duration-150 ${
+                    !isSignup ? 'bg-white shadow-sm text-text-primary' : 'text-text-muted'
+                  }`}
+                >
+                  Log in
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode('signup')}
+                  className={`rounded-lg py-2 text-sm font-medium transition-all duration-150 ${
+                    isSignup ? 'bg-white shadow-sm text-text-primary' : 'text-text-muted'
+                  }`}
+                >
+                  Sign up
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="input"
+                    autoComplete="email"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-text-secondary mb-1.5">
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="input"
+                    autoComplete={isSignup ? 'new-password' : 'current-password'}
+                    required
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading || !!validationError}
+                  className="btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? '...' : isSignup ? 'Create account' : 'Log in'}
+                </button>
+              </form>
+
+              {/* Bottom link */}
+              <div className="mt-6 text-center text-sm text-text-muted">
+                {isSignup ? (
+                  <>
+                    Already have an account?{' '}
+                    <button type="button" onClick={() => setMode('login')} className="text-primary-400 font-medium hover:underline">
+                      Log in
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    No account?{' '}
+                    <button type="button" onClick={() => setMode('signup')} className="text-primary-400 font-medium hover:underline">
+                      Sign up
+                    </button>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Back to home */}
+        <div className="text-center mt-6">
+          <a href="/" className="text-sm text-text-muted hover:text-text-secondary hover:underline">
+            ← Back to home
+          </a>
+        </div>
       </div>
     </div>
   )

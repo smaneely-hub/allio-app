@@ -57,9 +57,10 @@ export function OnboardingPage() {
     localStorage.setItem('onboarding_step', step.toString())
   }, [step])
 
-  // Redirect to schedule if onboarding is already complete
+  // Redirect to schedule if onboarding is already complete (unless in edit mode)
   useEffect(() => {
-    if (household && savedMembers.length > 0 && !loading) {
+    const isEditMode = new URLSearchParams(window.location.search).get('edit') === 'true'
+    if (!isEditMode && household && savedMembers.length > 0 && !loading) {
       // Already complete - redirect to schedule
       navigate('/schedule', { replace: true })
     }
@@ -182,9 +183,9 @@ export function OnboardingPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-4 md:space-y-6 px-3 md:px-6 pb-24">
       <div className="card">
-        <div className="mb-2 text-sm font-medium text-warm-400">Step {step} of 3</div>
-        <h1 className="font-display text-3xl text-warm-900">Household onboarding</h1>
-        <p className="mt-2 text-sm text-warm-700">Set up your planning profile once, then Allio can generate smarter weekly plans.</p>
+        <div className="mb-2 text-sm font-medium text-text-muted">Step {step} of 3</div>
+        <h1 className="font-display text-3xl text-text-primary">Household onboarding</h1>
+        <p className="mt-2 text-sm text-text-primary">Set up your planning profile once, then Allio can generate smarter weekly plans.</p>
       </div>
 
       <div className="card">
@@ -192,18 +193,18 @@ export function OnboardingPage() {
           <OnboardingSkeleton />
         ) : (
           <div className="space-y-6">
-            <h2 className="text-xl font-semibold text-warm-900">Household Basics</h2>
+            <h2 className="text-xl font-semibold text-text-primary">Household Basics</h2>
             <div className="grid gap-5 md:grid-cols-2">
               <div>
-                <div className="text-sm font-medium text-warm-700 mb-2">Total people</div>
+                <div className="text-sm font-medium text-text-primary mb-2">Total people</div>
                 <div className="flex flex-wrap gap-2">
                   {(['1','2','3','4','5+']).map((o) => (
-                    <button key={o} className={`rounded-full border px-4 py-2 text-sm ${form.total_people === o ? 'bg-white border-primary-400 text-primary-600' : 'border-warm-200 text-warm-700'}`} onClick={() => updateForm('total_people', o)}>{o}</button>
+                    <button key={o} className={`rounded-full border px-4 py-2 text-sm ${form.total_people === o ? 'bg-white border-primary-400 text-primary-600' : 'border-divider text-text-primary'}`} onClick={() => updateForm('total_people', o)}>{o}</button>
                   ))}
                 </div>
               </div>
               <div>
-                <div className="text-sm font-medium text-warm-700 mb-2">Planning scope</div>
+                <div className="text-sm font-medium text-text-primary mb-2">Planning scope</div>
                 <select value={form.planning_scope} onChange={(e) => updateForm('planning_scope', e.target.value)} className="input">
                   {['entire household','adults only','mixed'].map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
@@ -211,7 +212,7 @@ export function OnboardingPage() {
                 </select>
               </div>
               <div>
-                <div className="text-sm font-medium text-warm-700 mb-2">Meal sharing</div>
+                <div className="text-sm font-medium text-text-primary mb-2">Meal sharing</div>
                 <select value={form.meal_sharing} onChange={(e) => updateForm('meal_sharing', e.target.value)} className="input">
                   {['mostly shared','mixed','mostly individual'].map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
@@ -219,7 +220,7 @@ export function OnboardingPage() {
                 </select>
               </div>
               <div>
-                <div className="text-sm font-medium text-warm-700 mb-2">Budget sensitivity</div>
+                <div className="text-sm font-medium text-text-primary mb-2">Budget sensitivity</div>
                 <select value={form.budget_sensitivity} onChange={(e) => updateForm('budget_sensitivity', e.target.value)} className="input">
                   {['low','moderate','high'].map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
@@ -227,7 +228,7 @@ export function OnboardingPage() {
                 </select>
               </div>
               <div>
-                <div className="text-sm font-medium text-warm-700 mb-2">Diet focus</div>
+                <div className="text-sm font-medium text-text-primary mb-2">Diet focus</div>
                 <select value={form.diet_focus} onChange={(e) => updateForm('diet_focus', e.target.value)} className="input">
                   {['balanced','high protein','budget-conscious','mediterranean','other'].map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
@@ -235,7 +236,7 @@ export function OnboardingPage() {
                 </select>
               </div>
               <div>
-                <div className="text-sm font-medium text-warm-700 mb-2">Typical weeknight dinner</div>
+                <div className="text-sm font-medium text-text-primary mb-2">Typical weeknight dinner</div>
                 <select value={form.cooking_comfort} onChange={(e) => updateForm('cooking_comfort', e.target.value)} className="input">
                   {['takeout or frozen','simple meals','cook from scratch','love cooking'].map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
@@ -248,19 +249,19 @@ export function OnboardingPage() {
         {step === 2 && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="font-display text-xl text-warm-900">Household Members</h2>
+              <h2 className="font-display text-xl text-text-primary">Household Members</h2>
               <button onClick={() => setMembers((c) => [...c, { id: undefined, name: '', age: '', role: 'adult', label: `A${members.length + 1}` }])} className="btn-secondary text-sm">Add member</button>
             </div>
             {members.map((m, idx) => (
               <div key={m.id ?? idx} className="card p-5">
-                <div className="mb-3 text-sm font-medium text-warm-700">Member {idx + 1}</div>
+                <div className="mb-3 text-sm font-medium text-text-primary">Member {idx + 1}</div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <div className="text-sm font-medium text-warm-700 mb-1">Label / name</div>
+                    <div className="text-sm font-medium text-text-primary mb-1">Label / name</div>
                     <input className="input" value={m.name} onChange={(e) => updateMember(idx, 'name', e.target.value)} placeholder={m.label} />
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-warm-700 mb-1">Age</div>
+                    <div className="text-sm font-medium text-text-primary mb-1">Age</div>
                     <input className="input" value={m.age} onChange={(e) => updateMember(idx, 'age', e.target.value)} />
                   </div>
                 </div>
@@ -270,7 +271,7 @@ export function OnboardingPage() {
                   <div className="text-xs font-medium text-warm-600 mb-2">Dietary restrictions (optional)</div>
                   <div className="flex flex-wrap gap-2">
                     {['vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'nut allergy', 'shellfish allergy', 'egg allergy', 'soy allergy', 'kosher', 'halal'].map((opt) => (
-                      <button key={opt} type="button" onClick={() => toggleMemberChip(idx, 'dietary_restrictions', opt)} className={`rounded-full border px-3 py-1 text-xs ${(m.dietary_restrictions || []).includes(opt) ? 'bg-primary-50 border-primary-400 text-primary-700' : 'border-warm-200 text-warm-700'}`}>{opt}</button>
+                      <button key={opt} type="button" onClick={() => toggleMemberChip(idx, 'dietary_restrictions', opt)} className={`rounded-full border px-3 py-1 text-xs ${(m.dietary_restrictions || []).includes(opt) ? 'bg-primary-50 border-primary-400 text-primary-700' : 'border-divider text-text-primary'}`}>{opt}</button>
                     ))}
                   </div>
                 </div>
@@ -280,7 +281,7 @@ export function OnboardingPage() {
                   <div className="text-xs font-medium text-warm-600 mb-2">Food preferences (optional)</div>
                   <div className="flex flex-wrap gap-2">
                     {['loves spicy', 'prefers mild', 'picky eater', 'adventurous', 'comfort food lover'].map((opt) => (
-                      <button key={opt} type="button" onClick={() => toggleMemberChip(idx, 'food_preferences', opt)} className={`rounded-full border px-3 py-1 text-xs ${(m.food_preferences || []).includes(opt) ? 'bg-primary-50 border-primary-400 text-primary-700' : 'border-warm-200 text-warm-700'}`}>{opt}</button>
+                      <button key={opt} type="button" onClick={() => toggleMemberChip(idx, 'food_preferences', opt)} className={`rounded-full border px-3 py-1 text-xs ${(m.food_preferences || []).includes(opt) ? 'bg-primary-50 border-primary-400 text-primary-700' : 'border-divider text-text-primary'}`}>{opt}</button>
                     ))}
                   </div>
                 </div>
@@ -290,10 +291,10 @@ export function OnboardingPage() {
                   <div className="text-xs font-medium text-warm-600 mb-2">Health considerations (optional)</div>
                   <div className="flex flex-wrap gap-2">
                     {['low sodium', 'low sugar', 'heart-healthy', 'high protein', 'low carb', 'anti-inflammatory', 'pregnancy-safe'].map((opt) => (
-                      <button key={opt} type="button" onClick={() => toggleMemberChip(idx, 'health_considerations', opt)} className={`rounded-full border px-3 py-1 text-xs ${(m.health_considerations || []).includes(opt) ? 'bg-primary-50 border-primary-400 text-primary-700' : 'border-warm-200 text-warm-700'}`}>{opt}</button>
+                      <button key={opt} type="button" onClick={() => toggleMemberChip(idx, 'health_considerations', opt)} className={`rounded-full border px-3 py-1 text-xs ${(m.health_considerations || []).includes(opt) ? 'bg-primary-50 border-primary-400 text-primary-700' : 'border-divider text-text-primary'}`}>{opt}</button>
                     ))}
                   </div>
-                  <p className="mt-2 text-xs text-warm-400">Health info is optional and helps us suggest better meals. Not medical advice.</p>
+                  <p className="mt-2 text-xs text-text-muted">Health info is optional and helps us suggest better meals. Not medical advice.</p>
                 </div>
               </div>
             ))}
@@ -301,38 +302,38 @@ export function OnboardingPage() {
         )}
         {step === 3 && (
           <div className="space-y-6">
-            <h2 className="font-display text-xl text-warm-900">Preferences & Behavior</h2>
+            <h2 className="font-display text-xl text-text-primary">Preferences & Behavior</h2>
             <div className="grid gap-5 md:grid-cols-2">
               <div>
-                <div className="text-sm font-medium text-warm-700 mb-1">Low-prep nights</div>
+                <div className="text-sm font-medium text-text-primary mb-1">Low-prep nights</div>
                 <select value={form.low_prep_nights_needed} onChange={(e) => updateForm('low_prep_nights_needed', e.target.value)} className="input">
                   {['0','1','2','3+'].map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
               <div>
-                <div className="text-sm font-medium text-warm-700 mb-1">Repeat meal tolerance</div>
+                <div className="text-sm font-medium text-text-primary mb-1">Repeat meal tolerance</div>
                 <select value={form.repeat_meal_tolerance} onChange={(e) => updateForm('repeat_meal_tolerance', e.target.value)} className="input">
                   {['low','moderate','high'].map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
               <div>
-                <div className="text-sm font-medium text-warm-700 mb-1">Leftovers for lunch</div>
+                <div className="text-sm font-medium text-text-primary mb-1">Leftovers for lunch</div>
                 <select value={form.leftovers_for_lunch} onChange={(e) => updateForm('leftovers_for_lunch', e.target.value)} className="input">
                   {['yes','no','sometimes'].map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
               <div>
-                <div className="text-sm font-medium text-warm-700 mb-1">Adventurousness</div>
+                <div className="text-sm font-medium text-text-primary mb-1">Adventurousness</div>
                 <select value={form.adventurousness} onChange={(e) => updateForm('adventurousness', e.target.value)} className="input">
                   {['low','mixed','high'].map((o) => <option key={o} value={o}>{o}</option>)}
                 </select>
               </div>
             </div>
             <div>
-              <div className="text-sm font-medium text-warm-700 mb-3">Planning priorities</div>
+              <div className="text-sm font-medium text-text-primary mb-3">Planning priorities</div>
               <div className="flex flex-wrap gap-2">
                 {['healthy eating','reduce grocery chaos','kid-friendly dinners','lower food waste','support lunches with leftovers','stay on budget'].map((p) => (
-                  <button key={p} type="button" onClick={() => togglePriority(p)} className={`rounded-full border px-3 py-1 text-sm ${form.planning_priorities.includes(p) ? 'bg-primary-50 border-primary-400 text-primary-600' : 'border-warm-200 text-warm-700'}`}>
+                  <button key={p} type="button" onClick={() => togglePriority(p)} className={`rounded-full border px-3 py-1 text-sm ${form.planning_priorities.includes(p) ? 'bg-primary-50 border-primary-400 text-primary-600' : 'border-divider text-text-primary'}`}>
                     {p}
                   </button>
                 ))}

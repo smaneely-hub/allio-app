@@ -1,10 +1,11 @@
 import { useState } from 'react'
 
+// Vibrant gradient backgrounds by meal type
 const mealTypeStyles = {
-  breakfast: { emoji: '🌅', gradient: 'from-yellow-50 to-orange-100' },
-  lunch: { emoji: '☀️', gradient: 'from-green-50 to-emerald-100' },
-  dinner: { emoji: '🍽️', gradient: 'from-primary-50 to-primary-100' },
-  snack: { emoji: '🍎', gradient: 'from-rose-50 to-orange-100' },
+  breakfast: { emoji: '🌅', gradient: 'bg-gradient-to-br from-amber-100 to-orange-100', icon: '☀️' },
+  lunch: { emoji: '☀️', gradient: 'bg-gradient-to-br from-green-100 to-emerald-100', icon: '🥗' },
+  dinner: { emoji: '🍽️', gradient: 'bg-gradient-to-br from-blue-100 to-indigo-100', icon: '🍝' },
+  snack: { emoji: '🍎', gradient: 'bg-gradient-to-br from-rose-100 to-pink-100', icon: '🍎' },
 }
 
 export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
@@ -48,7 +49,6 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
     setCookingMode(false)
   }
 
-  // Extract dietary tags from meal metadata
   const dietaryTags = []
   if (meal.vegetarian) dietaryTags.push({ label: 'Vegetarian', color: 'bg-green-100 text-green-700' })
   if (meal.gluten_free) dietaryTags.push({ label: 'GF', color: 'bg-amber-100 text-amber-700' })
@@ -57,9 +57,8 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
   // Cooking Mode Overlay
   if (cookingMode) {
     return (
-      <div className="fixed inset-0 z-50 bg-warm-900 flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 bg-warm-800">
+      <div className="fixed inset-0 z-50 bg-text-primary flex flex-col">
+        <div className="flex items-center justify-between p-4 bg-text-primary">
           <button onClick={exitCooking} className="text-white font-medium">
             ← Exit
           </button>
@@ -68,57 +67,30 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
           </div>
           <div className="w-16"></div>
         </div>
-
-        {/* Progress bar */}
-        <div className="h-1 bg-warm-700">
-          <div 
-            className="h-full bg-primary-400 transition-all"
-            style={{ width: `${((currentStep + 1) / totalSteps) * 100}%` }}
-          />
+        <div className="h-1 bg-text-secondary">
+          <div className="h-full bg-primary-400 transition-all" style={{ width: `${((currentStep + 1) / totalSteps) * 100}%` }} />
         </div>
-
-        {/* Main content */}
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
           <div className="text-6xl mb-6">👨‍🍳</div>
           <div className="text-2xl md:text-3xl text-white font-medium leading-relaxed">
             {meal.instructions?.[currentStep]}
           </div>
         </div>
-
-        {/* Ingredient quick reference */}
-        <div className="p-4 bg-warm-800">
-          <div className="text-xs text-warm-400 mb-2 uppercase tracking-wide">Ingredients</div>
+        <div className="p-4 bg-text-primary">
+          <div className="text-xs text-text-muted mb-2 uppercase tracking-wide">Ingredients</div>
           <div className="flex flex-wrap gap-2">
             {(meal.ingredients || []).slice(0, 6).map((ing, i) => (
-              <span key={i} className="px-3 py-1 bg-warm-700 text-warm-200 text-sm rounded-full">
+              <span key={i} className="px-3 py-1 bg-text-secondary text-white/80 text-sm rounded-full">
                 {ing.quantity} {ing.unit} {ing.item}
               </span>
             ))}
           </div>
         </div>
-
-        {/* Navigation buttons */}
-        <div className="p-4 bg-warm-800 flex gap-4">
-          <button 
-            onClick={prevStep} 
-            disabled={currentStep === 0}
-            className={`flex-1 py-4 rounded-xl text-lg font-medium ${
-              currentStep === 0 
-                ? 'bg-warm-700 text-warm-500' 
-                : 'bg-warm-700 text-white'
-            }`}
-          >
+        <div className="p-4 bg-text-primary flex gap-4">
+          <button onClick={prevStep} disabled={currentStep === 0} className={`flex-1 py-4 rounded-xl text-lg font-medium ${currentStep === 0 ? 'bg-text-secondary text-text-muted' : 'bg-text-secondary text-white'}`}>
             ← Previous
           </button>
-          <button 
-            onClick={nextStep} 
-            disabled={currentStep === totalSteps - 1}
-            className={`flex-1 py-4 rounded-xl text-lg font-medium ${
-              currentStep === totalSteps - 1
-                ? 'bg-warm-700 text-warm-500'
-                : 'bg-primary-500 text-white'
-            }`}
-          >
+          <button onClick={nextStep} disabled={currentStep === totalSteps - 1} className={`flex-1 py-4 rounded-xl text-lg font-medium ${currentStep === totalSteps - 1 ? 'bg-text-secondary text-text-muted' : 'bg-primary-400 text-white'}`}>
             {currentStep === totalSteps - 1 ? 'All done!' : 'Next step →'}
           </button>
         </div>
@@ -127,58 +99,67 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
   }
 
   return (
-    <div className={`rounded-2xl border p-4 shadow-sm transition-all duration-200 hover:shadow-md ${meal.locked ? 'border-primary-300 bg-primary-50' : meal.is_leftover ? 'border-dashed border-warm-200 bg-warm-50' : 'border-warm-200 bg-white'}`}>
-      <div className={`h-36 -mx-4 -mt-4 mb-4 flex items-center justify-center rounded-t-2xl bg-gradient-to-br ${style.gradient}`}>
-        <span className="text-5xl">{style.emoji}</span>
+    <div className={`rounded-2xl border p-4 shadow-sm transition-all duration-200 hover:shadow-md ${meal.locked ? 'border-green-300 bg-green-50' : meal.is_leftover ? 'border-dashed border-divider bg-bg-primary' : 'border-divider bg-white'}`}>
+      {/* Meal header with vibrant gradient */}
+      <div className={`h-24 -mx-4 -mt-4 mb-4 flex items-center justify-center rounded-t-2xl ${style.gradient}`}>
+        <span className="text-5xl">{style.icon}</span>
       </div>
-        <button type="button" onClick={() => setExpanded(!expanded)} className="w-full text-left">
+      
+      <button type="button" onClick={() => setExpanded(!expanded)} className="w-full text-left">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="font-display text-lg text-warm-900">{meal.name}</div>
+            <div className="font-display text-lg text-text-primary">{meal.name}</div>
             {dietaryTags.length > 0 && (
-              <div className="mt-1 flex flex-wrap gap-1">
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {dietaryTags.map((tag, i) => (
                   <span key={i} className={`rounded-full px-2 py-0.5 text-xs font-medium ${tag.color}`}>{tag.label}</span>
                 ))}
               </div>
             )}
-            <div className="mt-1 text-sm text-warm-400">{meal.servings} servings · prep {meal.prep_time_minutes} min</div>
+            <div className="mt-1.5 text-sm text-text-secondary">{meal.servings} servings · {meal.prep_time_minutes} min</div>
           </div>
-          <div className="text-xs font-medium text-warm-400">{expanded ? 'Collapse' : 'Expand'}</div>
+          <div className="text-xs font-medium text-text-muted">{expanded ? 'Collapse' : 'Expand'}</div>
         </div>
       </button>
 
+      {/* Action buttons - icon-only on mobile */}
       <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" onClick={() => onToggleLock(meal.id, !meal.locked)} className="btn-ghost text-xs font-medium">
-          {meal.locked ? '🔒 Unlock' : '🔓 Lock'}
+        <button type="button" onClick={() => onToggleLock(meal.id, !meal.locked)} className="text-xs font-medium px-3 py-1.5 rounded-full bg-warm-100 text-text-secondary hover:bg-warm-200 transition-all duration-150 active:scale-[0.97]">
+          {meal.locked ? '🔒' : '🔓'}
         </button>
-        <button type="button" onClick={() => onSwap(meal)} className="btn-ghost text-xs font-medium">
-          🔄 Swap
+        <button type="button" onClick={() => onSwap(meal)} className="text-xs font-medium px-3 py-1.5 rounded-full bg-warm-100 text-text-secondary hover:bg-warm-200 transition-all duration-150 active:scale-[0.97]">
+          🔄
         </button>
-        <button type="button" onClick={() => navigator.clipboard.writeText(meal.name)} className="btn-ghost text-xs font-medium">
-          📋 Copy
+        <button type="button" onClick={() => navigator.clipboard.writeText(meal.name)} className="text-xs font-medium px-3 py-1.5 rounded-full bg-warm-100 text-text-secondary hover:bg-warm-200 transition-all duration-150 active:scale-[0.97]">
+          📋
         </button>
       </div>
 
+      {/* Expanded content */}
       {expanded && (
-        <div className="mt-4 space-y-4 border-t border-warm-100 pt-4">
-          {/* Ingredients */}
+        <div className="mt-4 space-y-4 border-t border-divider pt-4">
+          {/* Why this meal - italic with green border */}
+          {meal.notes && (
+            <div className="border-l-2 border-green-400 pl-3 italic text-text-muted text-sm">
+              {meal.notes}
+            </div>
+          )}
+
           <div>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-warm-500">Ingredients</div>
-            <ul className="space-y-1 text-sm text-warm-700">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">Ingredients</div>
+            <ul className="space-y-1 text-sm text-text-primary">
               {(meal.ingredients || []).map((ing, i) => (
                 <li key={i} className="flex justify-between">
                   <span>{ing.item}</span>
-                  <span className="text-warm-400">{ing.quantity} {ing.unit}</span>
+                  <span className="text-text-muted">{ing.quantity} {ing.unit}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          {/* Instructions */}
           <div>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-warm-500">Instructions</div>
-            <ol className="space-y-2 text-sm text-warm-700">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">Instructions</div>
+            <ol className="space-y-2 text-sm text-text-primary">
               {(meal.instructions || []).map((step, i) => (
                 <li key={i} className="flex gap-2">
                   <span className="text-primary-400 font-medium">{i + 1}.</span>
@@ -188,25 +169,12 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
             </ol>
           </div>
 
-          {/* Why this meal - styled as pull quote */}
-          {meal.notes && (
-            <div className="border-l-2 border-primary-300 pl-3 italic text-warm-600 text-sm">
-              <span className="font-medium not-italic text-warm-700">Why this meal:</span> {meal.notes}
-            </div>
-          )}
-
-          {/* Start Cooking Button */}
-          <button 
-            type="button" 
-            onClick={startCooking}
-            className="btn-primary w-full py-3 text-base font-medium"
-          >
+          <button type="button" onClick={startCooking} className="btn-primary w-full py-3 text-base font-medium">
             🍳 Start Cooking
           </button>
 
-          {/* User note */}
           <div>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-warm-500">Your note</div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">Your note</div>
             <textarea
               className="input w-full text-sm"
               rows={2}

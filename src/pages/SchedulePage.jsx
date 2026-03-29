@@ -6,6 +6,15 @@ import { useSchedule } from '../hooks/useSchedule'
 import { ScheduleSkeleton, EmptyState } from '../components/LoadingStates'
 
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+const dayColors = {
+  Monday: '#22C55E',
+  Tuesday: '#14B8A6',
+  Wednesday: '#3B82F6',
+  Thursday: '#A855F7',
+  Friday: '#EC4899',
+  Saturday: '#F59E0B',
+  Sunday: '#F97316',
+}
 const mealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Prep Block']
 
 export function SchedulePage() {
@@ -18,7 +27,7 @@ export function SchedulePage() {
   const [slotState, setSlotState] = useState({})
   const [saving, setSaving] = useState(false)
   const [repairing, setRepairing] = useState(false)
-  const [expandedDays, setExpandedDays] = useState({})
+  const [expandedDays, setExpandedDays] = useState({ Mon: false, Tue: false, Wed: false, Thu: false, Fri: false, Sat: false, Sun: false })
 
   // Check if we have a recovery situation: household exists but no members
   const needsMemberRepair = household && members.length === 0
@@ -128,9 +137,8 @@ export function SchedulePage() {
     }
 
     const activeSlots = Object.values(slotState).filter((slot) => slot.active && slot.attendees?.length > 0)
-    const activeSlotCount = activeSlots.length
-
-    console.log('[SchedulePage] Active slots:', activeSlotCount)
+    
+    console.log('[SchedulePage] Active slots:', activeSlots.length)
     
     if (activeSlots.length === 0) {
       toast.error('Please select at least one person for a meal slot.')
@@ -171,24 +179,25 @@ export function SchedulePage() {
     return (
       <div className="space-y-3 md:space-y-6 pb-24">
         <div className="card">
-          <h1 className="font-display text-3xl text-warm-900">Weekly Schedule</h1>
-          <p className="mt-2 text-sm text-warm-700">Your household exists but we couldn't find your members. Let's fix that.</p>
+          <div className="h-1 w-12 bg-gradient-to-r from-primary-400 via-teal-400 to-purple-400 rounded-full mb-2"></div>
+            <h1 className="font-display text-2xl md:text-3xl text-text-primary">Weekly Schedule</h1>
+          <p className="mt-2 text-sm text-text-primary">Your household exists but we couldn't find your members. Let's fix that.</p>
         </div>
         
         <div className="card text-center py-12">
           <div className="text-6xl mb-6">🔧</div>
-          <h2 className="font-display text-2xl text-warm-900 mb-3">Missing Household Members</h2>
-          <p className="text-warm-700 max-w-md mx-auto mb-6">
+          <h2 className="font-display text-2xl text-text-primary mb-3">Missing Household Members</h2>
+          <p className="text-text-primary max-w-md mx-auto mb-6">
             Your household is set up but we don't have any members saved. This might be from a previous issue.
           </p>
           <button 
             onClick={handleMemberRepair} 
             disabled={repairing}
-            className="btn-primary"
+            className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 active:scale-[0.97] disabled:opacity-50"
           >
             {repairing ? 'Restoring...' : 'Restore Default Members'}
           </button>
-          <p className="text-xs text-warm-500 mt-4">
+          <p className="text-xs text-text-secondary mt-4">
             After restoring, you'll be able to edit members in Settings.
           </p>
         </div>
@@ -198,16 +207,21 @@ export function SchedulePage() {
 
   const loading = householdLoading || scheduleLoading
 
+  // Calculate active slots for render
+  const activeSlots = Object.values(slotState).filter((slot) => slot.active && slot.attendees?.length > 0)
+  const activeSlotCount = activeSlots.length
+
   return (
     <div className="space-y-3 md:space-y-6 pb-24">
       <div className="card">
-        <h1 className="font-display text-3xl text-warm-900">Weekly Schedule</h1>
-        <p className="mt-2 text-sm text-warm-700">Build the week you actually need planned. Activate only the meal slots you want Allio to consider.</p>
+        <div className="h-1 w-12 bg-gradient-to-r from-primary-400 via-teal-400 to-purple-400 rounded-full mb-2"></div>
+            <h1 className="font-display text-2xl md:text-3xl text-text-primary">Weekly Schedule</h1>
+        <p className="mt-2 text-sm text-text-primary">Build the week you actually need planned. Activate only the meal slots you want Allio to consider.</p>
       </div>
 
-      <div className="grid gap-5 rounded-2xl border border-warm-200 bg-white p-6 shadow-sm md:grid-cols-2">
+      <div className="grid gap-5 rounded-2xl border border-divider bg-white p-6 shadow-sm md:grid-cols-2">
         <label className="space-y-2">
-          <span className="text-sm font-medium text-slate-700">Shopping Day</span>
+          <span className="text-sm font-medium text-text-700">Shopping Day</span>
           <select value={shoppingDay} onChange={(e) => setShoppingDay(e.target.value)} className={inputClassName}>
             {days.map((day) => (
               <option key={day} value={day}>{day}</option>
@@ -215,7 +229,7 @@ export function SchedulePage() {
           </select>
         </label>
         <label className="space-y-2">
-          <span className="text-sm font-medium text-slate-700">Week Notes</span>
+          <span className="text-sm font-medium text-text-700">Week Notes</span>
           <input value={weekNotes} onChange={(e) => setWeekNotes(e.target.value)} className={inputClassName} placeholder="Anything special this week?" />
         </label>
       </div>
@@ -239,15 +253,15 @@ export function SchedulePage() {
             const isExpanded = expandedDays[day] !== false
             const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
             return (
-            <div key={day} className="card p-4">
+            <div key={day} className="card p-4" style={{ borderTop: `3px solid ${dayColors[day]}` }}>
               <button
                 type="button"
                 onClick={() => setExpandedDays(prev => ({ ...prev, [day]: !prev[day] }))}
                 onMouseEnter={() => !isMobile && setExpandedDays(prev => ({ ...prev, [day]: true }))}
-                className="mb-4 flex w-full items-center justify-between text-left text-sm font-semibold text-slate-900 md:cursor-default"
+                className="mb-4 flex w-full items-center justify-between text-left text-sm font-semibold text-text-900 md:cursor-default"
               >
                 {day}
-                <span className="md:hidden text-warm-400 text-xs">{isExpanded ? '▼' : '▶'}</span>
+                <span className="md:hidden text-text-muted text-xs">{isExpanded ? '▼' : '▶'}</span>
               </button>
               <div className={`space-y-3 ${!isExpanded && 'hidden md:block'}`}>
                 {mealTypes.map((mealType) => {
@@ -258,11 +272,11 @@ export function SchedulePage() {
                       key={mealType}
                       type="button"
                       onClick={() => openSlotEditor(day, mealType)}
-                      className="btn-primary w-full text-left hover:border-warm-300"
+                      className="btn-primary w-full text-left hover:border-divider"
                     >
-                      <div className="text-sm font-medium text-slate-800">{mealType}</div>
+                      <div className="text-sm font-medium text-text-800">{mealType}</div>
                       {slot?.active ? (
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-text-500">
                           <span>{slot.attendees.length} attendee{slot.attendees.length !== 1 ? 's' : ''}</span>
                           <span className={`px-2 py-0.5 rounded-full ${
                             slot.effort_level === 'low' ? 'bg-green-100 text-green-700' :
@@ -273,7 +287,7 @@ export function SchedulePage() {
                           </span>
                         </div>
                       ) : (
-                        <div className="mt-2 text-xs text-slate-400">Empty slot</div>
+                        <div className="mt-2 text-xs text-text-400">Empty slot</div>
                       )}
                     </button>
                   )
@@ -288,19 +302,19 @@ export function SchedulePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setEditorKey(null)}>
         <div className="max-h-[90vh] w-full max-w-md overflow-auto rounded-2xl border border-stone-200 bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-slate-900">Edit {editorKey.replace('-', ' · ')}</h2>
-            <button type="button" onClick={() => setEditorKey(null)} className="text-sm text-slate-500">Close</button>
+            <h2 className="text-xl font-semibold text-text-900">Edit {editorKey.replace('-', ' · ')}</h2>
+            <button type="button" onClick={() => setEditorKey(null)} className="text-sm text-text-500">Close</button>
           </div>
 
           <div className="space-y-5">
             <div>
-              <div className="mb-3 text-sm font-medium text-slate-700">Attendees</div>
+              <div className="mb-3 text-sm font-medium text-text-700">Attendees</div>
               {memberOptions.length === 0 ? (
                 <p className="text-sm text-red-500">No members found. Go to Settings to add members.</p>
               ) : (
                 <div className="grid gap-3 md:grid-cols-2">
                   {memberOptions.map((member) => (
-                    <label key={member.id} className="flex items-center gap-3 rounded-xl border border-stone-200 p-3 text-sm text-slate-700">
+                    <label key={member.id} className="flex items-center gap-3 rounded-xl border border-stone-200 p-3 text-sm text-text-700">
                       <input
                         type="checkbox"
                         checked={(slotState[editorKey]?.attendees || []).includes(member.id)}
@@ -313,7 +327,7 @@ export function SchedulePage() {
               )}
             </div>
 
-            <label className="flex items-center gap-3 text-sm text-slate-700">
+            <label className="flex items-center gap-3 text-sm text-text-700">
               <input
                 type="checkbox"
                 checked={slotState[editorKey]?.is_leftover || false}
@@ -324,7 +338,7 @@ export function SchedulePage() {
 
             {slotState[editorKey]?.is_leftover ? (
               <label className="block space-y-2">
-                <span className="text-sm font-medium text-slate-700">Source meal</span>
+                <span className="text-sm font-medium text-text-700">Source meal</span>
                 <select value={slotState[editorKey]?.leftover_source || ''} onChange={(e) => updateSlot(editorKey, { leftover_source: e.target.value })} className={inputClassName}>
                   <option value="">Select source meal</option>
                   {Object.values(slotState).map((slot) => (
@@ -337,7 +351,7 @@ export function SchedulePage() {
             ) : null}
 
             <label className="block space-y-2">
-              <span className="text-sm font-medium text-slate-700">Effort level</span>
+              <span className="text-sm font-medium text-text-700">Effort level</span>
               <select value={slotState[editorKey]?.effort_level || 'medium'} onChange={(e) => updateSlot(editorKey, { effort_level: e.target.value })} className={inputClassName}>
                 <option value="low">low</option>
                 <option value="medium">medium</option>
@@ -346,7 +360,7 @@ export function SchedulePage() {
             </label>
 
             <label className="block space-y-2">
-              <span className="text-sm font-medium text-slate-700">Planning notes</span>
+              <span className="text-sm font-medium text-text-700">Planning notes</span>
               <input value={slotState[editorKey]?.planning_notes || ''} onChange={(e) => updateSlot(editorKey, { planning_notes: e.target.value, active: true })} className={inputClassName} placeholder="Quick notes for this slot" />
             </label>
           </div>
@@ -359,7 +373,7 @@ export function SchedulePage() {
           type="button"
           onClick={handleSaveSchedule}
           disabled={saving || members.length === 0 || activeSlotCount === 0}
-          className="btn-primary"
+          className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 active:scale-[0.97] disabled:opacity-50"
         >
           {saving ? 'Saving…' : `Generate plan (${activeSlotCount} meal${activeSlotCount !== 1 ? 's' : ''})`}
         </button>
