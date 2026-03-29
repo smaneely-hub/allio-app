@@ -10,6 +10,7 @@ import { NavBar } from './components/NavBar'
 import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
 import { OnboardingPage } from './pages/OnboardingPage'
+import { DashboardPage } from './pages/DashboardPage'
 import { SchedulePage } from './pages/SchedulePage'
 import { PlanPage } from './pages/PlanPage'
 import { ShopPage } from './pages/ShopPage'
@@ -21,19 +22,15 @@ function ConnectionCheck({ children }) {
   return children
 }
 
-// Redirect logged-in users from home to schedule
+// Home page: show landing for visitors, dashboard for logged-in users
 function HomePage() {
   const { user, loading } = useAuth()
   const navigate = useNavigate()
   
   useEffect(() => {
     if (user && !loading) {
-      const lastScheduleId = localStorage.getItem('last_schedule_id')
-      if (lastScheduleId) {
-        navigate(`/plan?schedule_id=${lastScheduleId}`, { replace: true })
-      } else {
-        navigate('/schedule', { replace: true })
-      }
+      // Logged in users go to dashboard
+      navigate('/dashboard', { replace: true })
     }
   }, [user, loading, navigate])
   
@@ -61,6 +58,14 @@ export default function App() {
                   element={
                     <ProtectedRoute>
                       <OnboardingPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute>
+                      <DashboardPage />
                     </ProtectedRoute>
                   }
                 />

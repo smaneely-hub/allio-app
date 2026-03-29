@@ -250,7 +250,7 @@ export function ShopPage() {
                         item.checked ? 'opacity-60' : 'opacity-100'
                       }`}
                     >
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-150 ${
+                      <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-150 ${
                         item.checked ? 'bg-green-500 border-green-500 scale-90' : 'border-warm-300'
                       }`}>
                         {item.checked && <span className="text-white text-xs">✓</span>}

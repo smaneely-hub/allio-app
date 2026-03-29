@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { SwapModal } from '../SwapModal'
 
 // Vibrant gradient backgrounds by meal type
 const mealTypeStyles = {
@@ -14,6 +15,7 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
   const [currentStep, setCurrentStep] = useState(0)
   const [note, setNote] = useState(meal.user_note || '')
   const [savingNote, setSavingNote] = useState(false)
+  const [showSwapModal, setShowSwapModal] = useState(false)
 
   const mealType = (meal.meal || '').toLowerCase()
   const style = mealTypeStyles[mealType] || mealTypeStyles.dinner
@@ -124,19 +126,27 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
 
       {/* Action buttons - icon-only on mobile */}
       <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" onClick={() => onToggleLock(meal.id, !meal.locked)} className="text-xs font-medium px-3 py-1.5 rounded-full bg-warm-100 text-text-secondary hover:bg-warm-200 transition-all duration-150 active:scale-[0.97]">
+        <button type="button" onClick={() => onToggleLock(meal.id, !meal.locked)} className="text-xs font-medium px-3 py-1.5 rounded-full bg-warm-100 text-text-secondary hover:bg-warm-200 transition-all duration-150 active:scale-[0.97] min-h-[44px]">
           {meal.locked ? '🔒' : '🔓'}
         </button>
-        <button type="button" onClick={() => {
-          const suggestion = prompt('What would you like instead? (e.g., "something vegetarian", "quick dinner", "chicken")')
-          onSwap(meal, suggestion || '')
-        }} className="text-xs font-medium px-3 py-1.5 rounded-full bg-warm-100 text-text-secondary hover:bg-warm-200 transition-all duration-150 active:scale-[0.97]">
+        <button type="button" onClick={() => setShowSwapModal(true)} className="text-xs font-medium px-3 py-1.5 rounded-full bg-warm-100 text-text-secondary hover:bg-warm-200 transition-all duration-150 active:scale-[0.97] min-h-[44px]">
           🔄
         </button>
-        <button type="button" onClick={() => navigator.clipboard.writeText(meal.name)} className="text-xs font-medium px-3 py-1.5 rounded-full bg-warm-100 text-text-secondary hover:bg-warm-200 transition-all duration-150 active:scale-[0.97]">
+        <button type="button" onClick={() => navigator.clipboard.writeText(meal.name)} className="text-xs font-medium px-3 py-1.5 rounded-full bg-warm-100 text-text-secondary hover:bg-warm-200 transition-all duration-150 active:scale-[0.97] min-h-[44px]">
           📋
         </button>
       </div>
+
+      {/* Swap Modal */}
+      <SwapModal
+        isOpen={showSwapModal}
+        onClose={() => setShowSwapModal(false)}
+        onSwap={(suggestion) => {
+          onSwap(meal, suggestion || '')
+          setShowSwapModal(false)
+        }}
+        mealName={meal.name}
+      />
 
       {/* Expanded content */}
       {expanded && (

@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth'
 import { Logo, LogoText } from './Logo'
 
 const links = [
+  { to: '/dashboard', label: 'Home', icon: '🏠' },
   { to: '/plan', label: 'Plan', icon: '📋' },
   { to: '/schedule', label: 'Schedule', icon: '📅' },
   { to: '/shop', label: 'Shop', icon: '🛒' },
