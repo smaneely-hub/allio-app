@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 // Leaf icon with brand color
 function Leaf({ className = '' }) {
   return (
-    <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 008 17c8-20 20-8 0-13z" fill="currentColor" fillOpacity="0.5"/>
     </svg>
   )
@@ -32,9 +32,10 @@ export function NavBar() {
       {/* Desktop navbar - gradient border, shadow */}
       <header className="hidden md:block bg-white shadow-sm">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
-          <Link to="/" className="font-display text-2xl text-text-primary flex items-center gap-1">
-            Allio
-            <Leaf className="text-primary-400" />
+          <Link to="/" className="font-display text-2xl text-text-primary flex items-center gap-1.5">
+            <span className="text-green-500">A</span>
+            <span className="text-text-primary">llio</span>
+            <Leaf className="text-primary-400 -ml-1" />
           </Link>
 
           {user ? (
@@ -77,8 +78,9 @@ export function NavBar() {
       <header className="md:hidden bg-white shadow-sm px-4 py-3">
         <div className="flex items-center justify-between">
           <Link to="/" className="font-display text-xl text-text-primary flex items-center gap-1">
-            Allio
-            <Leaf className="text-primary-400 w-4 h-4" />
+            <span className="text-green-500">A</span>
+            <span className="text-text-primary">llio</span>
+            <Leaf className="text-primary-400 w-4 h-4 -ml-0.5" />
           </Link>
           {user && (
             <Link to="/settings">

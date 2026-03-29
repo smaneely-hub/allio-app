@@ -250,20 +250,20 @@ export function SchedulePage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-7">
           {days.map((day) => {
-            const isExpanded = expandedDays[day] !== false
+            const isExpanded = expandedDays[day] === true
             const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
             return (
             <div key={day} className="card p-4" style={{ borderTop: `3px solid ${dayColors[day]}` }}>
               <button
                 type="button"
                 onClick={() => setExpandedDays(prev => ({ ...prev, [day]: !prev[day] }))}
-                onMouseEnter={() => !isMobile && setExpandedDays(prev => ({ ...prev, [day]: true }))}
+                
                 className="mb-4 flex w-full items-center justify-between text-left text-sm font-semibold text-text-900 md:cursor-default"
               >
                 {day}
                 <span className="md:hidden text-text-muted text-xs">{isExpanded ? '▼' : '▶'}</span>
               </button>
-              <div className={`space-y-3 ${!isExpanded && 'hidden md:block'}`}>
+              <div className={`space-y-3 ${!isExpanded ? 'hidden' : ''}`}>
                 {mealTypes.map((mealType) => {
                   const key = `${day}-${mealType}`
                   const slot = slotState[key]
