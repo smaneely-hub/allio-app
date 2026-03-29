@@ -123,7 +123,6 @@ export function useMealPlan(scheduleId) {
       }
 
       if ((nextStatus ?? mealPlan.status) === 'active') {
-        console.log('[useMealPlan] Finalizing plan - creating shopping list')
         const { data: household } = await supabase
           .from('households')
           .select('staples_on_hand')
@@ -132,7 +131,6 @@ export function useMealPlan(scheduleId) {
           .single()
 
         const items = aggregateShoppingList(nextPlan, household?.staples_on_hand || '')
-        console.log('[useMealPlan] Generated items:', items?.length || 0)
         
         const { error: listError } = await supabase.from('shopping_lists').upsert({
           user_id: user.id,
@@ -144,7 +142,6 @@ export function useMealPlan(scheduleId) {
         if (listError) {
           console.error('[useMealPlan] Shopping list error:', listError)
         } else {
-          console.log('[useMealPlan] Shopping list saved')
         }
       }
 
@@ -203,8 +200,6 @@ export function useMealPlan(scheduleId) {
         .eq('id', scheduleId)
         .single()
       
-      console.log('[useMealPlan] Fetched slots from DB:', slots?.length, 'for scheduleId:', scheduleId)
-      console.log('[useMealPlan] Slot details:', JSON.stringify(slots?.slice(0,3)))
 
       const lockedMeals = mealPlan?.draft_plan?.meals?.filter((meal) => meal.locked) || []
       
@@ -212,7 +207,6 @@ export function useMealPlan(scheduleId) {
       const slotKey = (s) => `${s.day}-${s.meal}`
       const currentSlotKeys = new Set(slots.map(slotKey))
       const validLockedMeals = lockedMeals.filter((m) => currentSlotKeys.has(`${m.day}-${m.meal}`))
-      console.log('[useMealPlan] lockedMeals:', lockedMeals.length, 'meals, validLockedMeals:', validLockedMeals.length)
       
       const payload = {
         household: {
@@ -247,16 +241,12 @@ export function useMealPlan(scheduleId) {
         locked_meals: validLockedMeals,
       }
 
-      console.log('[useMealPlan] Payload slots being sent:', JSON.stringify(payload.slots))
 
-      console.log('[useMealPlan] Calling generate-plan with payload:', JSON.stringify(payload).slice(0, 500))
       
       let { data: generated, error: functionError } = await supabase.functions.invoke('generate-plan', { body: payload })
-      console.log('[useMealPlan] Function response:', { data: generated, error: functionError, mealsCount: generated?.plan?.meals?.length })
       if (functionError) {
         console.error('[useMealPlan] Function error details:', functionError)
         // Fallback: try direct fetch
-        console.log('[useMealPlan] Trying direct fetch fallback...')
         try {
           const response = await fetch('https://rvgtmletsbycrbeycwus.supabase.co/functions/v1/generate-plan', {
             method: 'POST',
@@ -267,7 +257,6 @@ export function useMealPlan(scheduleId) {
             body: JSON.stringify(payload)
           })
           const fallbackData = await response.json()
-          console.log('[useMealPlan] Fallback response:', fallbackData)
           if (fallbackData.plan) {
             generated = fallbackData
           } else {
@@ -275,7 +264,6 @@ export function useMealPlan(scheduleId) {
           }
         } catch (fetchError) {
           // If both methods fail, use mock meals
-          console.log('[useMealPlan] Using mock meals as fallback')
           generated = {
             plan: generateMockMeals(payload.slots || [])
           }
@@ -283,7 +271,6 @@ export function useMealPlan(scheduleId) {
       }
 
       const nextPlan = withMealDefaults(generated.plan)
-      console.log('[useMealPlan] nextPlan.meals:', nextPlan.meals?.length, 'meals')
       
       const mergedPlan = {
         ...nextPlan,
@@ -295,7 +282,6 @@ export function useMealPlan(scheduleId) {
         ],
       }
 
-      console.log('[useMealPlan] nextPlan has', nextPlan.meals?.length, 'meals, mergedPlan has', mergedPlan.meals?.length, 'meals')
       
       const { data: savedPlan, error: saveError } = await supabase
         .from('meal_plans')
@@ -317,7 +303,6 @@ export function useMealPlan(scheduleId) {
         console.error('[useMealPlan] Save error:', saveError)
         throw saveError
       }
-      console.log('[useMealPlan] Saved plan with', savedPlan?.draft_plan?.meals?.length, 'meals')
       setMealPlan({ ...savedPlan, draft_plan: withMealDefaults(savedPlan.draft_plan || savedPlan.plan || {}) })
       return savedPlan
     } catch (err) {
@@ -428,7 +413,6 @@ export function useMealPlan(scheduleId) {
   }, [mealPlan, persistPlan, scheduleId, user])
 
   const finalizePlan = useCallback(async () => {
-    console.log('[useMealPlan] finalizePlan called, mealPlan.id:', mealPlan?.id, 'status:', mealPlan?.status)
     return persistPlan(mealPlan.draft_plan, 'active')
   }, [mealPlan, persistPlan])
 

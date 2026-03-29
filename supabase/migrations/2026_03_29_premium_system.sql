@@ -1,8 +1,8 @@
 -- Premium tier system for Allio
 -- Run this SQL to set up the premium features infrastructure
 
--- 1. Add tier column to households
-ALTER TABLE households ADD COLUMN IF NOT EXISTS tier TEXT DEFAULT 'free' CHECK (tier IN ('free', 'premium'));
+-- 1. Add tier column to households (subscription_tier for quick access)
+ALTER TABLE households ADD COLUMN IF NOT EXISTS subscription_tier TEXT DEFAULT 'free' CHECK (subscription_tier IN ('free', 'premium'));
 ALTER TABLE households ADD COLUMN IF NOT EXISTS premium_since TIMESTAMP;
 ALTER TABLE households ADD COLUMN IF NOT EXISTS subscription_id TEXT;
 

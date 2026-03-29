@@ -48,9 +48,7 @@ export function PlanPage() {
   const hasMeals = mealPlan?.draft_plan?.meals?.length > 0 || mealPlan?.plan?.meals?.length > 0
   useEffect(() => {
     if (autoGenerate && !loading && !hasMeals && !generating) {
-      console.log('[PlanPage] Auto-generating meal plan...')
       generateMealPlan()
-        .then(() => console.log('[PlanPage] Auto-generate completed'))
         .catch(err => {
           console.error('[PlanPage] Auto-generate failed:', err)
           toast.error(err.message || 'Failed to generate meal plan')

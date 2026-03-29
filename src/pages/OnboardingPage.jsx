@@ -129,7 +129,6 @@ export function OnboardingPage() {
     
     try {
       // Step 1: Save household
-      console.log('[Onboarding] Saving household...')
       savedHousehold = await saveHousehold({
         ...form,
         total_people: form.total_people === '5+' ? 5 : Number(form.total_people),
@@ -137,13 +136,11 @@ export function OnboardingPage() {
         diet_focus: form.diet_focus === 'other' ? form.custom_diet_focus : form.diet_focus,
       })
       
-      console.log('[Onboarding] household saved', savedHousehold?.id)
       
       // Step 2: Save members with the returned household ID
       let persistedMembers = []
       
       if (members.length > 0) {
-        console.log('[Onboarding] saving members', members.length)
         
         // Prepare members - saveMembers accepts householdIdOverride as 2nd param
         const membersToSave = members.map((m, idx) => ({ 
@@ -154,7 +151,6 @@ export function OnboardingPage() {
         // Pass the JUST RETURNED household ID as override
         persistedMembers = await saveMembers(membersToSave, savedHousehold.id)
         
-        console.log('[Onboarding] persisted members', persistedMembers?.length)
         
         // Verify members were actually persisted
         if (!persistedMembers || persistedMembers.length === 0) {
@@ -164,11 +160,9 @@ export function OnboardingPage() {
       }
       
       // Step 3: Mark onboarding complete (reload to sync state)
-      console.log('[Onboarding] Marking onboarding complete')
       await reloadHousehold()
       
       // Step 4: Navigate ONLY after all validation passes
-      console.log('[Onboarding] Navigation to /schedule')
       toast.success('Household saved successfully.')
       navigate('/schedule', { replace: true })
       

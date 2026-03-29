@@ -33,7 +33,6 @@ export function useSchedule() {
 
     try {
       const weekStartDate = getWeekStartDate()
-      console.log('[useSchedule] Loading for user:', user.id, 'week:', weekStartDate)
       
       const { data: scheduleData, error: scheduleError } = await supabase
         .from('weekly_schedules')
@@ -48,7 +47,6 @@ export function useSchedule() {
         throw scheduleError
       }
       
-      console.log('[useSchedule] Loaded schedule:', scheduleData?.id)
       setSchedule(scheduleData)
 
       if (scheduleData?.id) {
@@ -62,7 +60,6 @@ export function useSchedule() {
           console.error('[useSchedule] ERROR loading slots:', slotsError)
           throw slotsError
         }
-        console.log('[useSchedule] Loaded slots:', slotData?.length)
         setSlots(slotData ?? [])
       } else {
         setSlots([])
@@ -96,7 +93,6 @@ export function useSchedule() {
             .select('id')
             .eq('household_id', householdId)
           memberIds = (members || []).map(m => m.id)
-          console.log('[useSchedule] Fetched valid member IDs:', memberIds)
         }
 
         const payload = {
@@ -107,7 +103,6 @@ export function useSchedule() {
           status: 'draft',
         }
 
-        console.log('[useSchedule] Saving schedule payload:', payload)
 
         // Use UPSERT to handle existing schedules
         const { data: savedSchedule, error: saveError } = await supabase
@@ -122,7 +117,6 @@ export function useSchedule() {
           throw saveError
         }
 
-        console.log('[useSchedule.saveSchedule] schedule payload', savedSchedule)
 
         // Delete existing slots
         const { error: deleteError } = await supabase
@@ -159,7 +153,6 @@ export function useSchedule() {
           }
           
           // Add validation with logging
-          console.log('[useSchedule] Slot debug:', JSON.stringify({ slot, day, meal, validAttendees, validMemberIds }))
           
           const slotPayload = {
             user_id: user.id,
@@ -173,11 +166,9 @@ export function useSchedule() {
             planning_notes: slot.planning_notes || '',
           }
           
-          console.log('[useSchedule.saveSchedule] slot payload', slotPayload)
           return slotPayload
         })
 
-        console.log('[useSchedule] Inserting slots:', preparedSlots.length)
 
         if (preparedSlots.length > 0) {
           const { error: insertError } = await supabase.from('schedule_slots').insert(preparedSlots)

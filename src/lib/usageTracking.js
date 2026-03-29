@@ -40,13 +40,13 @@ export async function canPerformAction(userId, action, freeLimit = 1) {
   // Get user's tier
   const { data: household } = await supabase
     .from('households')
-    .select('tier')
+    .select('subscription_tier')
     .eq('user_id', userId)
     .limit(1)
     .single()
   
   // Premium users can do anything
-  if (household?.tier === 'premium') {
+  if (household?.subscription_tier === 'premium') {
     return { allowed: true, isPremium: true }
   }
   
@@ -93,12 +93,12 @@ export async function isFeatureEnabled(userId, featureName) {
   // Get user's tier
   const { data: household } = await supabase
     .from('households')
-    .select('tier')
+    .select('subscription_tier')
     .eq('user_id', userId)
     .limit(1)
     .single()
   
-  const isPremium = household?.tier === 'premium'
+  const isPremium = household?.subscription_tier === 'premium'
   
   return isPremium ? feature.premium : feature.free
 }

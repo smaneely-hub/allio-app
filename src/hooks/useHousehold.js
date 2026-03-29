@@ -29,7 +29,6 @@ export function useHousehold() {
     setError(null)
 
     try {
-      console.log('[useHousehold] Loading household for user:', user.id)
       
       const { data: householdData, error: householdError } = await supabase
         .from('households')
@@ -43,7 +42,6 @@ export function useHousehold() {
         throw householdError
       }
 
-      console.log('[useHousehold] Loaded household:', householdData)
       setHousehold(householdData)
 
       if (householdData?.id) {
@@ -57,10 +55,8 @@ export function useHousehold() {
           console.error('[useHousehold] ERROR loading members:', membersError)
           throw membersError
         }
-        console.log('[useHousehold] Loaded members:', membersData?.length)
         setMembers(membersData ?? [])
       } else {
-        console.log('[useHousehold] No household found, empty members')
         setMembers([])
       }
     } catch (err) {
@@ -101,14 +97,11 @@ export function useHousehold() {
           cooking_comfort: data.cooking_comfort,
         }
 
-        console.log('[useHousehold] saveHousehold payload:', payload)
 
-        console.log('[useHousehold.saveHousehold] FINAL payload', payload)
 
         let savedHousehold
         
         if (household?.id) {
-          console.log('[useHousehold] Updating existing household:', household.id)
           const { data: updated, error } = await supabase
             .from('households')
             .update(payload)
@@ -121,7 +114,6 @@ export function useHousehold() {
           }
           savedHousehold = updated
         } else {
-          console.log('[useHousehold] Inserting new household')
           const { data: inserted, error } = await supabase
             .from('households')
             .insert(payload)
@@ -134,7 +126,6 @@ export function useHousehold() {
           savedHousehold = inserted
         }
 
-        console.log('[useHousehold] Saved household:', savedHousehold)
         
         if (!savedHousehold) throw new Error('Failed to save household')
         
@@ -159,8 +150,6 @@ export function useHousehold() {
       const targetHouseholdId = householdIdOverride || household?.id
 
       // Log at start as required
-      console.log('[useHousehold.saveMembers] targetHouseholdId', targetHouseholdId)
-      console.log('[useHousehold.saveMembers] incoming members', memberList)
 
       if (!user) throw new Error('User is required to save household members.')
       
@@ -195,7 +184,6 @@ export function useHousehold() {
           effectiveHouseholdId = verifyHousehold.id
         }
 
-        console.log('[useHousehold.saveMembers] Using effectiveHouseholdId:', effectiveHouseholdId)
 
         // Prepare members with household_id set to effectiveHouseholdId
         const preparedMembers = memberList.map((member, index) => ({
@@ -213,7 +201,6 @@ export function useHousehold() {
           health_considerations: member.health_considerations || [],
         }))
 
-        console.log('[useHousehold.saveMembers] FINAL payload', preparedMembers)
 
         // FIXED: Delete ALL existing members first, then insert the new list
         // This ensures we don't have orphan members or sync issues
@@ -227,7 +214,6 @@ export function useHousehold() {
           throw deleteAllError
         }
         
-        console.log('[useHousehold.saveMembers] Deleted all existing members')
 
         // Now insert the new members
         const { error: insertError } = await supabase
@@ -239,7 +225,6 @@ export function useHousehold() {
           throw insertError
         }
 
-        console.log('[useHousehold.saveMembers] Members inserted successfully')
         
         // FIXED: Auto-update household total_people to match member count
         const memberCount = preparedMembers.length
@@ -252,7 +237,6 @@ export function useHousehold() {
           console.error('[useHousehold.saveMembers] WARNING: Could not update total_people:', householdUpdateError)
           // Non-critical, continue
         } else {
-          console.log('[useHousehold.saveMembers] Updated household total_people to:', memberCount)
           // Update local state
           setHousehold(prev => prev ? { ...prev, total_people: memberCount } : null)
         }
@@ -269,7 +253,6 @@ export function useHousehold() {
           throw refreshError
         }
 
-        console.log('[useHousehold.saveMembers] Members refreshed:', refreshedMembers?.length)
         setMembers(refreshedMembers ?? [])
         return refreshedMembers ?? []
       } catch (err) {
@@ -302,7 +285,6 @@ export function useHousehold() {
         preferences: [],
       }))
 
-      console.log('[useHousehold.repairMembers] restoring defaults', defaultMembers)
 
       return saveMembers(defaultMembers, household.id)
     },

@@ -61,7 +61,6 @@ export function SchedulePage() {
 
   const memberOptions = useMemo(
     () => {
-      console.log('[SchedulePage] Building memberOptions, members:', members.length)
       return members.map((member, index) => ({ 
         id: member.id || `member-${index}`, 
         label: member.name || member.label || `Member ${index + 1}` 
@@ -111,7 +110,6 @@ export function SchedulePage() {
   const handleMemberRepair = async () => {
     setRepairing(true)
     try {
-      console.log('[SchedulePage] Calling repairMembers()...')
       // repairMembers() now creates defaults based on household.total_people
       await repairMembers()
       toast.success('Default household members restored')
@@ -132,7 +130,6 @@ export function SchedulePage() {
       return
     }
 
-    console.log('[SchedulePage] Save clicked, household:', household?.id, 'members:', members.length, 'slots:', Object.keys(slotState).length)
     
     if (!household?.id) {
       toast.error('Household not loaded. Please refresh the page.')
@@ -141,7 +138,6 @@ export function SchedulePage() {
 
     const activeSlots = Object.values(slotState).filter((slot) => slot.active && slot.attendees?.length > 0)
     
-    console.log('[SchedulePage] Active slots:', activeSlots.length)
     
     if (activeSlots.length === 0) {
       toast.error('Please select at least one person for a meal slot.')
@@ -151,7 +147,6 @@ export function SchedulePage() {
     setSaving(true)
 
     try {
-      console.log('[SchedulePage] Saving schedule...')
       
       const savedSchedule = await saveSchedule({
         householdId: household.id,
@@ -160,7 +155,6 @@ export function SchedulePage() {
         slots: activeSlots,
       })
 
-      console.log('[SchedulePage] Schedule saved:', savedSchedule?.id)
       toast.success('Schedule saved successfully.')
       
       // Persist last schedule_id for session restoration
