@@ -15,6 +15,9 @@ import { SchedulePage } from './pages/SchedulePage'
 import { PlanPage } from './pages/PlanPage'
 import { ShopPage } from './pages/ShopPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { PricingPage } from './pages/PricingPage'
+import { PrivacyPage } from './pages/PrivacyPage'
+import { TermsPage } from './pages/TermsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
 // Connection check component - skip since we hardcoded Supabase credentials
@@ -101,6 +104,9 @@ export default function App() {
                     </ProtectedRoute>
                   }
                 />
+                <Route path="/pricing" element={<PricingPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/terms" element={<TermsPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </main>
