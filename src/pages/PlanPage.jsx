@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import toast from 'react-hot-toast'
 import { useMealPlan } from '../hooks/useMealPlan'
 import { useHousehold } from '../hooks/useHousehold'
@@ -16,6 +17,7 @@ import { AdSlot } from '../components/AdSlot'
 
 const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 
+  useDocumentTitle("Meal Plan | Allio")
 export function PlanPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()

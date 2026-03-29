@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'

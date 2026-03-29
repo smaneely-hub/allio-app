@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useNavigate } from 'react-router-dom'
 import { useHousehold } from '../hooks/useHousehold'
 import { useSchedule } from '../hooks/useSchedule'
