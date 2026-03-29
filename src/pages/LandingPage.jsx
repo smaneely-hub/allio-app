@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { Logo } from '../components/Logo'
 
 // Leaf decoration SVG
 function Leaf({ className = '' }) {
@@ -110,14 +111,9 @@ export function LandingPage() {
           <div className="flex flex-col lg:flex-row items-center gap-12">
             {/* Left - Text */}
             <div className="flex-1 text-center lg:text-left">
-              {/* Logo with leaf */}
-              <div className="relative inline-block mb-4">
-                <h1 className="font-display text-5xl md:text-6xl lg:text-7xl text-text-primary">
-                  Allio
-                </h1>
-                <div className="absolute -top-1 -right-6">
-                  <Leaf className="w-6 h-6" />
-                </div>
+              {/* Logo */}
+              <div className="mb-6">
+                <Logo size="lg" />
               </div>
               
               <h2 className="font-display text-2xl md:text-3xl lg:text-4xl text-text-primary mb-4">
