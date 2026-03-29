@@ -127,7 +127,10 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
         <button type="button" onClick={() => onToggleLock(meal.id, !meal.locked)} className="text-xs font-medium px-3 py-1.5 rounded-full bg-warm-100 text-text-secondary hover:bg-warm-200 transition-all duration-150 active:scale-[0.97]">
           {meal.locked ? '🔒' : '🔓'}
         </button>
-        <button type="button" onClick={() => onSwap(meal)} className="text-xs font-medium px-3 py-1.5 rounded-full bg-warm-100 text-text-secondary hover:bg-warm-200 transition-all duration-150 active:scale-[0.97]">
+        <button type="button" onClick={() => {
+          const suggestion = prompt('What would you like instead? (e.g., "something vegetarian", "quick dinner", "chicken")')
+          onSwap(meal, suggestion || '')
+        }} className="text-xs font-medium px-3 py-1.5 rounded-full bg-warm-100 text-text-secondary hover:bg-warm-200 transition-all duration-150 active:scale-[0.97]">
           🔄
         </button>
         <button type="button" onClick={() => navigator.clipboard.writeText(meal.name)} className="text-xs font-medium px-3 py-1.5 rounded-full bg-warm-100 text-text-secondary hover:bg-warm-200 transition-all duration-150 active:scale-[0.97]">

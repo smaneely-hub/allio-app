@@ -15,7 +15,7 @@ const corsHeaders = {
 
 // Build dynamic system prompt based on scheduled slots
 function buildSystemPrompt(
-  slots: Array<{ day: string; meal: string; is_leftover?: boolean }>, 
+  slots: Array<{ day: string; meal: string; is_leftover?: boolean; planning_notes?: string }>, 
   members: Array<{ 
     restrictions?: string; 
     preferences?: string;
@@ -24,7 +24,8 @@ function buildSystemPrompt(
     health_considerations?: string[];
   }>, 
   household: { cooking_comfort?: string; staples_on_hand?: string },
-  suggestion?: string
+  suggestion?: string,
+  weekNotes?: string
 ) {
   const slotDescriptions = slots
     .filter((s) => s.meal !== 'prep_block' && s.meal !== 'prep')
@@ -35,9 +36,13 @@ function buildSystemPrompt(
         'dinner': '(main evening meal like chicken, fish, pasta, stir-fry, tacos)',
       }
       const guidance = mealGuidance[s.meal.toLowerCase()] || ''
-      return `${s.day} ${s.meal} ${guidance}`
+      const notes = s.planning_notes ? ` Notes: ${s.planning_notes}` : ''
+      return `${s.day} ${s.meal} ${guidance}${notes}`
     })
     .join(', ')
+
+  // Add week-level context if provided
+  const weekContext = weekNotes ? `\n\nWEEK CONTEXT (IMPORTANT): ${weekNotes}\n` : ''
   
   const allDietary = members.flatMap(m => m.dietary_restrictions || []).filter(Boolean)
   const allFoodPrefs = members.flatMap(m => m.food_preferences || []).filter(Boolean)
@@ -267,7 +272,7 @@ serve(async (req) => {
     }
 
     const messages = [
-      { role: 'system', content: buildSystemPrompt(payload.slots, payload.members, payload.household, payload.replace_slot?.suggestion) },
+      { role: 'system', content: buildSystemPrompt(payload.slots, payload.members, payload.household, payload.replace_slot?.suggestion, payload.week_notes) },
       { role: 'user', content: JSON.stringify(payload) },
     ]
 

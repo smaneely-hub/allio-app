@@ -195,6 +195,13 @@ export function useMealPlan(scheduleId) {
         .eq('user_id', user.id)
         .eq('schedule_id', scheduleId)
       if (slotsError) throw slotsError
+
+      // Also fetch the schedule to get week_notes
+      const { data: schedule } = await supabase
+        .from('schedules')
+        .select('week_notes')
+        .eq('id', scheduleId)
+        .single()
       
       console.log('[useMealPlan] Fetched slots from DB:', slots?.length, 'for scheduleId:', scheduleId)
       console.log('[useMealPlan] Slot details:', JSON.stringify(slots?.slice(0,3)))
@@ -236,7 +243,8 @@ export function useMealPlan(scheduleId) {
           is_leftover: slot.is_leftover,
           leftover_source: slot.leftover_source,
         })),
-        locked_meals: lockedMeals,
+        week_notes: schedule?.week_notes || '',
+        locked_meals: validLockedMeals,
       }
 
       console.log('[useMealPlan] Payload slots being sent:', JSON.stringify(payload.slots))
@@ -343,6 +351,13 @@ export function useMealPlan(scheduleId) {
       const { data: members } = await supabase.from('household_members').select('*').eq('user_id', user.id).eq('household_id', household.id)
       const { data: slots } = await supabase.from('schedule_slots').select('*').eq('user_id', user.id).eq('schedule_id', scheduleId)
 
+      // Fetch schedule for week_notes
+      const { data: schedule } = await supabase
+        .from('schedules')
+        .select('week_notes')
+        .eq('id', scheduleId)
+        .single()
+
       const payload = {
         household: {
           total_people: household.total_people,
@@ -351,6 +366,7 @@ export function useMealPlan(scheduleId) {
           adventurousness: household.adventurousness,
           staples_on_hand: household.staples_on_hand,
           planning_priorities: household.planning_priorities,
+          cooking_comfort: household.cooking_comfort,
         },
         members: members.map((member) => ({
           label: member.name || member.label,
@@ -358,6 +374,9 @@ export function useMealPlan(scheduleId) {
           age: member.age,
           restrictions: member.restrictions,
           preferences: member.preferences,
+          dietary_restrictions: member.dietary_restrictions || [],
+          food_preferences: member.food_preferences || [],
+          health_considerations: member.health_considerations || [],
         })),
         slots: slots.map((slot) => ({
           day: String(slot.day_of_week || slot.day || '').slice(0, 3).toLowerCase(),
@@ -368,6 +387,7 @@ export function useMealPlan(scheduleId) {
           is_leftover: slot.is_leftover,
           leftover_source: slot.leftover_source,
         })),
+        week_notes: schedule?.week_notes || '',
         existing_plan: mealPlan.draft_plan,
         replace_slot: {
           day: mealToReplace.day,
