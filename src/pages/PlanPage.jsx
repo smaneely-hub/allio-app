@@ -302,7 +302,7 @@ export function PlanPage() {
 
       {/* Upgrade Prompt Modal */}
       <UpgradePrompt 
-        feature={upgradeFeature} 
+        isOpen={showUpgradePrompt} feature={upgradeFeature} 
         onClose={() => {
           setShowUpgradePrompt(false)
           setUpgradeFeature(null)

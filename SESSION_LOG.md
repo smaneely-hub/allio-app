@@ -1,25 +1,29 @@
 # Allio Development Log
 
-## March 28-29, 2026
+## March 29, 2026
 
-### Completed Tasks
+### Freemium Monetization - Completed
 
-#### Freemium Monetization System
-
-1. **DATABASE** - Created migration with subscriptions, usage_tracking, feature_flags tables
-2. **SUBSCRIPTION HOOK** - useSubscription.js with checkFeatureAccess, trackUsage, canGeneratePlan
-3. **UPGRADE PROMPT** - Modal with premium benefits, beta temporary upgrade
-4. **FEATURE GATING** - Wired up in PlanPage: Generate button (1/week limit), Email button (premium)
-5. **AD SLOTS** - AdSlot component, hidden for premium users
-6. **PREMIUM BADGES** - NavBar shows "⭐ Premium" badge
-7. **PRICING PAGE** - Two-column comparison with FAQ
-8. **LEGAL PAGES** - PrivacyPage, TermsPage with real content
-9. **PWA SETUP** - manifest.json, meta tags, installable
+1. **DATABASE** - SQL migration ready (subscriptions, usage_tracking tables)
+2. **SUBSCRIPTION HOOK** - useSubscription.js with feature access checks
+3. **UPGRADE PROMPT** - Modal with premium benefits, beta free trial
+4. **FEATURE GATING**:
+   - Plan: Generate (1/week limit), Email (premium)
+   - Shop: Share, Email (premium)
+   - MealCard: Cooking mode (premium)
+5. **AD SLOTS**: Plan, Shop, Schedule pages (free tier only)
+6. **PREMIUM BADGES**: NavBar + Settings page
+7. **PRICING PAGE**: /pricing with comparison table
+8. **LEGAL PAGES**: Privacy, Terms with real content
+9. **PWA**: manifest.json for installability
+10. **GROCERY CONNECT**: Placeholder store logos in Shop page
 
 ### Beta Note
-During beta, users can upgrade to premium for free. Upgrade button shows toast: "Payment coming soon! Enjoy premium features for free during our beta."
+Upgrade button shows toast: "Payment coming soon! Enjoy premium features for free during our beta."
+
+### To Enable
+Run SQL migration in Supabase SQL Editor.
 
 ### Remaining
-1. Run SQL migration in Supabase
-2. Add ad slots to ShopPage/SchedulePage
-3. Gate cooking mode in MealCard
+- PNG icons (192px, 512px) for PWA install
+- Onboarding health options premium gating

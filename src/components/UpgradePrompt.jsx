@@ -44,7 +44,10 @@ const premiumBenefits = [
   'Meal plan history'
 ]
 
-export function UpgradePrompt({ feature, onClose }) {
+export function UpgradePrompt({ feature, onClose, isOpen }) {
+  // Don't render if not open or no feature specified
+  if (!isOpen || !feature) return null
+  
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   
