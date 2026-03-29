@@ -102,7 +102,9 @@ export function LandingPage() {
         {/* Top right login */}
         <div className="container mx-auto px-4 py-4 flex justify-end">
           <Link to="/login" className="text-sm text-text-secondary hover:text-text-primary hover:underline font-medium">
-            Log in
+            </Link>
+            <Link to="/pricing" className="text-sm text-text-secondary hover:text-text-primary font-medium">Pricing</Link>
+            <Link to="/login" className="text-sm text-text-secondary hover:text-text-primary font-medium">Log in
           </Link>
         </div>
 
@@ -271,7 +273,7 @@ export function LandingPage() {
 
       {/* Footer */}
       <footer className="py-8 text-center text-sm text-text-muted border-t border-divider bg-bg-primary">
-        © 2026 Allio · <a href="#" className="hover:underline">Privacy</a> · <a href="#" className="hover:underline">Terms</a> · <a href="#" className="hover:underline">Contact</a>
+        © 2026 Allio · <Link to="/privacy" className="hover:underline">Privacy</Link> · <Link to="/terms" className="hover:underline">Terms</Link> · <a href="mailto:hello@allio.life" className="hover:underline">Contact</a>
       </footer>
     </div>
   )

@@ -5,11 +5,14 @@ import { useMealPlan } from '../hooks/useMealPlan'
 import { useHousehold } from '../hooks/useHousehold'
 import { useSchedule } from '../hooks/useSchedule'
 import { useAuth } from '../hooks/useAuth'
+import { useSubscription } from '../hooks/useSubscription'
 import { MealCard } from '../components/plan/MealCard'
 import { aggregateShoppingList } from '../lib/aggregateShoppingList'
 import { formatMealPlanEmail } from '../lib/formatMealPlanEmail'
 import { supabase } from '../lib/supabase'
 import { PlanSkeleton, EmptyState, PlanGenerationLoading, MealCardSkeleton } from '../components/LoadingStates'
+import { UpgradePrompt } from '../components/UpgradePrompt'
+import { AdSlot } from '../components/AdSlot'
 
 const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 
@@ -18,6 +21,10 @@ export function PlanPage() {
   const [searchParams] = useSearchParams()
   const scheduleId = searchParams.get('schedule_id')
   const autoGenerate = searchParams.get('auto_generate') === 'true'
+  
+  // Subscription hook for premium features
+  const { isPremium, canGeneratePlan, trackUsage, upgradeToPremium, loading: subLoading } = useSubscription()
+  
   const {
     mealPlan,
     loading,
@@ -33,6 +40,10 @@ export function PlanPage() {
   const { household } = useHousehold()
   const { schedule } = useSchedule(scheduleId)
   const { user } = useAuth()
+
+  // Upgrade prompt state
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
+  const [upgradeFeature, setUpgradeFeature] = useState(null)
 
   const hasMeals = mealPlan?.draft_plan?.meals?.length > 0 || mealPlan?.plan?.meals?.length > 0
   useEffect(() => {
@@ -73,8 +84,20 @@ export function PlanPage() {
   }
 
   const handleGenerate = async () => {
+    // Check if free user has used their weekly plan
+    if (!isPremium) {
+      const { allowed, used, limit } = await canGeneratePlan()
+      if (!allowed) {
+        setUpgradeFeature('unlimited_plans')
+        setShowUpgradePrompt(true)
+        return
+      }
+    }
+    
     try {
       await generateMealPlan()
+      // Track usage
+      await trackUsage('plan_generate', { schedule_id: scheduleId })
       toast.success('Meal plan generated successfully.')
     } catch (generationError) {
       toast.error(generationError.message || 'Unable to generate meal plan.')
@@ -109,6 +132,13 @@ export function PlanPage() {
   const [emailing, setEmailing] = useState(false)
   
   const handleEmailPlan = async () => {
+    // Check if premium - email is a premium feature
+    if (!isPremium) {
+      setUpgradeFeature('email_delivery')
+      setShowUpgradePrompt(true)
+      return
+    }
+    
     setEmailing(true)
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser()
@@ -133,6 +163,7 @@ export function PlanPage() {
         throw error
       } else {
         toast.success(`Meal plan sent to ${authUser.email}!`)
+        await trackUsage('email_sent')
       }
     } catch (err) {
       console.error('[PlanPage] Email error:', err)
@@ -261,6 +292,22 @@ export function PlanPage() {
           </button>
         </div>
       )}
+
+      {/* Ad slot for free tier */}
+      {!isPremium && (
+        <div className="mx-3 mt-4">
+          <AdSlot size="banner" position="plan_bottom" />
+        </div>
+      )}
+
+      {/* Upgrade Prompt Modal */}
+      <UpgradePrompt 
+        feature={upgradeFeature} 
+        onClose={() => {
+          setShowUpgradePrompt(false)
+          setUpgradeFeature(null)
+        }} 
+      />
     </div>
   )
 }
