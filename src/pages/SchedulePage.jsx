@@ -3,7 +3,9 @@ import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
 import { useHousehold } from '../hooks/useHousehold'
 import { useSchedule } from '../hooks/useSchedule'
+import { useSubscription } from '../hooks/useSubscription'
 import { ScheduleSkeleton, EmptyState } from '../components/LoadingStates'
+import { AdSlot } from '../components/AdSlot'
 
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const dayColors = {
@@ -21,6 +23,7 @@ export function SchedulePage() {
   const navigate = useNavigate()
   const { household, members, repairMembers, loading: householdLoading, reloadHousehold } = useHousehold()
   const { schedule, slots, loading: scheduleLoading, saveSchedule } = useSchedule()
+  const { isPremium } = useSubscription()
   const [shoppingDay, setShoppingDay] = useState('Sunday')
   const [weekNotes, setWeekNotes] = useState('')
   const [editorKey, setEditorKey] = useState(null)
@@ -378,6 +381,13 @@ export function SchedulePage() {
           {saving ? 'Saving…' : `Generate plan (${activeSlotCount} meal${activeSlotCount !== 1 ? 's' : ''})`}
         </button>
       </div>
+
+      {/* Ad slot at bottom (free tier only) */}
+      {!isPremium && (
+        <div className="mt-4">
+          <AdSlot size="banner" position="schedule_bottom" />
+        </div>
+      )}
     </div>
   )
 }

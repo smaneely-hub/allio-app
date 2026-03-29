@@ -3,9 +3,12 @@ import { Link, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { useSubscription } from '../hooks/useSubscription'
 import { shareListAsText } from '../lib/aggregateShoppingList'
 import { formatShoppingListEmail } from '../lib/formatShoppingListEmail'
 import { EmptyState } from '../components/LoadingStates'
+import { UpgradePrompt } from '../components/UpgradePrompt'
+import { AdSlot } from '../components/AdSlot'
 
 // Bold category colors
 const categoryColors = {
@@ -20,12 +23,17 @@ const categoryColors = {
 
 export function ShopPage() {
   const { user } = useAuth()
+  const { isPremium, trackUsage } = useSubscription()
   const [searchParams] = useSearchParams()
   const scheduleId = searchParams.get('schedule_id')
   const [shoppingList, setShoppingList] = useState(null)
   const [loading, setLoading] = useState(true)
   const [openCategories, setOpenCategories] = useState({})
   const [emailing, setEmailing] = useState(false)
+  
+  // Upgrade prompt state
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
+  const [upgradeFeature, setUpgradeFeature] = useState(null)
 
   useEffect(() => {
     async function loadShoppingList() {
@@ -106,12 +114,26 @@ export function ShopPage() {
   }
 
   const handleShare = () => {
+    // Check premium
+    if (!isPremium) {
+      setUpgradeFeature('shopping_share')
+      setShowUpgradePrompt(true)
+      return
+    }
+    
     const text = shareListAsText(shoppingList?.items || [])
     navigator.clipboard.writeText(text)
     toast.success('Shopping list copied!')
   }
 
   const handleEmailShop = async () => {
+    // Check premium
+    if (!isPremium) {
+      setUpgradeFeature('email_delivery')
+      setShowUpgradePrompt(true)
+      return
+    }
+    
     setEmailing(true)
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser()
@@ -134,6 +156,7 @@ export function ShopPage() {
         throw error
       } else {
         toast.success(`Shopping list sent to ${authUser.email}!`)
+        await trackUsage('email_sent')
       }
     } catch (err) {
       console.error('[ShopPage] Email error:', err)
@@ -209,6 +232,13 @@ export function ShopPage() {
           />
         </div>
       </div>
+
+      {/* Ad slot between progress and categories (free tier only) */}
+      {!isPremium && (
+        <div className="mb-3">
+          <AdSlot size="banner" position="shop_middle" />
+        </div>
+      )}
 
       {/* Categories */}
       {Object.entries(groupedItems).map(([category, items]) => {
@@ -293,6 +323,22 @@ export function ShopPage() {
           Copy list
         </button>
       </div>
+
+      {/* Ad slot for free tier */}
+      {!isPremium && (
+        <div className="mt-4">
+          <AdSlot size="banner" position="shop_bottom" />
+        </div>
+      )}
+
+      {/* Upgrade Prompt Modal */}
+      <UpgradePrompt 
+        feature={upgradeFeature} 
+        onClose={() => {
+          setShowUpgradePrompt(false)
+          setUpgradeFeature(null)
+        }} 
+      />
     </div>
   )
 }
