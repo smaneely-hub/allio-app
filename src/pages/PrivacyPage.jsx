@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
+  useDocumentTitle("Privacy Policy | Allio")
 export function PrivacyPage() {
   return (
     <div className="min-h-screen bg-bg-primary">

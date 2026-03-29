@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
 const freeFeatures = [
   { name: '1 meal plan per week', included: true },
@@ -38,6 +39,7 @@ const faqs = [
   }
 ]
 
+  useDocumentTitle("Pricing | Allio")
 export function PricingPage() {
   return (
     <div className="min-h-screen bg-bg-primary">

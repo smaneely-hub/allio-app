@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 
+  useDocumentTitle("Terms of Service | Allio")
 export function TermsPage() {
   return (
     <div className="min-h-screen bg-bg-primary">

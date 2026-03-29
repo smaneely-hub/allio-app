@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
@@ -13,6 +14,7 @@ function Leaf({ className = '' }) {
   )
 }
 
+  useDocumentTitle("Log in | Allio")
 export function LoginPage() {
   const navigate = useNavigate()
   const [mode, setMode] = useState('login')

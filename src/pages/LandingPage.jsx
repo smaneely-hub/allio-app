@@ -1,279 +1,270 @@
 import { Link } from 'react-router-dom'
 import { Logo } from '../components/Logo'
 
-// Leaf decoration SVG
-function Leaf({ className = '' }) {
+// Step component for How It Works
+function Step({ number, title, description, icon }) {
   return (
-    <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 008 17c8-20 20-8 0-13z" fill="#5FAF7A" fillOpacity="0.5"/>
-      <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 008 17c8-20 20-8 0-13z" stroke="#5FAF7A" strokeWidth="1"/>
-    </svg>
+    <div className="flex gap-4">
+      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center font-bold text-lg">
+        {number}
+      </div>
+      <div>
+        <h3 className="font-semibold text-text-primary mb-1">{title}</h3>
+        <p className="text-sm text-text-secondary">{description}</p>
+      </div>
+    </div>
   )
 }
 
-// Phone mockup
-function PhoneMockup() {
+// Testimonial card
+function Testimonial({ quote, author, role }) {
   return (
-    <div className="relative">
-      <div className="w-64 h-[480px] bg-white rounded-[2.5rem] border-4 border-divider shadow-card overflow-hidden">
-        {/* Notch */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-5 bg-warm-200 rounded-b-xl z-10"></div>
-        {/* Screen */}
-        <div className="w-full h-full bg-bg-primary overflow-hidden pt-6 px-3">
-          <div className="text-xs font-semibold text-primary-500 mb-2">Your Week</div>
-          <div className="flex gap-1 mb-3 overflow-x-auto pb-1">
-            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
-              <div key={day} className={`flex-shrink-0 px-2 py-1 rounded-lg text-xs ${day === 'Wed' ? 'bg-primary-400 text-white' : 'bg-warm-100 text-warm-600'}`}>
-                {day}
-              </div>
-            ))}
-          </div>
-          <div className="space-y-2">
-            <div className="bg-white rounded-xl p-3 shadow-soft">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xl">🍗</span>
-                <span className="font-medium text-sm text-text-primary">Chicken Stir Fry</span>
-              </div>
-              <div className="text-xs text-text-secondary">25 min · 4 servings</div>
-            </div>
-            <div className="bg-white rounded-xl p-3 shadow-soft">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xl">🌮</span>
-                <span className="font-medium text-sm text-text-primary">Pork Tacos</span>
-              </div>
-              <div className="text-xs text-text-secondary">30 min · 4 servings</div>
-            </div>
-            <div className="bg-white rounded-xl p-3 shadow-soft">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xl">🍝</span>
-                <span className="font-medium text-sm text-text-primary">Pasta Night</span>
-              </div>
-              <div className="text-xs text-text-secondary">20 min · 4 servings</div>
-            </div>
-          </div>
+    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+      <p className="text-text-secondary mb-4 italic">"{quote}"</p>
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 to-teal-400 flex items-center justify-center text-white font-bold">
+          {author.charAt(0)}
+        </div>
+        <div>
+          <p className="font-medium text-text-primary text-sm">{author}</p>
+          <p className="text-xs text-text-muted">{role}</p>
         </div>
       </div>
-      {/* Soft shadow/glow */}
-      <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-primary-200/30 rounded-full blur-2xl"></div>
     </div>
   )
 }
 
 // Feature card
-function FeatureCard({ emoji, title, description }) {
+function FeatureCard({ title, description, icon }) {
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-card text-center hover:shadow-lg transition-shadow">
-      <div className="text-3xl mb-3">{emoji}</div>
-      <h3 className="font-display text-lg text-text-primary mb-2">{title}</h3>
+    <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+      <div className="text-2xl mb-3">{icon}</div>
+      <h3 className="font-semibold text-text-primary mb-2">{title}</h3>
       <p className="text-sm text-text-secondary">{description}</p>
     </div>
   )
 }
 
-// Mini cards for features
-function MiniMealCard({ emoji, name, time }) {
-  return (
-    <div className="flex items-center gap-2 bg-white rounded-lg p-2 shadow-soft">
-      <span className="text-lg">{emoji}</span>
-      <div>
-        <div className="text-xs font-medium text-text-primary">{name}</div>
-        <div className="text-[10px] text-text-secondary">{time}</div>
-      </div>
-    </div>
-  )
-}
-
-function MiniShoppingItem({ name, checked }) {
-  return (
-    <div className="flex items-center gap-2 py-1">
-      <span className={`w-4 h-4 rounded border ${checked ? 'bg-primary-400 border-primary-400' : 'border-warm-300'} flex items-center justify-center`}>
-        {checked && <span className="text-white text-xs">✓</span>}
-      </span>
-      <span className={`text-xs ${checked ? 'line-through text-text-muted' : 'text-text-primary'}`}>{name}</span>
-    </div>
-  )
-}
-
+  useDocumentTitle("Allio — Dinner, figured out.")
 export function LandingPage() {
   return (
-    <div className="min-h-screen bg-bg-primary overflow-x-hidden">
-      {/* Hero Section - calm, clean */}
-      <div className="bg-bg-primary">
-        {/* Top right login */}
-        <div className="container mx-auto px-4 py-4 flex justify-end">
-          <Link to="/login" className="text-sm text-text-secondary hover:text-text-primary hover:underline font-medium">
-            </Link>
-            <Link to="/pricing" className="text-sm text-text-secondary hover:text-text-primary font-medium">Pricing</Link>
-            <Link to="/login" className="text-sm text-text-secondary hover:text-text-primary font-medium">Log in
-          </Link>
-        </div>
-
-        {/* Hero content */}
-        <div className="container mx-auto px-4 py-8 md:py-12">
-          <div className="flex flex-col lg:flex-row items-center gap-12">
-            {/* Left - Text */}
-            <div className="flex-1 text-center lg:text-left">
-              {/* Logo */}
-              <div className="mb-6">
-                <Logo size="lg" />
-              </div>
-              
-              <h2 className="font-display text-2xl md:text-3xl lg:text-4xl text-text-primary mb-4">
-                Everything your household needs. Finally in one place.
-              </h2>
-              <p className="text-text-secondary text-lg mb-8 max-w-xl mx-auto lg:mx-0">
-                Plan meals, organize shopping, and coordinate your family's schedule — all in one beautiful app.
-              </p>
-              
-              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                <Link to="/login" className="btn-primary text-lg py-3 px-8">
-                  Get Started
-                </Link>
-              </div>
-              
-              <p className="text-sm text-text-muted mt-4">No credit card required</p>
-            </div>
-
-            {/* Right - Phone */}
-            <div className="flex-1 flex justify-center">
-              <PhoneMockup />
-            </div>
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <header className="border-b border-gray-100">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <Logo size="md" />
+            <nav className="hidden md:flex items-center gap-8">
+              <Link to="/pricing" className="text-sm text-text-secondary hover:text-text-primary font-medium">
+                Pricing
+              </Link>
+              <Link to="/login" className="text-sm font-medium text-text-secondary hover:text-text-primary">
+                Log in
+              </Link>
+              <Link to="/login" className="btn-primary text-sm py-2 px-4">
+                Get started
+              </Link>
+            </nav>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Three Feature Cards */}
-      <div className="py-12 px-4 bg-white">
-        <div className="max-w-5xl mx-auto">
-          <div className="grid md:grid-cols-3 gap-6">
-            <FeatureCard 
-              icon="📅" 
-              title="Plan Your Week" 
-              description="Set your schedule and let Allio create personalized meal plans that fit your life."
-            />
-            <FeatureCard 
-              icon="🛒" 
-              title="Simplify Shopping" 
-              description="Auto-generated shopping lists with everything you need, organized by aisle."
-            />
-            <FeatureCard 
-              icon="✅" 
-              title="Organize Your Day" 
-              description="See who's eating, what's for dinner, and what tasks need doing at a glance."
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Detailed Features */}
-      <div className="py-16 px-4">
-        <div className="max-w-5xl mx-auto space-y-16">
-          
-          {/* Feature 1 */}
-          <div className="flex flex-col md:flex-row items-center gap-8">
-            <div className="flex-1">
-              <h3 className="font-display text-2xl text-text-primary mb-3">Plan Your Week</h3>
-              <p className="text-text-secondary mb-4">
-                Set your weekly schedule once, and Allio handles the rest. It adapts to who's actually home and creates meals that work for everyone.
-              </p>
-              <div className="bg-white rounded-2xl shadow-card p-4 inline-block">
-                <div className="text-xs font-semibold text-primary-500 mb-2">Your Week</div>
-                <div className="flex gap-1 mb-3">
-                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(d => (
-                    <div key={d} className={`px-2 py-1 rounded-lg text-xs ${d === 'Wed' ? 'bg-primary-400 text-white' : 'bg-warm-100 text-text-secondary'}`}>{d}</div>
-                  ))}
-                </div>
-                <div className="space-y-2">
-                  <MiniMealCard emoji="🍗" name="Chicken Stir Fry" time="25 min" />
-                  <MiniMealCard emoji="🌮" name="Pork Tacos" time="30 min" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Feature 2 */}
-          <div className="flex flex-col md:flex-row-reverse items-center gap-8">
-            <div className="flex-1">
-              <h3 className="font-display text-2xl text-text-primary mb-3">Simplify Shopping</h3>
-              <p className="text-text-secondary mb-4">
-                One list that combines everything from all your meals. No more duplicates, no more forgotten items.
-              </p>
-              <div className="bg-white rounded-2xl shadow-card p-4 inline-block min-w-[260px]">
-                <div className="text-xs font-semibold text-primary-500 mb-2">Shopping List</div>
-                <div className="mb-2">
-                  <div className="text-xs font-medium text-text-primary mb-1">Produce</div>
-                  <MiniShoppingItem name="Broccoli crowns" checked={true} />
-                  <MiniShoppingItem name="Lemon" checked={false} />
-                </div>
-                <div>
-                  <div className="text-xs font-medium text-text-primary mb-1">Protein</div>
-                  <MiniShoppingItem name="Chicken thighs" checked={false} />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Feature 3 */}
-          <div className="flex flex-col md:flex-row items-center gap-8">
-            <div className="flex-1">
-              <h3 className="font-display text-2xl text-text-primary mb-3">Organize Your Day</h3>
-              <p className="text-text-secondary mb-4">
-                See the whole picture at a glance. Tonight's dinner, who's home, and what needs attention.
-              </p>
-              <div className="bg-white rounded-2xl shadow-card p-4 inline-block">
-                <div className="text-xs font-semibold text-primary-500 mb-2">Tonight</div>
-                <div className="bg-primary-50 rounded-xl p-3 border border-primary-200 mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">🍗</span>
-                    <div>
-                      <div className="font-medium text-text-primary">Chicken Stir Fry</div>
-                      <div className="text-xs text-text-secondary">25 min · Serves 4</div>
-                    </div>
-                  </div>
-                </div>
-                <div className="text-xs text-text-muted">Who's eating: 4 people</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom CTA */}
-      <div className="py-16 px-4 bg-white">
-        <div className="max-w-2xl mx-auto text-center">
-          <h2 className="font-display text-3xl text-text-primary mb-3">
-            Try Allio for free today.
-          </h2>
-          <p className="text-text-secondary mb-6">
-            Get your household running smoothly.
+      {/* HERO SECTION */}
+      <section className="py-16 md:py-24 px-4">
+        <div className="max-w-4xl mx-auto text-center">
+          <h1 className="font-display text-4xl md:text-5xl lg:text-6xl text-text-primary mb-6 leading-tight">
+            Stop thinking about what to cook.
+          </h1>
+          <p className="text-xl md:text-2xl text-text-secondary mb-4 max-w-2xl mx-auto">
+            Allio plans your week, builds your grocery list, and keeps your family eating well — without the daily mental load.
           </p>
-          <Link to="/login" className="btn-primary text-lg py-3 px-8 inline-block">
-            Get Started
-          </Link>
+          <p className="text-text-muted mb-8 max-w-xl mx-auto">
+            Built for busy professionals who want to show up for their family without spending hours planning meals.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link to="/login" className="btn-primary text-lg py-3 px-8">
+              Plan my week in 30 seconds
+            </Link>
+            <a href="#how-it-works" className="btn-ghost text-lg py-3 px-8">
+              See how it works
+            </a>
+          </div>
+        </div>
+      </section>
 
-          {/* Testimonial */}
-          <div className="mt-10 bg-bg-primary rounded-2xl p-6 shadow-soft max-w-md mx-auto">
-            <div className="flex justify-center gap-1 mb-3">
-              {[...Array(5)].map((_, i) => (
-                <span key={i} className="text-primary-400">★</span>
-              ))}
+      {/* PAIN SECTION - alternating bg */}
+      <section className="py-16 md:py-24 px-4 bg-gray-50">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="font-display text-3xl md:text-4xl text-text-primary mb-6">
+            You don't need more recipes. You need fewer decisions.
+          </h2>
+          <div className="text-lg text-text-secondary space-y-4">
+            <p>You already have enough on your plate.</p>
+            <p className="font-medium">Work. Kids. Life.</p>
+            <p>And every day, the same question:</p>
+            <p className="text-xl text-text-primary font-semibold italic">"What are we eating tonight?"</p>
+            <p>Not because you can't cook.</p>
+            <p>But because you don't have time to think about it.</p>
+            <p className="font-semibold text-primary-600">Allio removes that decision entirely.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* HOW IT WORKS SECTION */}
+      <section id="how-it-works" className="py-16 md:py-24 px-4">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="font-display text-3xl md:text-4xl text-text-primary text-center mb-12">
+            How it works
+          </h2>
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="space-y-8">
+              <Step 
+                number="1" 
+                title="Tell us about your household" 
+                description="Who eats, when, and any preferences. We remember so you don't have to repeat yourself."
+                icon="👨‍👩‍👧‍👦"
+              />
+              <Step 
+                number="2" 
+                title="Get a full week plan instantly" 
+                description="AI-generated meals that fit your schedule, your tastes, and what's already in your pantry."
+                icon="📋"
+              />
+              <Step 
+                number="3" 
+                title="Grocery list built automatically" 
+                description="Everything you need, organized by store section. One click to your phone."
+                icon="🛒"
+              />
             </div>
-            <p className="text-text-secondary italic mb-4">
-              "Allio has been a game changer for our family. Everything is in one place, and it's so easy to use."
-            </p>
-            <div className="flex items-center justify-center gap-2">
-              <div className="w-10 h-10 rounded-full bg-primary-400 text-white flex items-center justify-center font-bold">
-                SM
-              </div>
-              <span className="font-medium text-text-primary">Sarah M.</span>
+            <div className="space-y-8">
+              <Step 
+                number="4" 
+                title="Cook without thinking" 
+                description="Step-by-step guidance when you need it. Recipes that actually match what you're making."
+                icon="🍳"
+              />
+              <Step 
+                number="5" 
+                title="It gets smarter every week" 
+                description="Learns what works, adapts to feedback, and keeps improving your plan."
+                icon="🧠"
+              />
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Footer */}
-      <footer className="py-8 text-center text-sm text-text-muted border-t border-divider bg-bg-primary">
-        © 2026 Allio · <Link to="/privacy" className="hover:underline">Privacy</Link> · <Link to="/terms" className="hover:underline">Terms</Link> · <a href="mailto:hello@allio.life" className="hover:underline">Contact</a>
+      {/* DIFFERENTIATION SECTION - alternating bg */}
+      <section className="py-16 md:py-24 px-4 bg-gray-50">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="font-display text-3xl md:text-4xl text-text-primary text-center mb-4">
+            This isn't a recipe app.
+          </h2>
+          <p className="text-center text-text-secondary mb-12">
+            It's a system that removes the mental overhead of feeding your family.
+          </p>
+          <div className="grid md:grid-cols-2 gap-4">
+            <FeatureCard 
+              icon="📅"
+              title="Plans around your schedule"
+              description="Know who's home on which nights. No more planning meals for no one."
+            />
+            <FeatureCard 
+              icon="🔄"
+              title="Reuses ingredients intelligently"
+              description="Ingredients bought for Monday's dinner become Wednesday's lunch. Less waste, less shopping."
+            />
+            <FeatureCard 
+              icon="🏠"
+              title="Built for households, not singletons"
+              description="Manages multiple preferences, portions, and schedules. One plan, everyone covered."
+            />
+            <FeatureCard 
+              icon="✨"
+              title="Eliminates daily decisions"
+              description="Set it once, cook all week. No more 'what's for dinner' stress."
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* EMOTIONAL SECTION */}
+      <section className="py-16 md:py-24 px-4">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="font-display text-3xl md:text-4xl text-text-primary mb-6">
+            Be present where it matters.
+          </h2>
+          <p className="text-xl text-text-secondary leading-relaxed">
+            Dinner shouldn't be another problem to solve.
+          </p>
+          <p className="text-xl text-text-secondary leading-relaxed mt-4">
+            With Allio, you spend less time planning<br />
+            and more time actually sitting at the table.
+          </p>
+        </div>
+      </section>
+
+      {/* SOCIAL PROOF SECTION - alternating bg */}
+      <section className="py-16 md:py-24 px-4 bg-gray-50">
+        <div className="max-w-5xl mx-auto">
+          <h2 className="font-display text-3xl md:text-4xl text-text-primary text-center mb-12">
+            What parents are saying
+          </h2>
+          <div className="grid md:grid-cols-3 gap-6">
+            <Testimonial 
+              quote="We went from 'what's for dinner' every single night to having an answer before I finish my commute home."
+              author="Sarah M."
+              role="Mom of two, marketing director"
+            />
+            <Testimonial 
+              quote="I didn't realize how much mental energy I was spending on meal planning until Allio took it off my plate."
+              author="David K."
+              role="Dad of three, software engineer"
+            />
+            <Testimonial 
+              quote="Finally, a solution that actually understands families. Not just recipes—it's a whole system."
+              author="Jennifer L."
+              role="Mom of four, physician"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* FINAL CTA SECTION */}
+      <section className="py-16 md:py-24 px-4">
+        <div className="max-w-2xl mx-auto text-center">
+          <h2 className="font-display text-3xl md:text-4xl text-text-primary mb-6">
+            Your week, handled.
+          </h2>
+          <p className="text-text-secondary mb-8">
+            Join thousands of families who've eliminated the dinner decision fatigue.
+          </p>
+          <Link to="/login" className="btn-primary text-lg py-4 px-10 inline-block">
+            Get started
+          </Link>
+          <p className="text-sm text-text-muted mt-4">
+            Free to try. No credit card required.
+          </p>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="border-t border-gray-100 py-12 px-4">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+            <Logo size="sm" />
+            <nav className="flex items-center gap-6 text-sm text-text-muted">
+              <Link to="/pricing" className="hover:text-text-primary">Pricing</Link>
+              <Link to="/privacy" className="hover:text-text-primary">Privacy</Link>
+              <Link to="/terms" className="hover:text-text-primary">Terms</Link>
+              <a href="mailto:hello@allio.life" className="hover:text-text-primary">Contact</a>
+            </nav>
+            <p className="text-sm text-text-muted">
+              © 2026 Allio
+            </p>
+          </div>
+        </div>
       </footer>
     </div>
   )
