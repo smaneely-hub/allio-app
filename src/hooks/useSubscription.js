@@ -22,51 +22,9 @@ export function useSubscription() {
     async function initSubscription() {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
-
-      if (!user) {
-        setLoading(false)
-        return
-      }
-
-      try {
-        let { data: sub, error } = await supabase
-          .from('subscriptions')
-          .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle()
-
-        if (error && (error.code === 'PGRST205' || String(error.message || '').includes('404'))) {
-          setTier('free')
-          setSubscription(null)
-          setLoading(false)
-          return
-        }
-
-        if (!sub && !error) {
-          const { data: newSub, error: insertError } = await supabase
-            .from('subscriptions')
-            .insert({ user_id: user.id, tier: 'free' })
-            .select()
-            .single()
-
-          if (!insertError) sub = newSub
-        }
-
-        if (sub) {
-          setTier(sub.tier || 'free')
-          setSubscription(sub)
-        }
-
-        await supabase
-          .from('households')
-          .update({ subscription_tier: sub?.tier || 'free' })
-          .eq('user_id', user.id)
-      } catch {
-        setTier('free')
-        setSubscription(null)
-      } finally {
-        setLoading(false)
-      }
+      setTier('free')
+      setSubscription(null)
+      setLoading(false)
     }
 
     initSubscription()
@@ -145,16 +103,6 @@ export function useSubscription() {
   const upgradeToPremium = useCallback(async () => {
     if (!user) return false
 
-    // Update subscription
-    await supabase
-      .from('subscriptions')
-      .update({ 
-        tier: 'premium',
-        status: 'active'
-      })
-      .eq('user_id', user.id)
-
-    // Update household
     await supabase
       .from('households')
       .update({ subscription_tier: 'premium' })
