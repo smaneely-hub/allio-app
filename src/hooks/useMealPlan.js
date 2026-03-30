@@ -33,10 +33,9 @@ async function invokeGeneratePlan(payload) {
   }
 
   return supabase.functions.invoke('generate-plan', {
-    body: payload,
+    body: JSON.stringify(payload),
     headers: {
       Authorization: `Bearer ${session.access_token}`,
-      apikey: supabase?.supabaseKey,
     },
   })
 }
