@@ -80,7 +80,15 @@ export function AuthProvider({ children }) {
       loading,
       emailUnverified,
       signOut: async () => {
-        await supabase.auth.signOut()
+        await supabase.auth.signOut({ scope: 'local' })
+        if (typeof window !== 'undefined') {
+          try {
+            const keys = Object.keys(window.localStorage)
+            keys.filter((k) => k.toLowerCase().includes('supabase') || k.toLowerCase().includes('sb-')).forEach((k) => window.localStorage.removeItem(k))
+            const sessionKeys = Object.keys(window.sessionStorage)
+            sessionKeys.filter((k) => k.toLowerCase().includes('supabase') || k.toLowerCase().includes('sb-')).forEach((k) => window.sessionStorage.removeItem(k))
+          } catch {}
+        }
         navigate('/login', { replace: true })
       },
       resendVerification: async () => {
