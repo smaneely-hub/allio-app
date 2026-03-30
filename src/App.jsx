@@ -13,6 +13,7 @@ import { OnboardingPage } from './pages/OnboardingPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { SchedulePage } from './pages/SchedulePage'
 import { PlanPage } from './pages/PlanPage'
+import { PlannerPage } from './pages/PlannerPage'
 import { ShopPage } from './pages/ShopPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { PricingPage } from './pages/PricingPage'
@@ -84,7 +85,7 @@ export default function App() {
                   path="/plan"
                   element={
                     <ProtectedRoute>
-                      <PlanPage />
+                      <PlannerPage />
                     </ProtectedRoute>
                   }
                 />

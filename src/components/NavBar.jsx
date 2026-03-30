@@ -4,8 +4,7 @@ import { Logo } from './Logo'
 
 const links = [
   { to: '/dashboard', label: 'Home', icon: '🏠' },
-  { to: '/plan', label: 'Plan', icon: '📋' },
-  { to: '/schedule', label: 'Schedule', icon: '📅' },
+  { to: '/plan', label: 'Weekly Plan', icon: '📋' },
   { to: '/shop', label: 'Shop', icon: '🛒' },
   { to: '/settings', label: 'Profile', icon: '👤' },
 ]
