@@ -28,11 +28,26 @@ export function AuthProvider({ children }) {
     let mounted = true
 
     async function loadSession() {
-      const { data } = await supabase.auth.getSession()
-      if (!mounted) return
-      setUser(data.session?.user ?? null)
-      prevUserRef.current = data.session?.user ?? null
-      setLoading(false)
+      try {
+        const { data, error } = await supabase.auth.getSession()
+        if (error && String(error.message || '').toLowerCase().includes('refresh token')) {
+          await supabase.auth.signOut({ scope: 'local' })
+          if (!mounted) return
+          setUser(null)
+          prevUserRef.current = null
+          setLoading(false)
+          return
+        }
+        if (!mounted) return
+        setUser(data.session?.user ?? null)
+        prevUserRef.current = data.session?.user ?? null
+      } catch {
+        if (!mounted) return
+        setUser(null)
+        prevUserRef.current = null
+      } finally {
+        if (mounted) setLoading(false)
+      }
     }
 
     loadSession()

@@ -22,41 +22,51 @@ export function useSubscription() {
     async function initSubscription() {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
-      
+
       if (!user) {
         setLoading(false)
         return
       }
 
-      // Check or create subscription
-      let { data: sub, error } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle()
-
-      if (!sub && !error) {
-        // Create free subscription
-        const { data: newSub } = await supabase
+      try {
+        let { data: sub, error } = await supabase
           .from('subscriptions')
-          .insert({ user_id: user.id, tier: 'free' })
-          .select()
-          .single()
-        sub = newSub
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (error && (error.code === 'PGRST205' || String(error.message || '').includes('404'))) {
+          setTier('free')
+          setSubscription(null)
+          setLoading(false)
+          return
+        }
+
+        if (!sub && !error) {
+          const { data: newSub, error: insertError } = await supabase
+            .from('subscriptions')
+            .insert({ user_id: user.id, tier: 'free' })
+            .select()
+            .single()
+
+          if (!insertError) sub = newSub
+        }
+
+        if (sub) {
+          setTier(sub.tier || 'free')
+          setSubscription(sub)
+        }
+
+        await supabase
+          .from('households')
+          .update({ subscription_tier: sub?.tier || 'free' })
+          .eq('user_id', user.id)
+      } catch {
+        setTier('free')
+        setSubscription(null)
+      } finally {
+        setLoading(false)
       }
-
-      if (sub) {
-        setTier(sub.tier || 'free')
-        setSubscription(sub)
-      }
-
-      // Also update household tier for quick access
-      await supabase
-        .from('households')
-        .update({ subscription_tier: sub?.tier || 'free' })
-        .eq('user_id', user.id)
-
-      setLoading(false)
     }
 
     initSubscription()
@@ -95,6 +105,7 @@ export function useSubscription() {
       .eq('action', action)
       .gte('created_at', sinceDate.toISOString())
 
+    if (error && (error.code === 'PGRST205' || String(error.message || '').includes('404'))) return 0
     return error ? 0 : (count || 0)
   }, [user])
 
@@ -110,7 +121,7 @@ export function useSubscription() {
         metadata
       })
 
-    if (error) {
+    if (error && !(error.code === 'PGRST205' || String(error.message || '').includes('404'))) {
       console.error('[useSubscription] trackUsage error:', error)
     }
   }, [user])

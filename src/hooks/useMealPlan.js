@@ -195,10 +195,10 @@ export function useMealPlan(scheduleId) {
 
       // Also fetch the schedule to get week_notes
       const { data: schedule } = await supabase
-        .from('schedules')
+        .from('weekly_schedules')
         .select('week_notes')
         .eq('id', scheduleId)
-        .single()
+        .maybeSingle()
       
 
       const lockedMeals = mealPlan?.draft_plan?.meals?.filter((meal) => meal.locked) || []
@@ -246,27 +246,12 @@ export function useMealPlan(scheduleId) {
       let { data: generated, error: functionError } = await supabase.functions.invoke('generate-plan', { body: payload })
       if (functionError) {
         console.error('[useMealPlan] Function error details:', functionError)
-        // Fallback: try direct fetch
-        try {
-          const response = await fetch('https://rvgtmletsbycrbeycwus.supabase.co/functions/v1/generate-plan', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2Z3RtbGV0c2J5Y3JiZXljd3VzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NDc2NjUsImV4cCI6MjA5MDAyMzY2NX0.yYkUKWodhGEpWEgErBeH5hWt0pGnLmx6kSNdBpLdwxQ'
-            },
-            body: JSON.stringify(payload)
-          })
-          const fallbackData = await response.json()
-          if (fallbackData.plan) {
-            generated = fallbackData
-          } else {
-            throw functionError
-          }
-        } catch (fetchError) {
-          // If both methods fail, use mock meals
-          generated = {
-            plan: generateMockMeals(payload.slots || [])
-          }
+        if (String(functionError.message || '').includes('non-2xx') || String(functionError.context || '').includes('401')) {
+          toast.error('Your session expired. Please log in again.')
+          throw new Error('Session expired')
+        }
+        generated = {
+          plan: generateMockMeals(payload.slots || [])
         }
       }
 
@@ -338,10 +323,10 @@ export function useMealPlan(scheduleId) {
 
       // Fetch schedule for week_notes
       const { data: schedule } = await supabase
-        .from('schedules')
+        .from('weekly_schedules')
         .select('week_notes')
         .eq('id', scheduleId)
-        .single()
+        .maybeSingle()
 
       const payload = {
         household: {
@@ -383,11 +368,21 @@ export function useMealPlan(scheduleId) {
       }
 
       const { data: generated, error: functionError } = await supabase.functions.invoke('generate-plan', { body: payload })
-      if (functionError) throw functionError
+      if (functionError) {
+        if (String(functionError.message || '').includes('non-2xx') || String(functionError.context || '').includes('401')) {
+          toast.error('Your session expired. Please log in again.')
+          throw new Error('Session expired')
+        }
+        throw functionError
+      }
 
       const replacement = withMealDefaults(generated.plan).meals.find(
         (meal) => meal.day === mealToReplace.day && meal.meal === mealToReplace.meal,
       )
+
+      if (!replacement) {
+        throw new Error('No replacement meal was returned for that slot')
+      }
 
       const nextPlan = {
         ...mealPlan.draft_plan,
