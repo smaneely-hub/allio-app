@@ -1,6 +1,13 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+/*
+DIAGNOSTIC FINDINGS
+- This edge function exists and already handles CORS preflight via OPTIONS plus Access-Control-Allow-Headers including authorization and apikey.
+- It was not the direct cause of the 401 seen in the app flow; the failing client path was the swap fallback request that omitted the Authorization bearer token.
+- The function now validates the incoming Authorization header with supabase.auth.getUser() and returns 401 when the bearer token is missing or invalid, matching the authenticated client invocation path.
+*/
+
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || ''
 const LLM_API_KEY = Deno.env.get('LLM_API_KEY') || ''
@@ -48,6 +55,17 @@ function buildSystemPrompt(
   const allFoodPrefs = members.flatMap(m => m.food_preferences || []).filter(Boolean)
   const allHealth = members.flatMap(m => m.health_considerations || []).filter(Boolean)
   const restrictions = members.map((m) => m.restrictions || m.preferences || '').filter(Boolean).join(', ')
+  const householdContext = members.map((m, i) => {
+    const parts = [
+      m.name || m.label || `Member ${i + 1}`,
+      m.age ? `age ${m.age}` : null,
+      (m.dietary_restrictions || []).length ? `dietary: ${(m.dietary_restrictions || []).join(', ')}` : null,
+      (m.food_preferences || []).length ? `preferences: ${(m.food_preferences || []).join(', ')}` : null,
+      (m.health_considerations || []).length ? `health: ${(m.health_considerations || []).join(', ')}` : null,
+      m.preferences ? `notes: ${m.preferences}` : null,
+    ].filter(Boolean)
+    return `- ${parts.join(' | ')}`
+  }).join('\n')
   const staplesOnHand = household?.staples_on_hand || 'olive oil, salt, pepper, garlic, rice, pasta'
   
   const cookingComplexity: Record<string, string> = {
@@ -68,10 +86,14 @@ function buildSystemPrompt(
 ${userWants}
 Generate meals for these slots: ${slotDescriptions || 'none'}
 
+HOUSEHOLD CONTEXT (use this to infer appropriate meals):
+${householdContext || '- No member detail provided.'}
+
 CRITICAL RULES FOR DIETARY RESTRICTIONS AND HEALTH:
-${allDietary.length > 0 ? `- Allergies and strict restrictions: ${[...new Set(allDietary)].join(', ')}. These MUST be completely avoided in ALL meals.` : '- No allergies or strict restrictions detected.'}
-${allFoodPrefs.length > 0 ? `- Food preferences: ${[...new Set(allFoodPrefs)].join(', ')}. Adjust meal selection accordingly.` : ''}
-${allHealth.length > 0 ? `- Health considerations: ${[...new Set(allHealth)].join(', ')}. Prefer healthier options when possible.` : ''}
+${allDietary.length > 0 ? `- Dietary restrictions and allergies present across the household: ${[...new Set(allDietary)].join(', ')}. The generated meals must fully respect these constraints.` : '- No allergies or strict restrictions detected.'}
+${allFoodPrefs.length > 0 ? `- Food preferences across the household: ${[...new Set(allFoodPrefs)].join(', ')}. Use these as positive signals for meal selection.` : ''}
+${allHealth.length > 0 ? `- Health considerations across the household: ${[...new Set(allHealth)].join(', ')}. Let this shape the style of meals and ingredients.` : ''}
+- Use the full member context above to infer what this household realistically eats. Do not treat these as isolated tags; treat them as a coherent family profile.
 
 COOKING COMPLEXITY: ${complexity}
 STAPLES ON HAND (do NOT include in shopping list): ${staplesOnHand}
@@ -100,11 +122,26 @@ LEFTOVER RULES:
 NOTES FIELD:
 - Every meal MUST have a 'notes' field with 1-2 sentences explaining why this meal was chosen. Reference the household context: who's eating, schedule constraints, dietary needs, ingredient reuse.
 
+MEAL INTELLIGENCE FIELDS:
+- meal_type: breakfast | lunch | dinner | snack
+- format: bowl | plated | handheld | salad | soup | breakfast plate | other
+- protein_type: chicken | beef | fish | pork | eggs | tofu | beans | mixed | none
+- flexibility_level: high | medium | low
+- why_this_works: 1 practical sentence tied to day, prep time, meal type, and household context
+- variations: array of 0-5 realistic modifications that still fit the same meal use case and format
+- similar_options: array of 0-3 alternate meals that fit the same meal type and same real-world use case
+- confidence_signal: short practical signal like 'Popular with families' or 'Great for busy weeknights'
+- If variations or similar_options are weak, return an empty array.
+
 OUTPUT FORMAT — each meal object must have exactly these fields:
 {
   day: 'mon',
   meal: 'dinner',
   name: 'Sheet Pan Lemon Herb Chicken Thighs',
+  meal_type: 'dinner',
+  format: 'plated',
+  protein_type: 'chicken',
+  flexibility_level: 'medium',
   servings: 4,
   attendees: ['A1', 'A2', 'K1', 'K2'],
   prep_time_minutes: 15,
@@ -125,7 +162,11 @@ OUTPUT FORMAT — each meal object must have exactly these fields:
     'Roast 22-25 minutes until chicken registers 165°F and broccoli is charred at the edges.',
     'Let rest 3 minutes. Squeeze roasted lemon over everything before serving.'
   ],
-  notes: 'Full family tonight. Sheet pan = one dish to clean. Kids love broccoli when it is crispy.'
+  notes: 'Full family tonight. Sheet pan = one dish to clean. Kids love broccoli when it is crispy.',
+  why_this_works: 'Quick dinner for a busy Monday that keeps prep low and uses familiar ingredients for the family.',
+  variations: ['Swap broccoli for green beans', 'Add lemony yogurt sauce', 'Serve over rice instead of on its own'],
+  similar_options: ['Sheet pan chicken fajitas', 'Chicken rice bowls', 'Lemon garlic chicken with potatoes'],
+  confidence_signal: 'Great for busy weeknights'
 }
 
 ${restrictions ? `Dietary restrictions to respect: ${restrictions}` : ''}`
@@ -165,8 +206,10 @@ function transformLlmOutput(llmOutput: unknown, scheduledSlots: Array<{ day: str
       const n = mealName.toLowerCase()
       const ing = []
       if (n.includes('chicken')) ing.push({item: 'chicken', q: 1, u: 'lb', c: 'meat'})
-      else if (n.includes('beef') || n.includes('steak')) ing.push({item: 'beef', q: 1, u: 'lb', c: 'meat'})
+      else if (n.includes('beef') || n.includes('steak') || n.includes('burger')) ing.push({item: 'beef', q: 1, u: 'lb', c: 'meat'})
       else if (n.includes('fish') || n.includes('salmon')) ing.push({item: 'fish', q: 0.5, u: 'lb', c: 'seafood'})
+      else if (n.includes('tofu')) ing.push({item: 'extra-firm tofu', q: 1, u: 'block', c: 'protein'})
+      else if (n.includes('bean') || n.includes('chickpea') || n.includes('lentil')) ing.push({item: 'beans', q: 2, u: 'can', c: 'pantry'})
       else if (n.includes('pasta')) ing.push({item: 'pasta', q: 1, u: 'box', c: 'pantry'})
       else if (n.includes('rice')) ing.push({item: 'rice', q: 2, u: 'cups', c: 'pantry'})
       else if (n.includes('egg')) ing.push({item: 'eggs', q: 1, u: 'dozen', c: 'dairy'})
@@ -186,13 +229,13 @@ function transformLlmOutput(llmOutput: unknown, scheduledSlots: Array<{ day: str
           let mealName = ''
           let mealIngredients: Array<Record<string, unknown>> = []
           
+          let mealObj: Record<string, unknown> = {}
           if (typeof mealValue === 'string') {
             mealName = mealValue
             mealIngredients = inferIngredients(mealName)
           } else if (typeof mealValue === 'object' && mealValue !== null) {
-            const mealObj = mealValue as Record<string, unknown>
+            mealObj = mealValue as Record<string, unknown>
             mealName = String(mealObj.name || '')
-            // Use provided ingredients or infer
             mealIngredients = (mealObj.ingredients as Array<Record<string, unknown>>) || inferIngredients(mealName)
           }
           
@@ -211,12 +254,21 @@ function transformLlmOutput(llmOutput: unknown, scheduledSlots: Array<{ day: str
             day: normalizedDay,
             meal: normalizedMeal,
             name: mealName.trim(),
-            servings: 2,
-            cook_time_minutes: 20 + Math.floor(Math.random() * 25),
-            difficulty: Math.random() > 0.5 ? 'Easy' : 'Medium',
-            prep_time_minutes: 30,
+            meal_type: String(mealObj.meal_type || normalizedMeal),
+            format: String(mealObj.format || 'other'),
+            protein_type: String(mealObj.protein_type || 'mixed'),
+            flexibility_level: String(mealObj.flexibility_level || 'medium'),
+            servings: Number(mealObj.servings || 2),
+            cook_time_minutes: Number(mealObj.cook_time_minutes || (20 + Math.floor(Math.random() * 25))),
+            difficulty: mealObj.difficulty || (Math.random() > 0.5 ? 'Easy' : 'Medium'),
+            prep_time_minutes: Number(mealObj.prep_time_minutes || 30),
             ingredients: mealIngredients,
-            instructions: ['Preheat oven to 425°F.', 'Prepare all ingredients by washing and chopping.', 'Season protein with salt, pepper, and desired spices.', 'Heat oil in a large oven-safe skillet over medium-high heat.', 'Sear protein for 3-4 minutes per side.', 'Add vegetables to the pan.', 'Transfer to oven and roast for 15-20 minutes until done.', 'Let rest 5 minutes before serving.'],
+            instructions: (mealObj.instructions as Array<string>) || ['Preheat oven to 425°F.', 'Prepare all ingredients by washing and chopping.', 'Season protein with salt, pepper, and desired spices.', 'Heat oil in a large oven-safe skillet over medium-high heat.', 'Sear protein for 3-4 minutes per side.', 'Add vegetables to the pan.', 'Transfer to oven and roast for 15-20 minutes until done.', 'Let rest 5 minutes before serving.'],
+            notes: String(mealObj.notes || ''),
+            why_this_works: String(mealObj.why_this_works || ''),
+            variations: Array.isArray(mealObj.variations) ? mealObj.variations : [],
+            similar_options: Array.isArray(mealObj.similar_options) ? mealObj.similar_options : [],
+            confidence_signal: String(mealObj.confidence_signal || ''),
           })
         }
       }
@@ -260,9 +312,35 @@ serve(async (req) => {
   }
 
   try {
-    // Allow calls without user verification for now (for debugging)
-    // The payload has all the data we need from the client
-    
+    const authorization = req.headers.get('Authorization')
+
+    if (!authorization) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: {
+        headers: {
+          Authorization: authorization,
+        },
+      },
+    })
+
+    const {
+      data: { user },
+      error: authError,
+    } = await authClient.auth.getUser()
+
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     const payload = await req.json()
     if (!payload?.household || !Array.isArray(payload?.members) || !Array.isArray(payload?.slots)) {
       return new Response(JSON.stringify({ error: 'Payload must include household, members, and slots' }), { 

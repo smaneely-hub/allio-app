@@ -1,13 +1,14 @@
 import { useState, useCallback } from 'react'
 
-export function SwapModal({ isOpen, onClose, onSwap, mealName }) {
+export function SwapModal({ isOpen, onClose, onSwap, mealName, loading = false }) {
   const [suggestion, setSuggestion] = useState('')
   
   if (!isOpen) return null
   
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    onSwap(suggestion)
+    if (loading) return
+    await onSwap(suggestion)
     setSuggestion('')
   }
   
@@ -32,7 +33,8 @@ export function SwapModal({ isOpen, onClose, onSwap, mealName }) {
       <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 animate-fadeIn">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-text-muted hover:text-text-primary"
+          disabled={loading}
+          className="absolute top-4 right-4 text-text-muted hover:text-text-primary disabled:opacity-50"
         >
           ✕
         </button>
@@ -63,7 +65,8 @@ export function SwapModal({ isOpen, onClose, onSwap, mealName }) {
                   key={option}
                   type="button"
                   onClick={() => setSuggestion(option)}
-                  className="text-xs px-3 py-1.5 rounded-full bg-primary-50 text-primary-600 hover:bg-primary-100 transition-colors"
+                  disabled={loading}
+                  className="text-xs px-3 py-1.5 rounded-full bg-primary-50 text-primary-600 hover:bg-primary-100 transition-colors disabled:opacity-50"
                 >
                   {option}
                 </button>
@@ -75,15 +78,17 @@ export function SwapModal({ isOpen, onClose, onSwap, mealName }) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 btn-secondary"
+              disabled={loading}
+              className="flex-1 btn-secondary disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 btn-primary"
+              disabled={loading}
+              className="flex-1 btn-primary disabled:opacity-50"
             >
-              Swap
+              {loading ? 'Swapping...' : 'Swap'}
             </button>
           </div>
         </form>

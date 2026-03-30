@@ -39,8 +39,8 @@ const faqs = [
   }
 ]
 
-  useDocumentTitle("Pricing | Allio")
 export function PricingPage() {
+  useDocumentTitle("Pricing | Allio")
   return (
     <div className="min-h-screen bg-bg-primary">
       {/* Header */}

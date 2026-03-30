@@ -8,8 +8,9 @@ import { OnboardingSkeleton, EmptyState } from '../components/LoadingStates'
 export function OnboardingPage() {
   const navigate = useNavigate()
   const { household, members: savedMembers, loading, saveHousehold, saveMembers, reloadHousehold } = useHousehold()
+  const isEditMode = new URLSearchParams(window.location.search).get('edit') === 'true'
   const [step, setStep] = useState(() => {
-    // Restore step from localStorage if household has partial data
+    if (isEditMode) return 2
     const savedStep = localStorage.getItem('onboarding_step')
     if (savedStep) return parseInt(savedStep, 10)
     return 1
@@ -52,19 +53,26 @@ export function OnboardingPage() {
     }))
   }, [household])
 
-  // Save step to localStorage
+  // Save step to localStorage for onboarding only (not edit mode)
   useEffect(() => {
-    localStorage.setItem('onboarding_step', step.toString())
-  }, [step])
+    if (!isEditMode) {
+      localStorage.setItem('onboarding_step', step.toString())
+    }
+  }, [step, isEditMode])
 
   // Redirect to schedule if onboarding is already complete (unless in edit mode)
   useEffect(() => {
-    const isEditMode = new URLSearchParams(window.location.search).get('edit') === 'true'
     if (!isEditMode && household && savedMembers.length > 0 && !loading) {
-      // Already complete - redirect to schedule
       navigate('/schedule', { replace: true })
     }
-  }, [household, savedMembers, loading, navigate])
+  }, [household, savedMembers, loading, navigate, isEditMode])
+
+  // In edit mode, always start on the member details step
+  useEffect(() => {
+    if (isEditMode && step !== 2) {
+      setStep(2)
+    }
+  }, [isEditMode])
 
   // derive member rows based on total_people
   useEffect(() => {
@@ -76,7 +84,6 @@ export function OnboardingPage() {
         id: m.id,
         name: m.name || '',
         age: m.age || '',
-        role: m.role || (i < 2 ? 'adult' : 'child'),
         label: m.label || (i < 2 ? `A${i + 1}` : `K${i - 1}`),
         gender: m.gender || '',
         restrictions: m.restrictions || '',
@@ -163,7 +170,8 @@ export function OnboardingPage() {
       await reloadHousehold()
       
       // Step 4: Navigate ONLY after all validation passes
-      toast.success('Household saved successfully.')
+      localStorage.removeItem('onboarding_step')
+      toast.success(isEditMode ? 'Household updated successfully.' : 'Household saved successfully.')
       navigate('/schedule', { replace: true })
       
     } catch (err) {
@@ -185,7 +193,7 @@ export function OnboardingPage() {
       <div className="card">
         {loading ? (
           <OnboardingSkeleton />
-        ) : (
+        ) : step === 1 ? (
           <div className="space-y-6">
             <h2 className="text-xl font-semibold text-text-primary">Household Basics</h2>
             <div className="grid gap-5 md:grid-cols-2">
@@ -193,7 +201,7 @@ export function OnboardingPage() {
                 <div className="text-sm font-medium text-text-primary mb-2">Total people</div>
                 <div className="flex flex-wrap gap-2">
                   {(['1','2','3','4','5+']).map((o) => (
-                    <button key={o} className={`rounded-full border px-4 py-2 text-sm ${form.total_people === o ? 'bg-white border-primary-400 text-primary-600' : 'border-divider text-text-primary'}`} onClick={() => updateForm('total_people', o)}>{o}</button>
+                    <button type="button" key={o} className={`rounded-full border px-4 py-2 text-sm ${form.total_people === o ? 'bg-white border-primary-400 text-primary-600' : 'border-divider text-text-primary'}`} onClick={() => updateForm('total_people', o)}>{o}</button>
                   ))}
                 </div>
               </div>
@@ -239,25 +247,44 @@ export function OnboardingPage() {
               </div>
             </div>
           </div>
-        )}
-        {step === 2 && (
+        ) : step === 2 ? (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-xl text-text-primary">Household Members</h2>
-              <button onClick={() => setMembers((c) => [...c, { id: undefined, name: '', age: '', role: 'adult', label: `A${members.length + 1}` }])} className="btn-secondary text-sm">Add member</button>
+              <button type="button" onClick={() => setMembers((c) => [...c, { id: undefined, name: '', age: '', label: `Member ${members.length + 1}` }])} className="btn-secondary text-sm">Add member</button>
             </div>
             {members.map((m, idx) => (
               <div key={m.id ?? idx} className="card p-5">
                 <div className="mb-3 text-sm font-medium text-text-primary">Member {idx + 1}</div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <div className="text-sm font-medium text-text-primary mb-1">Label / name</div>
+                    <div className="text-sm font-medium text-text-primary mb-1">Name</div>
                     <input className="input" value={m.name} onChange={(e) => updateMember(idx, 'name', e.target.value)} placeholder={m.label} />
                   </div>
                   <div>
                     <div className="text-sm font-medium text-text-primary mb-1">Age</div>
-                    <input className="input" value={m.age} onChange={(e) => updateMember(idx, 'age', e.target.value)} />
+                    <input className="input" value={m.age} onChange={(e) => updateMember(idx, 'age', e.target.value)} placeholder="e.g. 8" />
                   </div>
+                  <div>
+                    <div className="text-sm font-medium text-text-primary mb-1">Role</div>
+                    <select className="input" value={m.role} onChange={(e) => updateMember(idx, 'role', e.target.value)}>
+                      {['adult','teen','child','toddler'].map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-text-primary mb-1">Gender (optional)</div>
+                    <select className="input" value={m.gender || ''} onChange={(e) => updateMember(idx, 'gender', e.target.value)}>
+                      <option value="">Prefer not to say</option>
+                      <option value="female">Female</option>
+                      <option value="male">Male</option>
+                      <option value="nonbinary">Non-binary</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <div className="text-xs font-medium text-warm-600 mb-2">Notes about this person (optional)</div>
+                  <textarea className="input min-h-[88px]" value={m.preferences || ''} onChange={(e) => updateMember(idx, 'preferences', e.target.value)} placeholder="Examples: loves pasta, hates mushrooms, only home on weekends, sports practice Tuesdays..." />
                 </div>
                 
                 {/* Dietary restrictions */}
@@ -293,8 +320,7 @@ export function OnboardingPage() {
               </div>
             ))}
           </div>
-        )}
-        {step === 3 && (
+        ) : step === 3 ? (
           <div className="space-y-6">
             <h2 className="font-display text-xl text-text-primary">Preferences & Behavior</h2>
             <div className="grid gap-5 md:grid-cols-2">
@@ -334,11 +360,15 @@ export function OnboardingPage() {
               </div>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
-      <div className="flex items-center justify-between pt-6">
-        <button type="button" onClick={() => setStep(s => Math.max(1, s - 1))} disabled={step === 1 || submitting} className="btn-ghost">Back</button>
-        {step < 3 ? (
+      <div className="flex items-center justify-between pt-6 gap-3">
+        <button type="button" onClick={() => setStep(s => Math.max(1, s - 1))} disabled={step === 1 || submitting || isEditMode} className="btn-ghost">Back</button>
+        {isEditMode ? (
+          <button type="button" onClick={handleSave} disabled={submitting || !members.every((mm) => mm.name !== '' && mm.age !== '')} className="btn-primary">
+            {submitting ? 'Saving...' : 'Save Changes'}
+          </button>
+        ) : step < 3 ? (
           <button type="button" onClick={() => setStep(s => s + 1)} disabled={!stepValid || submitting} className="btn-primary">Next</button>
         ) : (
           <button type="button" onClick={handleSave} disabled={!stepValid || submitting} className="btn-primary">{submitting ? 'Saving...' : 'Save & Continue'}</button>

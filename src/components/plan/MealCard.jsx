@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { SwapModal } from '../SwapModal'
 import { useSubscription } from '../../hooks/useSubscription'
 import { UpgradePrompt } from '../UpgradePrompt'
@@ -11,6 +11,7 @@ const mealTypeStyles = {
   snack: { emoji: '🍎', gradient: 'bg-gradient-to-br from-rose-100 to-pink-100', icon: '🍎' },
 }
 
+
 export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
   const { isPremium } = useSubscription()
   const [expanded, setExpanded] = useState(false)
@@ -18,12 +19,32 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
   const [currentStep, setCurrentStep] = useState(0)
   const [note, setNote] = useState(meal.user_note || '')
   const [savingNote, setSavingNote] = useState(false)
+  const [swapping, setSwapping] = useState(false)
   const [showSwapModal, setShowSwapModal] = useState(false)
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
+  const [selectedVariation, setSelectedVariation] = useState(null)
 
   const mealType = (meal.meal || '').toLowerCase()
   const style = mealTypeStyles[mealType] || mealTypeStyles.dinner
   const totalSteps = meal.instructions?.length || 0
+  const prepTime = meal.prep_time_minutes || Math.max(10, Math.round((meal.cook_time_minutes || 30) * 0.35))
+  const cookTime = meal.cook_time_minutes || 30
+
+  const planningRationale = useMemo(() => {
+    return String(meal.why_this_works || meal.notes || '').trim()
+  }, [meal.why_this_works, meal.notes])
+
+  const variations = useMemo(() => {
+    return Array.isArray(meal.variations) ? meal.variations.filter(Boolean).slice(0, 5) : []
+  }, [meal.variations])
+
+  const similarOptions = useMemo(() => {
+    return Array.isArray(meal.similar_options) ? meal.similar_options.filter(Boolean).slice(0, 3) : []
+  }, [meal.similar_options])
+
+  const socialSignal = useMemo(() => {
+    return String(meal.confidence_signal || '').trim()
+  }, [meal.confidence_signal])
 
   const handleSaveNote = async () => {
     setSavingNote(true)
@@ -110,9 +131,12 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
 
   return (
     <div className={`rounded-2xl border p-4 shadow-sm transition-all duration-200 hover:shadow-md ${meal.locked ? 'border-green-300 bg-green-50' : meal.is_leftover ? 'border-dashed border-divider bg-bg-primary' : 'border-divider bg-white'}`}>
-      {/* Meal header with vibrant gradient */}
-      <div className={`h-24 -mx-4 -mt-4 mb-4 flex items-center justify-center rounded-t-2xl ${style.gradient}`}>
-        <span className="text-5xl">{style.icon}</span>
+      {/* Meal image / visual */}
+      <div className={`h-36 -mx-4 -mt-4 mb-4 flex flex-col items-center justify-center rounded-t-2xl ${style.gradient}`}>
+        <span className="text-6xl">{style.icon}</span>
+        <div className="mt-2 rounded-full bg-white/70 px-3 py-1 text-xs font-medium text-gray-700 shadow-sm">
+          {socialSignal}
+        </div>
       </div>
       
       <button type="button" onClick={() => setExpanded(!expanded)} className="w-full text-left">
@@ -126,7 +150,7 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
                 ))}
               </div>
             )}
-            <div className="mt-1.5 text-sm text-text-secondary">{meal.servings} servings · {meal.prep_time_minutes} min</div>
+            <div className="mt-1.5 text-sm text-text-secondary">{meal.servings} servings · {prepTime} min prep • {cookTime} min cook</div>
           </div>
           <div className="text-xs font-medium text-text-muted">{expanded ? 'Collapse' : 'Expand'}</div>
         </div>
@@ -148,47 +172,89 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
       {/* Swap Modal */}
       <SwapModal
         isOpen={showSwapModal}
-        onClose={() => setShowSwapModal(false)}
-        onSwap={(suggestion) => {
-          onSwap(meal, suggestion || '')
-          setShowSwapModal(false)
+        onClose={() => !swapping && setShowSwapModal(false)}
+        onSwap={async (suggestion) => {
+          try {
+            setSwapping(true)
+            await onSwap(meal, suggestion || '')
+            setShowSwapModal(false)
+          } finally {
+            setSwapping(false)
+          }
         }}
         mealName={meal.name}
+        loading={swapping}
       />
 
       {/* Expanded content */}
       {expanded && (
-        <div className="mt-4 space-y-4 border-t border-divider pt-4">
-          {/* Why this meal - italic with green border */}
-          {meal.notes && (
-            <div className="border-l-2 border-green-400 pl-3 italic text-text-muted text-sm">
-              {meal.notes}
+        <div className="mt-4 space-y-5 border-t border-divider pt-4">
+          <div className="rounded-xl border border-green-100 bg-green-50 p-4">
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-green-700">Why this works in the plan</div>
+            <div className="text-sm text-gray-700">{planningRationale}</div>
+          </div>
+
+          {variations.length > 0 && (
+            <div className="rounded-xl border border-divider bg-white p-4">
+              <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-text-secondary">Make it your way</div>
+              <div className="space-y-2">
+                {variations.map((variation, i) => (
+                  <button
+                    key={variation}
+                    type="button"
+                    onClick={() => setSelectedVariation(i)}
+                    className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left text-sm transition-colors ${selectedVariation === i ? 'border-primary-400 bg-primary-50 text-primary-700' : 'border-divider bg-white text-text-primary hover:bg-warm-50'}`}
+                  >
+                    <span className="text-primary-500">✦</span>
+                    <span>{variation}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
-          <div>
+          <div className="rounded-xl border border-divider bg-white p-4">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">Ingredients</div>
             <ul className="space-y-1 text-sm text-text-primary">
               {(meal.ingredients || []).map((ing, i) => (
-                <li key={i} className="flex justify-between">
+                <li key={i} className="flex justify-between gap-4">
                   <span>{ing.item}</span>
-                  <span className="text-text-muted">{ing.quantity} {ing.unit}</span>
+                  <span className="shrink-0 text-text-muted">{ing.quantity} {ing.unit}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          <div>
+          <div className="rounded-xl border border-divider bg-white p-4">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">Instructions</div>
-            <ol className="space-y-2 text-sm text-text-primary">
+            <ol className="space-y-3 text-sm text-text-primary">
               {(meal.instructions || []).map((step, i) => (
-                <li key={i} className="flex gap-2">
-                  <span className="text-primary-400 font-medium">{i + 1}.</span>
+                <li key={i} className="flex gap-3">
+                  <span className="mt-0.5 text-primary-500 font-semibold">{i + 1}.</span>
                   <span>{step}</span>
                 </li>
               ))}
             </ol>
           </div>
+
+          {similarOptions.length > 0 && (
+            <div className="rounded-xl border border-divider bg-white p-4">
+              <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-text-secondary">Similar options</div>
+              <div className="space-y-2">
+                {similarOptions.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => onSwap(meal, option)}
+                    className="flex w-full items-center justify-between rounded-xl border border-divider px-3 py-3 text-left text-sm text-text-primary hover:bg-warm-50"
+                  >
+                    <span>{option}</span>
+                    <span className="text-primary-500">Replace</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <button type="button" onClick={startCooking} className="btn-primary w-full py-3 text-base font-medium">
             🍳 Start Cooking

@@ -17,6 +17,30 @@ function withMealDefaults(plan) {
   }
 }
 
+async function invokeGeneratePlan(payload) {
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession()
+
+  if (sessionError) {
+    throw sessionError
+  }
+
+  if (!session?.access_token) {
+    console.error('[useMealPlan] No active session while calling generate-plan')
+    throw new Error('No active session — user must log in')
+  }
+
+  return supabase.functions.invoke('generate-plan', {
+    body: payload,
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      apikey: supabase?.supabaseKey,
+    },
+  })
+}
+
 // Mock meal generator fallback when edge function is unavailable
 function generateMockMeals(slots) {
   const mealDatabase = {
@@ -243,7 +267,7 @@ export function useMealPlan(scheduleId) {
 
 
       
-      let { data: generated, error: functionError } = await supabase.functions.invoke('generate-plan', { body: payload })
+      let { data: generated, error: functionError } = await invokeGeneratePlan(payload)
       if (functionError) {
         console.error('[useMealPlan] Function error details:', functionError)
         if (String(functionError.message || '').includes('non-2xx') || String(functionError.context || '').includes('401')) {
@@ -367,26 +391,14 @@ export function useMealPlan(scheduleId) {
         },
       }
 
-      let { data: generated, error: functionError } = await supabase.functions.invoke('generate-plan', { body: payload })
+      let { data: generated, error: functionError } = await invokeGeneratePlan(payload)
       if (functionError) {
-        try {
-          const response = await fetch('https://rvgtmletsbycrbeycwus.supabase.co/functions/v1/generate-plan', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2Z3RtbGV0c2J5Y3JiZXljd3VzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NDc2NjUsImV4cCI6MjA5MDAyMzY2NX0.yYkUKWodhGEpWEgErBeH5hWt0pGnLmx6kSNdBpLdwxQ'
-            },
-            body: JSON.stringify(payload)
-          })
-          const fallbackData = await response.json()
-          if (fallbackData.plan) {
-            generated = fallbackData
-          } else {
-            throw functionError
-          }
-        } catch {
-          throw functionError
+        console.error('[useMealPlan] Swap function error details:', functionError)
+        if (String(functionError.message || '').includes('non-2xx') || String(functionError.context || '').includes('401')) {
+          toast.error('Your session expired. Please log in again.')
+          throw new Error('Session expired')
         }
+        throw functionError
       }
 
       const replacement = withMealDefaults(generated.plan).meals.find(

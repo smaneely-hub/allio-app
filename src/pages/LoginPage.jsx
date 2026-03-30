@@ -14,8 +14,8 @@ function Leaf({ className = '' }) {
   )
 }
 
-  useDocumentTitle("Log in | Allio")
 export function LoginPage() {
+  useDocumentTitle("Log in | Allio")
   const navigate = useNavigate()
   const [mode, setMode] = useState('login')
   const [email, setEmail] = useState('')
@@ -43,17 +43,36 @@ export function LoginPage() {
     setLoading(true)
     try {
       if (isSignup) {
-        const { error } = await supabase.auth.signUp({
+        // Sign up and immediately try to sign in (bypasses email verification in many cases)
+        const { error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: window.location.origin
           }
         })
-        if (error) throw error
         
-        setConfirmationSent(true)
-        toast.success('Account created. Check your email to confirm.')
+        if (signUpError) {
+          // If signup fails due to existing user, try to sign in
+          if (signUpError.message.includes('already been registered')) {
+            const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+            if (signInError) throw signInError
+            navigate('/onboarding')
+            return
+          }
+          throw signUpError
+        }
+        
+        // Try to auto-login immediately after signup
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+        if (signInError) {
+          // If auto-login fails, show success and let user log in manually
+          setConfirmationSent(true)
+          toast.success('Account created! Please log in.')
+        } else {
+          // Auto-login succeeded, proceed to onboarding
+          navigate('/onboarding')
+        }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
@@ -117,25 +136,18 @@ export function LoginPage() {
         <div className="bg-white rounded-2xl shadow-card p-6 md:p-8">
           {confirmationSent ? (
             <div className="text-center py-6">
-              <div className="text-4xl mb-4">✉️</div>
-              <h2 className="font-display text-xl text-text-primary mb-2">Check your email!</h2>
+              <div className="text-4xl mb-4">🎉</div>
+              <h2 className="font-display text-xl text-text-primary mb-2">Welcome to Allio!</h2>
               <p className="text-text-secondary text-sm mb-4">
-                We sent a confirmation link to <span className="font-medium">{email}</span>
+                Your account has been created.
               </p>
               <button 
                 type="button"
-                onClick={handleResendVerification}
-                disabled={resending}
-                className="text-sm text-primary-400 hover:underline disabled:opacity-50"
+                onClick={() => { setConfirmationSent(false); setMode('login') }}
+                className="btn-primary w-full"
               >
-                {resending ? 'Sending...' : 'Resend email'}
+                Log in to continue
               </button>
-              <div className="mt-6 text-sm text-text-muted">
-                Already verified?{' '}
-                <button type="button" onClick={() => { setConfirmationSent(false); setMode('login') }} className="text-primary-400 font-medium hover:underline">
-                  Log in
-                </button>
-              </div>
             </div>
           ) : (
             <>

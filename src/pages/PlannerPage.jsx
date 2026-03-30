@@ -12,10 +12,20 @@ import { supabase } from '../lib/supabase'
 
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const mealTypes = ['Breakfast', 'Lunch', 'Dinner']
-const dayColors = {
-  Monday: '#22C55E', Tuesday: '#14B8A6', Wednesday: '#3B82F6', Thursday: '#A855F7', Friday: '#EC4899', Saturday: '#F59E0B', Sunday: '#F97316',
-}
 const inputClassName = 'input'
+const dayTabs = [
+  { label: 'Mon', value: 'Monday' },
+  { label: 'Tue', value: 'Tuesday' },
+  { label: 'Wed', value: 'Wednesday' },
+  { label: 'Thu', value: 'Thursday' },
+  { label: 'Fri', value: 'Friday' },
+  { label: 'Sat', value: 'Saturday' },
+  { label: 'Sun', value: 'Sunday' },
+]
+
+function getTodayName() {
+  return new Date().toLocaleDateString('en-US', { weekday: 'long' })
+}
 
 export function PlannerPage() {
   useDocumentTitle('Weekly Plan | Allio')
@@ -26,10 +36,10 @@ export function PlannerPage() {
 
   const [shoppingDay, setShoppingDay] = useState('Sunday')
   const [weekNotes, setWeekNotes] = useState('')
+  const [selectedDay, setSelectedDay] = useState(getTodayName())
   const [editorKey, setEditorKey] = useState(null)
   const [slotState, setSlotState] = useState({})
   const [saving, setSaving] = useState(false)
-  const [expandedDays, setExpandedDays] = useState({ Mon: false, Tue: false, Wed: false, Thu: false, Fri: false, Sat: false, Sun: false })
   const [shoppingItems, setShoppingItems] = useState([])
 
   useEffect(() => {
@@ -189,56 +199,77 @@ export function PlannerPage() {
         </div>
       </div>
 
-      <div className="grid gap-5 rounded-2xl border border-divider bg-white p-6 shadow-sm md:grid-cols-2">
+      <div className="grid gap-4 rounded-2xl border border-divider bg-white p-4 shadow-sm md:grid-cols-2 md:gap-5 md:p-6">
         <label className="space-y-2">
           <span className="text-sm font-medium text-text-700">Shopping Day</span>
-          <select value={shoppingDay} onChange={(e) => setShoppingDay(e.target.value)} className={inputClassName}>
+          <select value={shoppingDay} onChange={(e) => setShoppingDay(e.target.value)} className={`${inputClassName} w-full`}>
             {days.map((day) => <option key={day} value={day}>{day}</option>)}
           </select>
         </label>
         <label className="space-y-2">
           <span className="text-sm font-medium text-text-700">Week Notes</span>
-          <input value={weekNotes} onChange={(e) => setWeekNotes(e.target.value)} className={inputClassName} placeholder="Anything special this week?" />
+          <input value={weekNotes} onChange={(e) => setWeekNotes(e.target.value)} className={`${inputClassName} w-full`} placeholder="Anything special this week?" />
         </label>
       </div>
 
       {loading ? <ScheduleSkeleton /> : (
-        <div className="grid gap-4 md:grid-cols-7">
-          {days.map((day) => {
-            const isExpanded = expandedDays[day] === true
-            const short = day.slice(0, 3).toLowerCase()
-            return (
-              <div key={day} className="card p-4" style={{ borderTop: `3px solid ${dayColors[day]}` }}>
-                <button type="button" onClick={() => setExpandedDays(prev => ({ ...prev, [day]: !prev[day] }))} className="mb-4 flex w-full items-center justify-between text-left text-sm font-semibold text-text-900">
-                  {day}
-                  <span className="text-text-muted text-xs">{isExpanded ? '▼' : '▶'}</span>
+        <div className="space-y-4">
+          <div className="overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex min-w-max gap-2 sm:min-w-0 sm:flex-wrap sm:justify-between">
+              {dayTabs.map((dayTab) => {
+                const isActive = selectedDay === dayTab.value
+                return (
+                  <button
+                    key={dayTab.value}
+                    type="button"
+                    onClick={() => setSelectedDay(dayTab.value)}
+                    className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition-all duration-150 sm:flex-1 sm:px-3 ${isActive ? 'border-green-500 bg-green-500 text-white shadow-sm' : 'border-divider bg-white text-text-secondary hover:border-green-200 hover:text-text-primary'}`}
+                  >
+                    {dayTab.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {mealTypes.map((mealType) => {
+              const key = `${selectedDay}-${mealType}`
+              const slot = slotState[key]
+              const short = selectedDay.slice(0, 3).toLowerCase()
+              const normalizedMeal = mealType.toLowerCase().replace(' ', '_')
+              const meal = groupedMeals[`${short}-${normalizedMeal}`]
+
+              return meal ? (
+                <MealCard key={key} meal={meal} onToggleLock={toggleMealLock} onSwap={swapMeal} onSaveNote={saveMealNote} />
+              ) : (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => openSlotEditor(selectedDay, mealType)}
+                  className="w-full rounded-2xl border-2 border-dashed border-divider bg-white p-5 text-left shadow-sm transition-colors hover:border-green-300 hover:bg-green-50/40"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-base font-semibold text-text-primary">{mealType}</div>
+                      <div className="mt-2 text-sm text-text-muted">+ Add Meal</div>
+                      {slot?.active ? (
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-text-500">
+                          <span>{slot.attendees.length} attendee{slot.attendees.length !== 1 ? 's' : ''}</span>
+                          <span className={`px-2 py-0.5 rounded-full ${slot.effort_level === 'low' ? 'bg-green-100 text-green-700' : slot.effort_level === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+                            {slot.effort_level === 'low' ? 'Quick' : slot.effort_level === 'medium' ? 'Standard' : 'Full'}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="mt-3 text-xs text-text-400">Empty slot</div>
+                      )}
+                    </div>
+                    <div className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">{dayTabs.find((tab) => tab.value === selectedDay)?.label}</div>
+                  </div>
                 </button>
-                <div className={`space-y-3 ${!isExpanded ? 'hidden md:block' : ''}`}>
-                  {mealTypes.map((mealType) => {
-                    const key = `${day}-${mealType}`
-                    const slot = slotState[key]
-                    const normalizedMeal = mealType.toLowerCase().replace(' ', '_')
-                    const meal = groupedMeals[`${short}-${normalizedMeal}`]
-                    return meal ? (
-                      <MealCard key={key} meal={meal} onToggleLock={toggleMealLock} onSwap={swapMeal} onSaveNote={saveMealNote} />
-                    ) : (
-                      <button key={key} type="button" onClick={() => openSlotEditor(day, mealType)} className="btn-primary w-full text-left hover:border-divider">
-                        <div className="text-sm font-medium text-text-800">{mealType}</div>
-                        {slot?.active ? (
-                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-text-500">
-                            <span>{slot.attendees.length} attendee{slot.attendees.length !== 1 ? 's' : ''}</span>
-                            <span className={`px-2 py-0.5 rounded-full ${slot.effort_level === 'low' ? 'bg-green-100 text-green-700' : slot.effort_level === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
-                              {slot.effort_level === 'low' ? 'Quick' : slot.effort_level === 'medium' ? 'Standard' : 'Full'}
-                            </span>
-                          </div>
-                        ) : <div className="mt-2 text-xs text-text-400">Empty slot</div>}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       )}
 

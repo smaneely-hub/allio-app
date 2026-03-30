@@ -10,6 +10,15 @@ const toIntOrNull = (value) => {
   return Number.isNaN(parsed) ? null : parsed
 }
 
+const roleFromAge = (age) => {
+  const n = toIntOrNull(age)
+  if (n == null) return 'adult'
+  if (n <= 4) return 'toddler'
+  if (n <= 12) return 'child'
+  if (n <= 17) return 'teen'
+  return 'adult'
+}
+
 export function useHousehold() {
   const { user } = useAuth()
   const [household, setHousehold] = useState(null)
@@ -192,7 +201,7 @@ export function useHousehold() {
           label: member.name || member.label || `Member ${index + 1}`,
           name: member.name || member.label || '',
           age: toIntOrNull(member.age),  // Never send "" to database
-          role: member.role || 'adult',
+          role: roleFromAge(member.age),
           gender: member.gender || '',
           restrictions: member.restrictions || '',
           preferences: member.preferences || '',
@@ -279,7 +288,7 @@ export function useHousehold() {
         label: `member-${index + 1}`,
         name: total === 1 && index === 0 ? 'Me' : `Member ${index + 1}`,
         age: null,
-        role: index === 0 ? 'adult' : null,
+        role: index === 0 ? 'adult' : 'child',
         gender: null,
         restrictions: [],
         preferences: [],
