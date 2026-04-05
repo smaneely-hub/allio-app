@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../hooks/useAuth'
 
 // Leaf decoration
 function Leaf({ className = '' }) {
@@ -23,6 +24,14 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [resending, setResending] = useState(false)
   const [confirmationSent, setConfirmationSent] = useState(false)
+  const { user, loading: authLoading } = useAuth()
+
+  // Redirect already-authenticated users to tonight page
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate('/tonight', { replace: true })
+    }
+  }, [authLoading, user, navigate])
 
   const isSignup = mode === 'signup'
 

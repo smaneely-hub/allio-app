@@ -52,7 +52,14 @@ export function DashboardPage() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <Link to="/tonight" className="card hover:shadow-md transition-shadow">
+          <div className="text-2xl mb-1">🍲</div>
+          <div className="text-sm font-medium text-text-primary">Tonight</div>
+          <div className="text-xs text-text-muted">
+            Quick meal
+          </div>
+        </Link>
         <Link to="/plan" className="card hover:shadow-md transition-shadow">
           <div className="text-2xl mb-1">🍽️</div>
           <div className="text-sm font-medium text-text-primary">Meal Plan</div>
@@ -102,17 +109,24 @@ export function DashboardPage() {
         <h2 className="font-display text-lg text-text-primary mb-3">Quick Actions</h2>
         <div className="space-y-2">
           <Link 
-            to="/schedule" 
+            to="/" 
             className="flex items-center justify-between p-3 rounded-xl bg-bg-primary hover:bg-primary-50 transition-colors min-h-[48px]"
           >
-            <span className="text-sm text-text-primary">Update weekly schedule</span>
+            <span className="text-sm text-text-primary">Tonight's Meal</span>
+            <span className="text-text-muted">→</span>
+          </Link>
+          <Link 
+            to="/shop" 
+            className="flex items-center justify-between p-3 rounded-xl bg-bg-primary hover:bg-primary-50 transition-colors min-h-[48px]"
+          >
+            <span className="text-sm text-text-primary">Shopping List</span>
             <span className="text-text-muted">→</span>
           </Link>
           <Link 
             to="/settings" 
             className="flex items-center justify-between p-3 rounded-xl bg-bg-primary hover:bg-primary-50 transition-colors min-h-[48px]"
           >
-            <span className="text-sm text-text-primary">Edit household</span>
+            <span className="text-sm text-text-primary">Family & Demographics</span>
             <span className="text-text-muted">→</span>
           </Link>
         </div>

@@ -186,7 +186,7 @@ export function OnboardingPage() {
     <div className="mx-auto max-w-4xl space-y-4 md:space-y-6 px-3 md:px-6 pb-24">
       <div className="card">
         <div className="mb-2 text-sm font-medium text-text-muted">Step {step} of 3</div>
-        <h1 className="font-display text-3xl text-text-primary">Household onboarding</h1>
+        <h1 className="font-display text-2xl md:text-3xl text-text-primary">Household onboarding</h1>
         <p className="mt-2 text-sm text-text-primary">Set up your planning profile once, then Allio can generate smarter weekly plans.</p>
       </div>
 

@@ -10,6 +10,7 @@ DIAGNOSTIC FINDINGS
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || ''
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 const LLM_API_KEY = Deno.env.get('LLM_API_KEY') || ''
 const LLM_MODEL = Deno.env.get('LLM_MODEL') || 'meta-llama/llama-3.1-70b-instruct'
 const LLM_ENDPOINT = Deno.env.get('LLM_ENDPOINT') || 'https://openrouter.ai/api/v1/chat/completions'
@@ -18,6 +19,75 @@ const LLM_ENDPOINT = Deno.env.get('LLM_ENDPOINT') || 'https://openrouter.ai/api/
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// HYBRID MODE: Try recipe catalog first, then fall back to LLM
+const HYBRID_MODE = true
+
+// Meat proteins to exclude for vegetarian - comprehensive list
+const MEAT_PROTEINS = ['chicken', 'beef', 'pork', 'lamb', 'turkey', 'bacon', 'sausage', 'ham', 'steak', 'ground beef', 'ground pork', 'veal', 'cod', 'salmon', 'shrimp', 'lobster', 'crab', 'scallop', 'fish', 'duck', 'mussel', 'tilapia', 'turkey']
+
+// Get recipe from catalog
+async function getRecipeFromCatalog(
+  supabase: any,
+  mealType: string,
+  effortLevel: string,
+  suggestion: string,
+  members: any[]
+) {
+  const maxTime = effortLevel === 'low' ? 30 : effortLevel === 'medium' ? 45 : 60
+  
+  const isVegetarian = suggestion?.toLowerCase().includes('vegetarian') || 
+    members?.some((m: any) => m.diet?.toLowerCase().includes('vegetarian'))
+  
+  let query = supabase
+    .from('recipes')
+    .select('id, title, description, cuisine, meal_type, prep_time_minutes, cook_time_minutes, servings, ingredients_json, instructions_json, weeknight_score, kid_friendly_score, leftovers_score')
+    .eq('meal_type', mealType)
+    .eq('active', true)
+    .neq('title', 'ilike', '%test%')
+    .lte('cook_time_minutes', maxTime)
+    .order('weeknight_score', { ascending: false })
+    .limit(50)  // Get more to have candidates after vegetarian filter
+  
+  const { data: recipes, error } = await query
+  
+  if (error || !recipes || recipes.length === 0) {
+    console.log('[generate-plan] No recipes from catalog:', error?.message)
+    return null
+  }
+  
+  // Filter for vegetarian if needed
+  let filtered = recipes
+  if (isVegetarian) {
+    filtered = recipes.filter((r: any) => {
+      const title = r.title.toLowerCase()
+      for (const meat of MEAT_PROTEINS) {
+        if (title.includes(meat)) return false
+      }
+      return true
+    })
+    console.log('[generate-plan] Vegetarian filter:', recipes.length, '->', filtered.length)
+  }
+  
+  if (filtered.length === 0) return null
+  
+  const recipe = filtered[0]
+  const ingredients = typeof recipe.ingredients_json === 'string' ? JSON.parse(recipe.ingredients_json) : recipe.ingredients_json
+  const instructions = typeof recipe.instructions_json === 'string' ? JSON.parse(recipe.instructions_json) : recipe.instructions_json
+  
+  return {
+    name: recipe.title,
+    description: recipe.description || '',
+    prep_time_minutes: recipe.prep_time_minutes,
+    cook_time_minutes: recipe.cook_time_minutes,
+    servings: recipe.servings || 4,
+    ingredients,
+    instructions,
+    cuisine: recipe.cuisine,
+    recipe_id: recipe.id,
+    from_recipe_library: true
+  }
 }
 
 // Build dynamic system prompt based on scheduled slots
@@ -183,15 +253,30 @@ function transformLlmOutput(llmOutput: unknown, scheduledSlots: Array<{ day: str
     if (!llmOutput || typeof llmOutput !== 'object') {
       return { meals: [] }
     }
-    
+
     const output = llmOutput as Record<string, unknown>
+
+    // Handle flat meals array format: { meals: [...] } — this is what the LLM produces
+    // when given the system prompt's per-object format with day/meal as flat fields.
+    const flatList = output.meals || output.meal_plan || output.plan
+    if (Array.isArray(flatList)) {
+      const result = (flatList as Array<Record<string, unknown>>)
+        .filter((m) => m.day && m.meal && m.name)
+        .filter((m) => {
+          if (scheduledSlots.length === 0) return true
+          return scheduledSlots.some((s) => s.day === m.day && s.meal === m.meal)
+        })
+        .map((m) => ({ ...m, difficulty: m.effort || m.difficulty || 'medium' }))
+      return { meals: result }
+    }
+
     // Look for meal_plan or plan or just use the object directly
     const source = output.meal_plan || output.plan || output
-    
+
     if (typeof source !== 'object' || !source) {
       return { meals: [] }
     }
-    
+
     const meals: Array<Record<string, unknown>> = []
     
     // Handle nested structure like { Monday: { breakfast: "...", lunch: "..." } }
@@ -260,7 +345,7 @@ function transformLlmOutput(llmOutput: unknown, scheduledSlots: Array<{ day: str
             flexibility_level: String(mealObj.flexibility_level || 'medium'),
             servings: Number(mealObj.servings || 2),
             cook_time_minutes: Number(mealObj.cook_time_minutes || (20 + Math.floor(Math.random() * 25))),
-            difficulty: mealObj.difficulty || (Math.random() > 0.5 ? 'Easy' : 'Medium'),
+            difficulty: mealObj.effort || mealObj.difficulty || 'medium',
             prep_time_minutes: Number(mealObj.prep_time_minutes || 30),
             ingredients: mealIngredients,
             instructions: (mealObj.instructions as Array<string>) || ['Preheat oven to 425°F.', 'Prepare all ingredients by washing and chopping.', 'Season protein with salt, pepper, and desired spices.', 'Heat oil in a large oven-safe skillet over medium-high heat.', 'Sear protein for 3-4 minutes per side.', 'Add vegetables to the pan.', 'Transfer to oven and roast for 15-20 minutes until done.', 'Let rest 5 minutes before serving.'],
@@ -343,10 +428,132 @@ serve(async (req) => {
 
     const payload = await req.json()
     if (!payload?.household || !Array.isArray(payload?.members) || !Array.isArray(payload?.slots)) {
-      return new Response(JSON.stringify({ error: 'Payload must include household, members, and slots' }), { 
-        status: 400, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      return new Response(JSON.stringify({ error: 'Payload must include household, members, and slots' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
+    }
+
+    // Validate slots have required fields
+    for (let i = 0; i < payload.slots.length; i++) {
+      const slot = payload.slots[i]
+      if (!slot?.day || !slot?.meal) {
+        return new Response(JSON.stringify({ error: `Slot ${i} missing day or meal` }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+      // Ensure attendees is always an array - default to user.id if not provided
+      if (!Array.isArray(slot.attendees)) {
+        slot.attendees = user?.id ? [user.id] : []
+        console.log('[generate-plan] Slot missing attendees, defaulting to:', slot.attendees)
+      }
+    }
+
+    // Swap mode: restrict processing to only the single slot being replaced
+    if (payload.replace_slot) {
+      const { day: swapDay, meal: swapMeal, suggestion: swapSuggestion } = payload.replace_slot
+      const matchingSlot = payload.slots.find(
+        (s: any) => s.day === swapDay && s.meal === swapMeal
+      )
+      // Ensure attendees is preserved in swap mode - default to user.id if not provided
+      const fallbackAttendees = user?.id ? [user.id] : []
+      payload.slots = matchingSlot
+        ? [{ 
+            ...matchingSlot, 
+            suggestion: swapSuggestion,
+            attendees: matchingSlot.attendees || fallbackAttendees
+          }]
+        : [{ 
+            day: swapDay, 
+            meal: swapMeal, 
+            suggestion: swapSuggestion,
+            attendees: fallbackAttendees
+          }]
+      console.log('[generate-plan] Swap mode: narrowed to single slot', swapDay, swapMeal, swapSuggestion || '(no suggestion)')
+    }
+
+    // HYBRID MODE: Try catalog first for each slot
+    if (HYBRID_MODE) {
+      console.log('[generate-plan] HYBRID_MODE enabled, trying catalog first')
+
+      const catalogMeals = []
+      const remainingSlots = []
+      const supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+      for (const slot of payload.slots) {
+        if (slot.is_leftover) continue
+
+        // Include household diet_focus and slot preferences
+        const dietFocus = payload.household?.diet_focus || ''
+        const slotPref = slot.preferences?.[0] || ''
+        const suggestion = [dietFocus, slotPref, slot.suggestion].filter(Boolean).join(' ')
+
+        console.log('[generate-plan] Looking for:', suggestion || 'any')
+
+        const recipe = await getRecipeFromCatalog(
+          supabaseClient,
+          slot.meal || 'dinner',
+          slot.effort || 'medium',
+          suggestion,
+          payload.members
+        )
+
+        if (recipe) {
+          console.log('[generate-plan] Using catalog recipe:', recipe.name)
+          catalogMeals.push({
+            day: slot.day,
+            meal: slot.meal || 'dinner',
+            ...recipe,
+            why_this_meal: `${recipe.cuisine} ${slot.meal || 'dinner'} - Great flavor profile`,
+          })
+        } else {
+          console.log('[generate-plan] No catalog recipe for slot', slot.day, slot.meal, '- queuing for LLM')
+          remainingSlots.push(slot)
+        }
+      }
+
+      if (remainingSlots.length === 0 && catalogMeals.length > 0) {
+        // All slots matched catalog - return early
+        console.log('[generate-plan] All', catalogMeals.length, 'meals from catalog')
+        return new Response(JSON.stringify({
+          plan: { meals: catalogMeals },
+          debug: { hybrid_mode: true, source: 'catalog', meal_count: catalogMeals.length }
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (remainingSlots.length > 0 && catalogMeals.length > 0) {
+        // Partial match - call LLM for remaining slots and combine
+        console.log('[generate-plan]', catalogMeals.length, 'from catalog,', remainingSlots.length, 'slots need LLM')
+        const llmMessages = [
+          { role: 'system', content: buildSystemPrompt(remainingSlots, payload.members, payload.household, payload.replace_slot?.suggestion, payload.week_notes) },
+          { role: 'user', content: JSON.stringify({ ...payload, slots: remainingSlots }) },
+        ]
+        let llmJson = await callLlm(llmMessages)
+        let parsedPlan = JSON.parse(llmJson.choices[0].message.content)
+        let llmTransformed
+        try {
+          llmTransformed = transformLlmOutput(parsedPlan, remainingSlots)
+        } catch (e) {
+          console.error('[transform] Error in hybrid LLM fallback:', e)
+          llmTransformed = { meals: [] }
+        }
+        const allMeals = [...catalogMeals, ...(llmTransformed.meals || [])]
+        console.log('[generate-plan] Returning', allMeals.length, 'meals (', catalogMeals.length, 'catalog +', llmTransformed.meals?.length || 0, 'LLM)')
+        return new Response(JSON.stringify({
+          plan: { meals: allMeals },
+          debug: { hybrid_mode: true, source: 'mixed', catalog_count: catalogMeals.length, llm_count: llmTransformed.meals?.length || 0 }
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // No catalog matches at all - fall through to LLM with all slots
+      console.log('[generate-plan] No catalog meals, falling back to LLM for all slots')
     }
 
     const messages = [
