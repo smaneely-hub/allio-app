@@ -87,7 +87,7 @@ export function LoginPage() {
         if (!household) {
           navigate('/onboarding', { replace: true })
         } else {
-          navigate('/schedule', { replace: true })
+          navigate('/tonight', { replace: true })
         }
         toast.success('Welcome back.')
       }

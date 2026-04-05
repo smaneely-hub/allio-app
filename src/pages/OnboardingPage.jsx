@@ -63,7 +63,7 @@ export function OnboardingPage() {
   // Redirect to schedule if onboarding is already complete (unless in edit mode)
   useEffect(() => {
     if (!isEditMode && household && savedMembers.length > 0 && !loading) {
-      navigate('/schedule', { replace: true })
+      navigate('/tonight', { replace: true })
     }
   }, [household, savedMembers, loading, navigate, isEditMode])
 
@@ -172,7 +172,7 @@ export function OnboardingPage() {
       // Step 4: Navigate ONLY after all validation passes
       localStorage.removeItem('onboarding_step')
       toast.success(isEditMode ? 'Household updated successfully.' : 'Household saved successfully.')
-      navigate('/schedule', { replace: true })
+      navigate('/tonight', { replace: true })
       
     } catch (err) {
       console.error('[Onboarding] ERROR during save:', err)
