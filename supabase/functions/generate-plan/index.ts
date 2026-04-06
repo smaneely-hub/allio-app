@@ -34,11 +34,32 @@ async function getRecipeFromCatalog(
   effortLevel: string,
   suggestion: string,
   members: any[]
-) {
+): Promise<{ recipe: any; dietApplied: string | null }> {
   const maxTime = effortLevel === 'low' ? 30 : effortLevel === 'medium' ? 45 : 60
   
-  const isVegetarian = suggestion?.toLowerCase().includes('vegetarian') || 
-    members?.some((m: any) => m.diet?.toLowerCase().includes('vegetarian'))
+  // Extract dietary preferences from suggestion and member data
+  const suggestionLower = suggestion?.toLowerCase() || ''
+  const memberDiets = members?.flatMap((m: any) => [
+    m.diet?.toLowerCase() || '',
+    ...(m.dietary_restrictions || []).map((d: string) => d.toLowerCase()),
+    ...(m.health_considerations || []).map((h: string) => h.toLowerCase())
+  ]) || []
+  const allDietText = [suggestionLower, ...memberDiets].join(' ')
+  
+  // Determine diet focus - check for various diet types
+  const isVegetarian = allDietText.includes('vegetarian') || allDietText.includes('vegan')
+  const isLowCarb = allDietText.includes('low carb') || allDietText.includes('low-carb') || allDietText.includes('keto')
+  const isGlutenFree = allDietText.includes('gluten free') || allDietText.includes('gluten-free') || allDietText.includes('gf ')
+  const isDairyFree = allDietText.includes('dairy free') || allDietText.includes('dairy-free')
+  
+  // Determine which diet focus is being applied (for logging/return)
+  let dietApplied: string | null = null
+  if (isVegetarian) dietApplied = 'vegetarian'
+  else if (isLowCarb) dietApplied = 'low-carb'
+  else if (isGlutenFree) dietApplied = 'gluten-free'
+  else if (isDairyFree) dietApplied = 'dairy-free'
+  
+  console.log('[generate-plan] Diet focus detected:', dietApplied, '| isVegetarian:', isVegetarian, '| isLowCarb:', isLowCarb)
   
   let query = supabase
     .from('recipes')
@@ -48,45 +69,88 @@ async function getRecipeFromCatalog(
     .neq('title', 'ilike', '%test%')
     .lte('cook_time_minutes', maxTime)
     .order('weeknight_score', { ascending: false })
-    .limit(50)  // Get more to have candidates after vegetarian filter
+    .limit(100)  // Get more to have candidates after dietary filters
   
   const { data: recipes, error } = await query
   
   if (error || !recipes || recipes.length === 0) {
     console.log('[generate-plan] No recipes from catalog:', error?.message)
-    return null
+    return { recipe: null, dietApplied }
   }
   
-  // Filter for vegetarian if needed
+  // Filter recipes based on dietary restrictions
   let filtered = recipes
+  
+  // Filter for vegetarian/vegan - exclude meat proteins
   if (isVegetarian) {
-    filtered = recipes.filter((r: any) => {
+    filtered = filtered.filter((r: any) => {
       const title = r.title.toLowerCase()
+      const desc = (r.description || '').toLowerCase()
+      const combined = title + ' ' + desc
       for (const meat of MEAT_PROTEINS) {
-        if (title.includes(meat)) return false
+        if (combined.includes(meat)) return false
       }
       return true
     })
     console.log('[generate-plan] Vegetarian filter:', recipes.length, '->', filtered.length)
   }
   
-  if (filtered.length === 0) return null
+  // For low-carb/keto, prefer recipes that are typically low-carb
+  // Filter out high-carb recipes like pasta, bread, rice-based dishes
+  if (isLowCarb && filtered.length > 0) {
+    const highCarbKeywords = ['pasta', 'bread', 'rice', 'noodle', 'spaghetti', 'lasagna', 'mac and cheese', 'macaroni']
+    filtered = filtered.filter((r: any) => {
+      const title = r.title.toLowerCase()
+      for (const carb of highCarbKeywords) {
+        if (title.includes(carb)) return false
+      }
+      return true
+    })
+    console.log('[generate-plan] Low-carb filter:', recipes.length, '->', filtered.length)
+  }
   
-  const recipe = filtered[0]
+  // For gluten-free, filter out obvious gluten-containing recipes
+  if (isGlutenFree && filtered.length > 0) {
+    const glutenKeywords = ['pasta', 'bread', 'noodle', 'spaghetti', 'lasagna', 'couscous', 'seitan', 'ramen', 'udon']
+    filtered = filtered.filter((r: any) => {
+      const title = r.title.toLowerCase()
+      for (const g of glutenKeywords) {
+        if (title.includes(g)) return false
+      }
+      return true
+    })
+    console.log('[generate-plan] Gluten-free filter:', recipes.length, '->', filtered.length)
+  }
+  
+  if (filtered.length === 0) {
+    console.log('[generate-plan] No recipes after dietary filter, returning null to trigger LLM')
+    return { recipe: null, dietApplied }
+  }
+  
+  // Pick a recipe - prefer variety by selecting based on recipe ID to avoid always picking first
+  // Use a simple hash of mealType + day to rotate through options
+  const selectionIndex = Math.abs((mealType + (suggestion || '')).split('').reduce((a: number, b: string) => ((a << 5) - a) + b.charCodeAt(0), 0)) % filtered.length
+  const recipe = filtered[selectionIndex]
+  
+  console.log('[generate-plan] Selected recipe index:', selectionIndex, 'of', filtered.length, '| Recipe:', recipe.title)
+  
   const ingredients = typeof recipe.ingredients_json === 'string' ? JSON.parse(recipe.ingredients_json) : recipe.ingredients_json
   const instructions = typeof recipe.instructions_json === 'string' ? JSON.parse(recipe.instructions_json) : recipe.instructions_json
   
   return {
-    name: recipe.title,
-    description: recipe.description || '',
-    prep_time_minutes: recipe.prep_time_minutes,
-    cook_time_minutes: recipe.cook_time_minutes,
-    servings: recipe.servings || 4,
-    ingredients,
-    instructions,
-    cuisine: recipe.cuisine,
-    recipe_id: recipe.id,
-    from_recipe_library: true
+    recipe: {
+      name: recipe.title,
+      description: recipe.description || '',
+      prep_time_minutes: recipe.prep_time_minutes,
+      cook_time_minutes: recipe.cook_time_minutes,
+      servings: recipe.servings || 4,
+      ingredients,
+      instructions,
+      cuisine: recipe.cuisine,
+      recipe_id: recipe.id,
+      from_recipe_library: true
+    },
+    dietApplied
   }
 }
 
@@ -491,7 +555,7 @@ serve(async (req) => {
 
         console.log('[generate-plan] Looking for:', suggestion || 'any')
 
-        const recipe = await getRecipeFromCatalog(
+        const { recipe, dietApplied } = await getRecipeFromCatalog(
           supabaseClient,
           slot.meal || 'dinner',
           slot.effort || 'medium',
@@ -500,16 +564,21 @@ serve(async (req) => {
         )
 
         if (recipe) {
-          console.log('[generate-plan] Using catalog recipe:', recipe.name)
+          console.log('[generate-plan] Using catalog recipe:', recipe.name, '| dietApplied:', dietApplied)
           catalogMeals.push({
             day: slot.day,
             meal: slot.meal || 'dinner',
             ...recipe,
             why_this_meal: `${recipe.cuisine} ${slot.meal || 'dinner'} - Great flavor profile`,
+            diet_applied: dietApplied,
           })
         } else {
           console.log('[generate-plan] No catalog recipe for slot', slot.day, slot.meal, '- queuing for LLM')
-          remainingSlots.push(slot)
+          // Add diet focus to the slot for LLM to use
+          const slotWithDiet = dietApplied 
+            ? { ...slot, suggestion: [slot.suggestion, dietApplied].filter(Boolean).join(' ') }
+            : slot
+          remainingSlots.push(slotWithDiet)
         }
       }
 
