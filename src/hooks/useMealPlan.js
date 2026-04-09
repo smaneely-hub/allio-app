@@ -2,19 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { aggregateShoppingList } from '../lib/aggregateShoppingList'
+import { normalizeMealPlan, normalizeMealRecord } from '../lib/mealSchema'
+import { invokePlannerFunction } from '../lib/plannerFunction'
 import { useAuth } from './useAuth'
 
-function withMealDefaults(plan) {
-  return {
-    ...plan,
-    meals: (plan?.meals || []).map((meal) => ({
-      locked: false,
-      user_note: null,
-      swapped: false,
-      original_name: null,
-      ...meal,
-    })),
-  }
+function withMealDefaults(plan, fallbackSlots = []) {
+  return normalizeMealPlan(plan, fallbackSlots)
 }
 
 async function invokeGeneratePlan(payload) {
@@ -27,70 +20,61 @@ async function invokeGeneratePlan(payload) {
     throw sessionError
   }
 
-  if (!session?.access_token) {
+  console.log('[useMealPlan] generate-plan session present:', Boolean(session))
+
+  let activeSession = session
+
+  if (!activeSession?.access_token) {
+    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+    if (refreshError) {
+      throw refreshError
+    }
+    activeSession = refreshData.session
+  }
+
+  if (!activeSession?.access_token) {
     console.error('[useMealPlan] No active session while calling generate-plan')
     throw new Error('No active session — user must log in')
   }
 
-  return supabase.functions.invoke('generate-plan', {
-    body: JSON.stringify(payload),
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-    },
-  })
-}
+  const tokenExpired = activeSession.expires_at ? Date.now() >= activeSession.expires_at * 1000 : false
+  console.log('[useMealPlan] generate-plan token ready:', { hasToken: Boolean(activeSession.access_token), tokenExpired })
+  console.log('[useMealPlan] generate-plan request headers prepared:', { hasAuthorization: true, hasApiKey: Boolean(import.meta.env.VITE_SUPABASE_ANON_KEY) })
 
-// Mock meal generator fallback when edge function is unavailable
-function generateMockMeals(slots) {
-  const mealDatabase = {
-    breakfast: [
-      { name: 'Scrambled Eggs & Toast', emoji: '🍳', prep_time_minutes: 15, servings: 4, ingredients: [{ item: 'Eggs', quantity: '8', unit: '' }, { item: 'Bread', quantity: '4', unit: 'slices' }, { item: 'Butter', quantity: '2', unit: 'tbsp' }], instructions: ['Beat eggs with salt and pepper', 'Melt butter in pan over medium heat', 'Pour in eggs and stir gently', 'Toast bread while eggs cook'] },
-      { name: 'Oatmeal with Berries', emoji: '🥣', prep_time_minutes: 10, servings: 4, ingredients: [{ item: 'Oats', quantity: '2', unit: 'cups' }, { item: 'Milk', quantity: '4', unit: 'cups' }, { item: 'Mixed berries', quantity: '1', unit: 'cup' }], instructions: ['Bring milk to simmer', 'Add oats and cook 5 minutes', 'Top with berries'] },
-      { name: 'Yogurt Parfait', emoji: '🥛', prep_time_minutes: 5, servings: 4, ingredients: [{ item: 'Greek yogurt', quantity: '4', unit: 'cups' }, { item: 'Granola', quantity: '1', unit: 'cup' }, { item: 'Honey', quantity: '2', unit: 'tbsp' }], instructions: ['Layer yogurt and granola', 'Drizzle with honey'] },
-      { name: 'Pancakes', emoji: '🥞', prep_time_minutes: 20, servings: 4, ingredients: [{ item: 'Pancake mix', quantity: '2', unit: 'cups' }, { item: 'Milk', quantity: '1.5', unit: 'cups' }, { item: 'Eggs', quantity: '2', unit: '' }], instructions: ['Mix pancake ingredients', 'Heat griddle', 'Pour batter and flip when bubbly'] },
-    ],
-    lunch: [
-      { name: 'Turkey Sandwiches', emoji: '🥪', prep_time_minutes: 10, servings: 4, ingredients: [{ item: 'Turkey breast', quantity: '1', unit: 'lb' }, { item: 'Bread', quantity: '8', unit: 'slices' }, { item: 'Cheese', quantity: '4', unit: 'slices' }], instructions: ['Lay out bread', 'Layer turkey and cheese', 'Add condiments and close'] },
-      { name: 'Caesar Salad', emoji: '🥗', prep_time_minutes: 15, servings: 4, ingredients: [{ item: 'Romaine lettuce', quantity: '2', unit: 'heads' }, { item: 'Caesar dressing', quantity: '0.5', unit: 'cup' }, { item: 'Parmesan', quantity: '0.5', unit: 'cup' }], instructions: ['Chop lettuce', 'Toss with dressing', 'Top with parmesan'] },
-      { name: 'Tomato Soup & Grilled Cheese', emoji: '🍅', prep_time_minutes: 25, servings: 4, ingredients: [{ item: 'Canned tomato soup', quantity: '2', unit: 'cans' }, { item: 'Bread', quantity: '8', unit: 'slices' }, { item: 'Cheddar cheese', quantity: '4', unit: 'slices' }], instructions: ['Heat soup', 'Make grilled cheese sandwiches', 'Serve together'] },
-      { name: 'Chicken Wrap', emoji: '🌯', prep_time_minutes: 15, servings: 4, ingredients: [{ item: 'Chicken breast', quantity: '1', unit: 'lb' }, { item: 'Tortillas', quantity: '4', unit: '' }, { item: 'Lettuce', quantity: '2', unit: 'cups' }], instructions: ['Cook and slice chicken', 'Warm tortillas', 'Fill with chicken and lettuce'] },
-    ],
-    dinner: [
-      { name: 'Chicken Stir Fry', emoji: '🍗', prep_time_minutes: 25, servings: 4, ingredients: [{ item: 'Chicken thighs', quantity: '1.5', unit: 'lb' }, { item: 'Broccoli', quantity: '2', unit: 'cups' }, { item: 'Soy sauce', quantity: '3', unit: 'tbsp' }], instructions: ['Cut chicken into pieces', 'Stir fry chicken 5 min', 'Add broccoli and sauce', 'Cook until done'] },
-      { name: 'Pork Tacos', emoji: '🌮', prep_time_minutes: 30, servings: 4, ingredients: [{ item: 'Pork shoulder', quantity: '1.5', unit: 'lb' }, { item: 'Taco shells', quantity: '8', unit: '' }, { item: 'Taco seasoning', quantity: '1', unit: 'packet' }], instructions: ['Season and cook pork', 'Shred pork', 'Warm shells and assemble'] },
-      { name: 'Pasta Night', emoji: '🍝', prep_time_minutes: 20, servings: 4, ingredients: [{ item: 'Spaghetti', quantity: '1', unit: 'lb' }, { item: 'Marinara sauce', quantity: '2', unit: 'jars' }, { item: 'Parmesan', quantity: '0.5', unit: 'cup' }], instructions: ['Boil pasta', 'Heat sauce', 'Combine and top with parmesan'] },
-      { name: 'Baked Salmon & Veggies', emoji: '🐟', prep_time_minutes: 30, servings: 4, ingredients: [{ item: 'Salmon fillets', quantity: '4', unit: '' }, { item: 'Asparagus', quantity: '1', unit: 'bunch' }, { item: 'Lemon', quantity: '1', unit: '' }], instructions: ['Season salmon', 'Roast at 400°F for 15 min', 'Add asparagus and cook 10 more min'] },
-      { name: 'Beef Burgers', emoji: '🍔', prep_time_minutes: 20, servings: 4, ingredients: [{ item: 'Ground beef', quantity: '1.5', unit: 'lb' }, { item: 'Burger buns', quantity: '4', unit: '' }, { item: 'Cheese', quantity: '4', unit: 'slices' }], instructions: ['Form patties', 'Grill to preference', 'Add cheese to melt', 'Assemble burgers'] },
-      { name: 'Chicken Casserole', emoji: '🥘', prep_time_minutes: 40, servings: 6, ingredients: [{ item: 'Chicken breast', quantity: '2', unit: 'lb' }, { item: 'Cream of chicken soup', quantity: '2', unit: 'cans' }, { item: 'Frozen vegetables', quantity: '2', unit: 'cups' }], instructions: ['Cook and chop chicken', 'Mix with soup and veggies', 'Bake at 350°F for 30 min'] },
-    ]
+  let result = await invokePlannerFunction(payload).then(({ data, error, functionName }) => {
+      console.log('[useMealPlan] planner function used:', functionName)
+      return { data, error }
+  }).then(({ data, error }) => {
+    return error
+      ? { data: null, error: { message: error?.message || 'Function invoke failed', context: error?.context || error, status: error?.status || 500 } }
+      : { data, error: null }
+  }).catch((error) => {
+    if (error?.name === 'AbortError') {
+      return { data: null, error: { message: 'generate-plan timed out after 45 seconds', context: null, status: 408 } }
+    }
+    throw error
+  })
+
+  if (result.error && (String(result.error.message || '').includes('non-2xx') || String(result.error.context || '').includes('401') || String(result.error.message || '').toLowerCase().includes('jwt'))) {
+    const { data: retryData, error: retryRefreshError } = await supabase.auth.refreshSession()
+    if (!retryRefreshError && retryData.session?.access_token) {
+      result = await invokePlannerFunction(payload).then(({ data, error, functionName }) => {
+        console.log('[useMealPlan] planner retry function used:', functionName)
+        return { data, error }
+      }).then(({ data, error }) => {
+        return error
+          ? { data: null, error: { message: error?.message || 'Function invoke failed', context: error?.context || error, status: error?.status || 500 } }
+          : { data, error: null }
+      }).catch((error) => {
+        if (error?.name === 'AbortError') {
+          return { data: null, error: { message: 'generate-plan timed out after 45 seconds', context: null, status: 408 } }
+        }
+        throw error
+      })
+    }
   }
-  
-  const dayNames = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
-  const meals = []
-  
-  for (const slot of slots) {
-    if (slot.meal === 'prep_block') continue
-    
-    const mealType = slot.meal.toLowerCase()
-    const mealOptions = mealDatabase[mealType] || mealDatabase.dinner
-    const mealTemplate = mealOptions[Math.floor(Math.random() * mealOptions.length)]
-    
-    meals.push({
-      day: slot.day?.toLowerCase().slice(0, 3) || 'mon',
-      meal: mealType,
-      name: mealTemplate.name,
-      emoji: mealTemplate.emoji,
-      prep_time_minutes: mealTemplate.prep_time_minutes,
-      servings: slot.attendees?.length || 4,
-      ingredients: mealTemplate.ingredients,
-      instructions: mealTemplate.instructions,
-      notes: 'Quick and easy family meal',
-      locked: false,
-      user_note: null,
-    })
-  }
-  
-  return { meals }
+
+  return result
 }
 
 export function useMealPlan(scheduleId) {
@@ -120,7 +104,8 @@ export function useMealPlan(scheduleId) {
         .maybeSingle()
 
       if (loadError) throw loadError
-      setMealPlan(data ? { ...data, draft_plan: withMealDefaults(data.draft_plan || data.plan || {}) } : null)
+      const fallbackSlots = Array.isArray(data?.draft_plan?.meals) ? data.draft_plan.meals : Array.isArray(data?.plan?.meals) ? data.plan.meals : []
+      setMealPlan(data ? { ...data, draft_plan: withMealDefaults(data.draft_plan || data.plan || {}, fallbackSlots), plan: withMealDefaults(data.plan || data.draft_plan || {}, fallbackSlots) } : null)
     } catch (err) {
       setError(err)
       toast.error("Couldn't load your data. Give it another shot.")
@@ -181,7 +166,7 @@ export function useMealPlan(scheduleId) {
         .single()
 
       if (saveError) throw saveError
-      setMealPlan({ ...data, draft_plan: withMealDefaults(data.draft_plan || data.plan || {}) })
+      setMealPlan({ ...data, draft_plan: withMealDefaults(data.draft_plan || data.plan || {}), plan: withMealDefaults(data.plan || data.draft_plan || {}) })
       return data
     },
     [mealPlan, user],
@@ -227,7 +212,7 @@ export function useMealPlan(scheduleId) {
       const lockedMeals = mealPlan?.draft_plan?.meals?.filter((meal) => meal.locked) || []
       
       // Only keep locked meals that match current scheduled slots
-      const slotKey = (s) => `${s.day}-${s.meal}`
+      const slotKey = (s) => `${String(s?.day || '').trim()}-${String(s?.meal || '').trim()}`
       const currentSlotKeys = new Set(slots.map(slotKey))
       const validLockedMeals = lockedMeals.filter((m) => currentSlotKeys.has(`${m.day}-${m.meal}`))
       
@@ -251,34 +236,52 @@ export function useMealPlan(scheduleId) {
           food_preferences: member.food_preferences || [],
           health_considerations: member.health_considerations || [],
         })),
-        slots: slots.map((slot) => ({
-          day: String(slot.day_of_week || slot.day || '').slice(0, 3).toLowerCase(),
-          meal: String(slot.meal_type || slot.meal || '').toLowerCase().replace(' ', '_'),
-          attendees: slot.attendees || [],
-          effort_level: slot.effort_level,
-          planning_notes: slot.planning_notes,
-          is_leftover: slot.is_leftover,
-          leftover_source: slot.leftover_source,
-        })),
+        slots: slots
+          .map((slot) => ({
+            day: typeof slot?.day === 'string' ? slot.day.trim().slice(0, 3).toLowerCase() : '',
+            meal: typeof slot?.meal === 'string' ? slot.meal.trim().toLowerCase().replace(/\s+/g, '_') : '',
+            attendees: Array.isArray(slot?.attendees) ? slot.attendees : [],
+            effort_level: slot?.effort_level,
+            planning_notes: slot?.planning_notes,
+            is_leftover: slot?.is_leftover,
+            leftover_source: slot?.leftover_source,
+          }))
+          .filter((slot) => slot.day && slot.meal),
         week_notes: schedule?.week_notes || '',
         locked_meals: validLockedMeals,
       }
 
 
       
+      console.log('[useMealPlan] generate-plan invoke started', {
+        slotCount: payload.slots?.length || 0,
+        memberCount: payload.members?.length || 0,
+        hasWeekNotes: Boolean(payload.week_notes),
+        hasLockedMeals: (payload.locked_meals?.length || 0) > 0,
+      })
       let { data: generated, error: functionError } = await invokeGeneratePlan(payload)
+      console.log('[useMealPlan] generate-plan invoke resolved')
+      console.log('[useMealPlan] generate-plan response received', {
+        hasData: Boolean(generated),
+        hasPlan: Boolean(generated?.plan),
+        mealCount: generated?.plan?.meals?.length || 0,
+      })
       if (functionError) {
-        console.error('[useMealPlan] Function error details:', functionError)
-        if (String(functionError.message || '').includes('non-2xx') || String(functionError.context || '').includes('401')) {
+        console.error('[useMealPlan] generate-plan invoke rejected', functionError)
+        console.error('[useMealPlan] generate-plan response error', functionError)
+        if (String(functionError.message || '').includes('non-2xx') || String(functionError.context || '').includes('401') || functionError.status === 401) {
           toast.error('Your session expired. Please log in again.')
           throw new Error('Session expired')
         }
-        generated = {
-          plan: generateMockMeals(payload.slots || [])
-        }
+        throw new Error(functionError.message || 'generate-plan failed')
       }
 
-      const nextPlan = withMealDefaults(generated.plan)
+      console.log('[useMealPlan] generate-plan payload shape', {
+        returnedKeys: generated ? Object.keys(generated) : [],
+        planKeys: generated?.plan ? Object.keys(generated.plan) : [],
+      })
+
+      const nextPlan = withMealDefaults(generated.plan, payload.slots)
       
       const mergedPlan = {
         ...nextPlan,
@@ -291,6 +294,12 @@ export function useMealPlan(scheduleId) {
       }
 
       
+      console.log('[useMealPlan] response parse started')
+      console.log('[useMealPlan] save started')
+      console.log('[useMealPlan] about to save returned plan', {
+        mealCount: mergedPlan?.meals?.length || 0,
+        scheduleId,
+      })
       const { data: savedPlan, error: saveError } = await supabase
         .from('meal_plans')
         .upsert({
@@ -308,10 +317,15 @@ export function useMealPlan(scheduleId) {
         .single()
 
       if (saveError) {
-        console.error('[useMealPlan] Save error:', saveError)
+        console.error('[useMealPlan] plan save failed', saveError)
         throw saveError
       }
-      setMealPlan({ ...savedPlan, draft_plan: withMealDefaults(savedPlan.draft_plan || savedPlan.plan || {}) })
+      console.log('[useMealPlan] save finished')
+      console.log('[useMealPlan] plan save succeeded', {
+        savedPlanId: savedPlan?.id,
+        mealCount: savedPlan?.draft_plan?.meals?.length || savedPlan?.plan?.meals?.length || 0,
+      })
+      setMealPlan({ ...savedPlan, draft_plan: withMealDefaults(savedPlan.draft_plan || savedPlan.plan || {}), plan: withMealDefaults(savedPlan.plan || savedPlan.draft_plan || {}) })
       return savedPlan
     } catch (err) {
       setError(err)
@@ -371,15 +385,17 @@ export function useMealPlan(scheduleId) {
           food_preferences: member.food_preferences || [],
           health_considerations: member.health_considerations || [],
         })),
-        slots: slots.map((slot) => ({
-          day: String(slot.day_of_week || slot.day || '').slice(0, 3).toLowerCase(),
-          meal: String(slot.meal_type || slot.meal || '').toLowerCase().replace(' ', '_'),
-          attendees: slot.attendees || [],
-          effort_level: slot.effort_level,
-          planning_notes: slot.planning_notes,
-          is_leftover: slot.is_leftover,
-          leftover_source: slot.leftover_source,
-        })),
+        slots: slots
+          .map((slot) => ({
+            day: typeof slot?.day === 'string' ? slot.day.trim().slice(0, 3).toLowerCase() : '',
+            meal: typeof slot?.meal === 'string' ? slot.meal.trim().toLowerCase().replace(/\s+/g, '_') : '',
+            attendees: Array.isArray(slot?.attendees) ? slot.attendees : [],
+            effort_level: slot?.effort_level,
+            planning_notes: slot?.planning_notes,
+            is_leftover: slot?.is_leftover,
+            leftover_source: slot?.leftover_source,
+          }))
+          .filter((slot) => slot.day && slot.meal),
         week_notes: schedule?.week_notes || '',
         existing_plan: mealPlan.draft_plan,
         replace_slot: {
@@ -387,12 +403,23 @@ export function useMealPlan(scheduleId) {
           meal: mealToReplace.meal,
           suggestion: suggestion,
           reason: suggestion ? `user wants: ${suggestion}` : 'user requested swap',
+          current_meal_name: mealToReplace.name || '',
         },
       }
 
+      console.log('[useMealPlan] about to invoke generate-plan for swap', {
+        day: mealToReplace.day,
+        meal: mealToReplace.meal,
+        hasSuggestion: Boolean(suggestion),
+      })
       let { data: generated, error: functionError } = await invokeGeneratePlan(payload)
+      console.log('[useMealPlan] swap generate-plan response received', {
+        hasData: Boolean(generated),
+        hasPlan: Boolean(generated?.plan),
+        mealCount: generated?.plan?.meals?.length || 0,
+      })
       if (functionError) {
-        console.error('[useMealPlan] Swap function error details:', functionError)
+        console.error('[useMealPlan] generate-plan response error', functionError)
         if (String(functionError.message || '').includes('non-2xx') || String(functionError.context || '').includes('401')) {
           toast.error('Your session expired. Please log in again.')
           throw new Error('Session expired')
@@ -400,7 +427,12 @@ export function useMealPlan(scheduleId) {
         throw functionError
       }
 
-      const replacement = withMealDefaults(generated.plan).meals.find(
+      console.log('[useMealPlan] swap generate-plan payload shape', {
+        returnedKeys: generated ? Object.keys(generated) : [],
+        planKeys: generated?.plan ? Object.keys(generated.plan) : [],
+      })
+
+      const replacement = withMealDefaults(generated.plan, payload.slots).meals.find(
         (meal) => meal.day === mealToReplace.day && meal.meal === mealToReplace.meal,
       )
 
@@ -412,14 +444,14 @@ export function useMealPlan(scheduleId) {
         ...mealPlan.draft_plan,
         meals: mealPlan.draft_plan.meals.map((meal) =>
           meal.id === mealToReplace.id
-            ? {
+            ? normalizeMealRecord({
                 ...replacement,
                 id: meal.id,
                 locked: false,
                 user_note: meal.user_note,
                 swapped: true,
                 original_name: meal.original_name || meal.name,
-              }
+              }, { day: meal.day, meal: meal.meal })
             : meal,
         ),
       }
@@ -430,6 +462,30 @@ export function useMealPlan(scheduleId) {
       throw err
     }
   }, [mealPlan, persistPlan, scheduleId, user])
+
+  const clearMealPlan = useCallback(async () => {
+    if (!user || !scheduleId) throw new Error('Schedule is required before clearing a meal plan.')
+
+    const { error: mealPlanError } = await supabase
+      .from('meal_plans')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('schedule_id', scheduleId)
+
+    if (mealPlanError) throw mealPlanError
+
+    const { error: listError } = await supabase
+      .from('shopping_lists')
+      .delete()
+      .eq('user_id', user.id)
+
+    if (listError) {
+      console.error('[useMealPlan] Clear shopping list error:', listError)
+    }
+
+    setMealPlan(null)
+    return true
+  }, [scheduleId, user])
 
   const finalizePlan = useCallback(async () => {
     return persistPlan(mealPlan.draft_plan, 'active')
@@ -445,6 +501,7 @@ export function useMealPlan(scheduleId) {
     toggleMealLock,
     saveMealNote,
     swapMeal,
+    clearMealPlan,
     finalizePlan,
   }
 }

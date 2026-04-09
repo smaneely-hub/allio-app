@@ -12,7 +12,7 @@ const mealTypeStyles = {
 }
 
 
-export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
+export function MealCard({ meal, onSwap, onSaveNote }) {
   const { isPremium } = useSubscription()
   const [expanded, setExpanded] = useState(false)
   const [cookingMode, setCookingMode] = useState(false)
@@ -158,9 +158,6 @@ export function MealCard({ meal, onToggleLock, onSwap, onSaveNote }) {
 
       {/* Action buttons - icon-only on mobile */}
       <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" onClick={() => onToggleLock(meal.id, !meal.locked)} className="text-xs font-medium px-3 py-1.5 rounded-full bg-warm-100 text-text-secondary hover:bg-warm-200 transition-all duration-150 active:scale-[0.97] min-h-[44px]">
-          {meal.locked ? '🔒' : '🔓'}
-        </button>
         <button type="button" onClick={() => setShowSwapModal(true)} className="text-xs font-medium px-3 py-1.5 rounded-full bg-warm-100 text-text-secondary hover:bg-warm-200 transition-all duration-150 active:scale-[0.97] min-h-[44px]">
           🔄
         </button>

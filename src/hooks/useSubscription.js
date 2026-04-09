@@ -56,31 +56,53 @@ export function useSubscription() {
     const sinceDate = new Date()
     sinceDate.setDate(sinceDate.getDate() - sinceDaysAgo)
 
-    const { count, error } = await supabase
-      .from('usage_tracking')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('action', action)
-      .gte('created_at', sinceDate.toISOString())
+    try {
+      const { count, error } = await supabase
+        .from('usage_tracking')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('action', action)
+        .gte('created_at', sinceDate.toISOString())
 
-    if (error && (error.code === 'PGRST205' || String(error.message || '').includes('404'))) return 0
-    return error ? 0 : (count || 0)
+      if (error) {
+        const errorText = `${error.code || ''} ${error.message || ''}`
+        if (error.code === 'PGRST205' || error.status === 404 || errorText.includes('404') || errorText.toLowerCase().includes('not found')) {
+          console.warn('[useSubscription] usage_tracking unavailable; continuing without telemetry')
+          return 0
+        }
+        console.warn('[useSubscription] usage count check failed; continuing without telemetry', error)
+        return 0
+      }
+      return count || 0
+    } catch (err) {
+      console.warn('[useSubscription] usage count threw; continuing without telemetry', err)
+      return 0
+    }
   }, [user])
 
   // Track usage
   const trackUsage = useCallback(async (action, metadata = {}) => {
     if (!user) return
 
-    const { error } = await supabase
-      .from('usage_tracking')
-      .insert({
-        user_id: user.id,
-        action,
-        metadata
-      })
+    try {
+      const { error } = await supabase
+        .from('usage_tracking')
+        .insert({
+          user_id: user.id,
+          action,
+          metadata
+        })
 
-    if (error && !(error.code === 'PGRST205' || String(error.message || '').includes('404'))) {
-      console.error('[useSubscription] trackUsage error:', error)
+      if (error) {
+        const errorText = `${error.code || ''} ${error.message || ''}`
+        if (error.code === 'PGRST205' || error.status === 404 || errorText.includes('404') || errorText.toLowerCase().includes('not found')) {
+          console.warn('[useSubscription] usage_tracking unavailable; continuing without telemetry')
+          return
+        }
+        console.warn('[useSubscription] trackUsage failed; continuing without telemetry', error)
+      }
+    } catch (err) {
+      console.warn('[useSubscription] trackUsage threw; continuing without telemetry', err)
     }
   }, [user])
 

@@ -14,12 +14,32 @@ import { DashboardPage } from './pages/DashboardPage'
 import { SchedulePage } from './pages/SchedulePage'
 import { PlanPage } from './pages/PlanPage'
 import { PlannerPage } from './pages/PlannerPage'
+import { TonightPage } from './pages/TonightPage'
+
+function TonightPageWrapper() {
+  const { user, loading } = useAuth()
+  const navigate = useNavigate()
+  
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/login')
+    }
+  }, [user, loading, navigate])
+  
+  if (loading) return <div className="p-8 text-center">Loading...</div>
+  if (!user) return null
+  
+  return <TonightPage />
+}
 import { ShopPage } from './pages/ShopPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { PricingPage } from './pages/PricingPage'
 import { PrivacyPage } from './pages/PrivacyPage'
 import { TermsPage } from './pages/TermsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { OpenRouterTestPage } from './pages/OpenRouterTestPage'
+import { PlannerTestPage } from './pages/PlannerTestPage'
+import { TokenDebugPage } from './pages/TokenDebugPage'
 
 // Connection check component - skip since we hardcoded Supabase credentials
 function ConnectionCheck({ children }) {
@@ -55,7 +75,7 @@ export default function App() {
             <EmailVerificationBanner />
             <main className="min-h-screen bg-bg-primary animate-fadeIn">
               <Routes>
-                <Route path="/" element={<HomePage />} />
+                <Route path="/" element={<TonightPageWrapper />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route
                   path="/onboarding"
@@ -90,6 +110,14 @@ export default function App() {
                   }
                 />
                 <Route
+                  path="/tonight"
+                  element={
+                    <ProtectedRoute>
+                      <TonightPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="/shop"
                   element={
                     <ProtectedRoute>
@@ -108,6 +136,16 @@ export default function App() {
                 <Route path="/pricing" element={<PricingPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/terms" element={<TermsPage />} />
+                <Route path="/openrouter-test" element={<OpenRouterTestPage />} />
+                <Route
+                  path="/planner-test"
+                  element={
+                    <ProtectedRoute>
+                      <PlannerTestPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="/token-debug" element={<TokenDebugPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </main>

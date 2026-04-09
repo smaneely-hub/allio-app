@@ -1,0 +1,99 @@
+// Security fix - runs DDL using postgres directly via deno-postgres
+import { serve } from 'https://deno.land/std@0.224.0/http/server. ts'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client- info, apikey, content-type',
+}
+
+const DB_URL = Deno.env.get('SUPABASE_DB_URL') || 'postgresql://postgres:AllioLife87@db.rvgtmletsbycrbeycwus. supabase.co:5432/postgres'
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders })
+  }
+
+  try {
+    const { apply } = await req.json()
+    
+    if (!apply) {
+      return new Response(JSON.stringify({ 
+        message: 'Send {"apply": true} to run security fix'
+      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    // Import postgres client
+    const { Client } = await import('https://deno.land/x/postgres/mod.ts')
+    
+    const client = new Client(DB_URL)
+    await client.connect()
+    
+    const results = []
+    
+    // 1. Enable RLS on feature_flags
+    try {
+      await client.queryObject('ALTER TABLE feature_flags ENABLE ROW LEVEL SECURITY')
+      results.push('feature_flags: RLS enabled')
+    } catch (e) { results.push('feature_flags: ' + e.message) }
+    
+    // 2. Enable RLS on usage_tracking  
+    try {
+      await client.queryObject('ALTER TABLE usage_tracking ENABLE ROW LEVEL SECURITY')
+      results.push('usage_tracking: RLS enabled')
+    } catch (e) { results.push('usage_tracking: ' + e.message) }
+    
+    // 3. Add policies for feature_flags
+    try {
+      await client.queryObject(`
+        DROP POLICY IF EXISTS "Service role can manage feature flags" ON feature_flags;
+        CREATE POLICY "Service role can manage feature flags" ON feature_flags
+        FOR ALL USING (auth.role() = 'service_role');
+      `)
+      results.push('feature_flags: policies added')
+    } catch (e) { results.push('feature_flags policies: ' + e.message) }
+    
+    // 4. Add policies for usage_tracking
+    try {
+      await client.queryObject(`
+        DROP POLICY IF EXISTS "Authenticated users can insert usage tracking" ON usage_tracking;
+        CREATE POLICY "Authenticated users can insert usage tracking" ON usage_tracking
+        FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+      `)
+      results.push('usage_tracking: policies added')
+    } catch (e) { results.push('usage_tracking policies: ' + e.message) }
+    
+    // 5. Fix recipes policies
+    try {
+      await client.queryObject(`
+        DROP POLICY IF EXISTS "Anyone can read recipes" ON recipes;
+        DROP POLICY IF EXISTS "Anyone can insert recipes" ON recipes;
+        DROP POLICY IF EXISTS "Users can insert recipes" ON recipes;
+        CREATE POLICY "Authenticated users can read recipes" ON recipes
+          FOR SELECT USING (auth.uid() IS NOT NULL);
+        CREATE POLICY "Service role can manage recipes" ON recipes
+          FOR ALL USING (auth.role() = 'service_role');
+      `)
+      results.push('recipes: policies fixed')
+    } catch (e) { results.push('recipes: ' + e.message) }
+    
+    // Verify
+    const tables = await client.queryObject(`
+      SELECT schemaname, tablename, rowsecurity as rls_ enabled
+      FROM pg_tables WHERE schemaname = 'public'
+    `)
+    
+    await client.end()
+    
+    return new Response(JSON.stringify({ 
+      status: 'applied',
+      results,
+      tables: tables.rows
+    }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    
+  } catch (err) {
+    return new Response(JSON.stringify({ error: err.message, stack: err.stack }), { 
+      status: 500, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    })
+  }
+})

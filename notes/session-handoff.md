@@ -1,62 +1,51 @@
 ## Session Rollover
 ### Project
-Allio
+Allio planner recovery / edge function auth isolation
+
+> **Note:** This repo uses the OpenClaw debugging architecture. See `.openclaw/OPERATING_CONTRACT.md`.
 
 ### What We Did
-- Repositioned Allio as a planning system rather than a recipe app.
-- Added project guardrail docs: product principles, architecture rules, current decisions, regression memory.
-- Reworked household/profile editing so family members are editable inline from Profile.
-- Removed role as a user-facing field; role is inferred from age behind the scenes.
-- Tightened meal generation to use richer household/member context.
-- Shifted meal-detail intelligence toward model-owned output (`why_this_works`, `variations`, `similar_options`, `confidence_signal`).
-- Unified Schedule + Plan into one `/plan` planner surface.
-- Removed finalize flow from the primary planning path.
-- Hardened auth/session handling around stale Supabase refresh tokens.
-- Removed hard dependency on missing `subscriptions` table in the frontend.
-- Added swap fallback path through direct function endpoint.
+- Added `/planner-test` UI route and dashboard link for direct planner-function testing using live household/member context.
+- Added token claim decoding to confirm browser session JWT shape.
+- Added `planner-diagnostic` edge function for minimal route-level diagnostics.
+- Added `planner-generate-test` edge function using the same broad implementation style as `openrouter-test`.
+- Repeated live tests from browser against:
+  - `planner-diagnostic`
+  - `openrouter-test`
+  - `planner-generate-test`
+  - `generate-plan`
 
 ### Decisions / Constraints
-- Allio is a planning system, not a recipe app.
-- Schedule and plan are one flow.
-- Generated meals should be immediately usable.
-- Shopping list should be available automatically after generation.
-- Household management lives in Profile.
-- Intelligence should live in prompt/model output, not frontend heuristics.
-- Session rollover should be aggressive when idle or context gets large/multi-topic.
+- Local env files should be read first before code/debugging tasks in this workspace.
+- Do not assume the planner works just because UI no longer crashes.
+- Telemetry / `usage_tracking` is secondary and must not block planner flow.
+- Avoid broad unrelated auth changes; focus on exact failing layer.
 
 ### Current State
-- Production app live at `https://allio.life`.
-- Unified planner route is `/plan`; `/schedule` redirects there.
-- Current production JS seen in latest session: `index-DAwFDNhZ.js` then later `index-BXZ9Lf3I.js` / newer builds depending deploy.
-- `generate-plan` edge function has been redeployed and now returns richer meal-intelligence fields.
-- Heartbeat and memory files now contain the full session rollover protocol plus hard safety trigger.
+- Browser session token is valid and project-aligned:
+  - `iss`: `https://rvgtmletsbycrbeycwus.supabase.co/auth/v1`
+  - `aud`: `authenticated`
+  - `role`: `authenticated`
+  - `sub`: `4377e2a5-db07-412f-9887-e7d5b80e362d`
+- `openrouter-test` succeeds from the browser with status 200.
+- `planner-diagnostic`, `planner-generate-test`, and `generate-plan` all fail from the browser with the same response:
+  - status 401
+  - body `{ "code": 401, "message": "Invalid JWT" }`
+- This means the blocker is not global browser auth and not OpenRouter access.
+- The rejection appears tied to the planner function routes/family at the Supabase edge gateway layer, before handler logic can help.
 
 ### Open Issues
-- Swap/generate reliability still needs real-world verification after auth/session fixes.
-- Frontend/backend schema drift may still exist in scattered areas and should be audited further.
-- PlannerPage is functional but likely needs another cleanup pass to fully remove old two-page assumptions.
-- Premium/subscription system is currently degraded to free-tier default in frontend due missing backend tables.
+- Core planner loop is still blocked at function entry for planner-related routes.
+- `generate-plan` is not currently reachable from the browser despite a valid session token.
+- Existing planner-specific function route names may be affected by platform-side auth/config behavior not visible in repo.
 
 ### Next Step
-- Verify current swap flow in production after the latest auth/session and fallback changes.
-- Then do a schema/reference cleanup pass to eliminate remaining stale table references and old assumptions.
-- After that, continue refining planner UX and shopping-list auto-sync from the unified planner surface.
-
-### Critical Technical Details
-- Supabase project ref: `rvgtmletsbycrbeycwus`
-- Main edge function: `generate-plan`
-- Key project docs:
-  - `allio-app/PRODUCT_PRINCIPLES.md`
-  - `allio-app/ARCHITECTURE_RULES.md`
-  - `allio-app/CURRENT_DECISIONS.md`
-  - `allio-app/REGRESSION_MEMORY.md`
-- Session rollover operational logic:
-  - `/home/claude/.openclaw/workspace/HEARTBEAT.md`
-  - `/home/claude/.openclaw/workspace/memory/2026-03-30.md`
+- Direct fix path: temporarily route planner generation through a known-good function family/path pattern (matching `openrouter-test`) rather than the blocked planner-related function routes.
+- Then adapt frontend save/render to consume that working function response.
+- After core loop works again, either:
+  1. keep the replacement route and deprecate blocked planner routes, or
+  2. investigate Supabase dashboard/platform config differences between the working and blocked function routes.
 
 ### Not Preserved
-- Detailed conversational back-and-forth
-- superseded brainstorming
-- repeated explanations of architecture preferences
-- long debugging trails that are recoverable from source/history
-- temporary deployment noise and transient error spam already addressed or superseded
+- Raw repeated console logs beyond the decisive evidence above.
+- Intermediate auth theories disproven by the openrouter-test comparison.

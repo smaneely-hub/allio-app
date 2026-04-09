@@ -1,1 +1,1 @@
--- Initial schema stub for Allio
+-- Initial schema stub for Allio;

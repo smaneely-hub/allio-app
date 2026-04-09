@@ -572,6 +572,76 @@ async function callLlm(messages: Array<{ role: string; content: string }>) {
   return json
 }
 
+// Save an LLM-generated recipe to the database for future reuse
+async function saveGeneratedRecipe(supabaseClient: any, meal: any, members: any[], dietApplied: string): Promise<string | null> {
+  try {
+    // Validate required fields
+    const title = meal.name || meal.title
+    if (!title) {
+      console.log('[saveGenerated] Skipping - no title')
+      return null
+    }
+
+    const ingredients = meal.ingredients || []
+    const instructions = meal.instructions || []
+    
+    // Validate required data
+    if (!Array.isArray(ingredients) || ingredients.length === 0) {
+      console.log('[saveGenerated] Skipping - no ingredients')
+      return null
+    }
+    if (!Array.isArray(instructions) || instructions.length === 0) {
+      console.log('[saveGenerated] Skipping - no instructions')
+      return null
+    }
+
+    // Determine dietary tags from members
+    const dietaryRestrictions = members?.flatMap((m: any) => m.dietary_restrictions || []) || []
+    const uniqueRestrictions = [...new Set(dietaryRestrictions)]
+    
+    // Calculate scores (default medium)
+    const kidFriendlyScore = uniqueRestrictions.includes('child') ? 7 : 5
+    const weeknightScore = (meal.prep_time_minutes || 20) + (meal.cook_time_minutes || 30) <= 45 ? 8 : 5
+
+    // Build the recipe record - use existing schema columns
+    const recipeRecord = {
+      title: title,
+      slug: title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').slice(0, 60) + '-' + Date.now().toString(36),
+      cuisine: meal.cuisine || 'American',
+      meal_type: meal.meal || 'dinner',
+      description: meal.description || `AI-generated recipe: ${title}`,
+      ingredients_json: JSON.stringify(ingredients),
+      instructions_json: JSON.stringify(instructions),
+      prep_time_minutes: meal.prep_time_minutes || 15,
+      cook_time_minutes: meal.cook_time_minutes || 30,
+      servings: meal.servings || 4,
+      difficulty: meal.difficulty || 'medium',
+      tags_json: JSON.stringify(['ai-generated', ...uniqueRestrictions].filter(Boolean)),
+      kid_friendly_score: kidFriendlyScore,
+      weeknight_score: weeknightScore,
+      source_type: 'ai_generated',
+    }
+
+    // Insert the recipe
+    const { data, error } = await supabaseClient
+      .from('recipes')
+      .insert(recipeRecord)
+      .select('id')
+      .single()
+
+    if (error) {
+      console.log('[saveGenerated] Error saving recipe:', error.message)
+      return null
+    }
+
+    console.log('[saveGenerated] Saved recipe:', data.id, '-', title)
+    return data.id
+  } catch (e) {
+    console.log('[saveGenerated] Exception:', e.message)
+    return null
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -785,6 +855,15 @@ serve(async (req) => {
           console.error('[transform] Error in hybrid LLM fallback:', e)
           llmTransformed = { meals: [] }
         }
+        
+        // Save LLM-generated recipes to database for future reuse
+        if (llmTransformed.meals?.length > 0) {
+          const dietFromSlot = remainingSlots[0]?.suggestion || dietApplied || ''
+          for (const meal of llmTransformed.meals) {
+            await saveGeneratedRecipe(supabaseClient, meal, payload.members, dietFromSlot)
+          }
+        }
+        
         const allMeals = [...catalogMeals, ...(llmTransformed.meals || [])]
         console.log('[generate-plan] Returning', allMeals.length, 'meals (', catalogMeals.length, 'catalog +', llmTransformed.meals?.length || 0, 'LLM)')
         return new Response(JSON.stringify({
@@ -820,6 +899,14 @@ serve(async (req) => {
       transformedPlan = { meals: [] }
     }
     console.log('[generate-plan] Transformed plan:', JSON.stringify(transformedPlan).slice(0, 200))
+
+    // Save LLM-generated recipes to database for future reuse
+    if (transformedPlan.meals?.length > 0) {
+      const dietFromPayload = payload.household?.diet_focus || ''
+      for (const meal of transformedPlan.meals) {
+        await saveGeneratedRecipe(supabaseClient, meal, payload.members, dietFromPayload)
+      }
+    }
 
     return new Response(JSON.stringify({ plan: transformedPlan }), {
       status: 200,

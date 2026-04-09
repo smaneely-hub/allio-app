@@ -1,0 +1,2 @@
+ALTER TABLE IF EXISTS usage_tracking
+ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;

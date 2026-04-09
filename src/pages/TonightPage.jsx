@@ -345,7 +345,7 @@ export function TonightPage() {
 
       if (!data?.plan?.meals?.length) {
         console.error('[TonightPage] no meals in response:', data)
-        throw new Error('No meal returned')
+        throw new Error('We couldn\'t find or generate a meal matching your family\'s restrictions. Try simplifying filters or try again.')
       }
 
       console.log('[TonightPage] received meal:', data.plan.meals[0])
@@ -558,7 +558,7 @@ export function TonightPage() {
       }
 
       if (!data?.plan?.meals?.length) {
-        throw new Error('No meal returned')
+        throw new Error('We couldn\'t find or generate a swap matching your family\'s restrictions. Try adjusting filters.')
       }
 
       const normalized = normalizeMealRecord(data.plan.meals[0])

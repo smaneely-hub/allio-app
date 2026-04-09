@@ -37,37 +37,31 @@ export function ShopPage() {
   const [upgradeFeature, setUpgradeFeature] = useState(null)
 
   useEffect(() => {
-    async function loadShoppingList() {
-      if (!user) return
-      setLoading(true)
-      
-      let query = supabase
-        .from('shopping_lists')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-      
-      if (scheduleId) {
-        query = query.eq('schedule_id', scheduleId)
-      }
-      
-      const { data, error } = await query.maybeSingle()
-
-      if (error) {
-        toast.error(error.message)
-      } else {
-        setShoppingList(data)
-        if (data?.items?.length > 0) {
-          const firstCat = data.items[0].category || 'other'
-          setOpenCategories({ [firstCat]: true })
+    if (!user) return
+    setLoading(true)
+    
+    // Get today's shopping list only
+    const today = new Date().toISOString().split('T')[0]
+    
+    supabase
+      .from('shopping_lists')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('week_of', today)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          toast.error(error.message)
+        } else {
+          setShoppingList(data)
+          if (data?.items?.length > 0) {
+            const firstCat = data.items[0].category || 'other'
+            setOpenCategories({ [firstCat]: true })
+          }
         }
-      }
-      setLoading(false)
-    }
-
-    loadShoppingList()
-  }, [user, scheduleId])
+        setLoading(false)
+      })
+  }, [user])
 
   const groupedItems = useMemo(() => {
     const items = shoppingList?.items || []
@@ -190,9 +184,9 @@ export function ShopPage() {
         <EmptyState
           emoji="🛒"
           headline="No shopping list yet"
-          body="Finalize a meal plan to generate your shopping list."
-          ctaLabel="Go to meal plan"
-          ctaLink="/plan"
+          body="Generate a meal on Tonight's Meal to create your shopping list."
+          ctaLabel="Generate meal"
+          ctaLink="/"
         />
       </div>
     )

@@ -129,6 +129,22 @@ export function SettingsPage() {
   const [draftMembers, setDraftMembers] = useState([])
   const [savingMemberId, setSavingMemberId] = useState(null)
 
+  const addMember = () => {
+    const newMember = {
+      id: `new_${Date.now()}`,
+      name: '',
+      age: '',
+      gender: '',
+      role: 'child',
+      preferences: '',
+      dietary_restrictions: [],
+      food_preferences: [],
+      health_considerations: [],
+    }
+    setDraftMembers((cur) => [...cur, newMember])
+    setExpandedMember(draftMembers.length)
+  }
+
   const userInitial = user?.email?.charAt(0).toUpperCase() || '?'
 
   useEffect(() => {
@@ -165,8 +181,18 @@ export function SettingsPage() {
         return
       }
       setSavingMemberId(member.id || idx)
-      await saveMembers(draftMembers)
-      toast.success('Member updated.')
+      
+      // Clean up temp ID for new members
+      const membersToSave = draftMembers.map(m => {
+        if (String(m.id).startsWith('new_')) {
+          const { id, ...rest } = m
+          return rest
+        }
+        return m
+      })
+      
+      await saveMembers(membersToSave)
+      toast.success('Member saved.')
       setExpandedMember(null)
     } catch (err) {
       toast.error(err?.message || 'Could not save member.')
@@ -234,7 +260,9 @@ export function SettingsPage() {
       <div className="card p-5 shadow-sm hover:shadow-md transition-shadow duration-200">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-display text-lg text-text-primary">Family Members</h2>
-          <div className="text-xs text-text-muted">Tap a member to edit</div>
+          <button type="button" onClick={addMember} className="text-sm font-medium text-primary-600 hover:text-primary-700">
+            + Add Member
+          </button>
         </div>
 
         {draftMembers.length === 0 ? (
