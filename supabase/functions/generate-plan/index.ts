@@ -15,7 +15,38 @@ const LLM_API_KEY = Deno.env.get('LLM_API_KEY') || ''
 const LLM_MODEL = Deno.env.get('LLM_MODEL') || 'meta-llama/llama-3.1-70b-instruct'
 const LLM_ENDPOINT = Deno.env.get('LLM_ENDPOINT') || 'https://openrouter.ai/api/v1/chat/completions'
 
-// CORS headers
+// ─────────────────────────────────────────────
+// SERVING EQUIVALENTS HELPERS (Phase 2)
+// ─────────────────────────────────────────────
+// Simple serving calculation - use member count, with weight adjustments if DOB available
+function calculateServings(members: any[]): number {
+  if (!members || members.length === 0) return 2
+  
+  let total = 0
+  for (const m of members) {
+    // If DOB provided, calculate weight, otherwise assume adult (1.0)
+    let weight = 1.0
+    if (m.date_of_birth) {
+      try {
+        // Simple year extraction - use string parsing
+        const dobYear = parseInt(m.date_of_birth.substring(0, 4), 10)
+        const currentYear = 2026  // hardcoded for edge function
+        const age = currentYear - dobYear
+        
+        if (age <= 4) weight = 0.4
+        else if (age <= 9) weight = 0.7  
+        else if (age <= 12) weight = 0.85
+        else if (age > 64) weight = 0.9
+        // age 13-64 = 1.0 (adult weight)
+      } catch(e) {
+        weight = 1.0  // fallback
+      }
+    }
+    total += weight
+  }
+  
+  return Math.max(1, Math.round(total))
+}
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -33,7 +64,9 @@ async function getRecipeFromCatalog(
   mealType: string,
   effortLevel: string,
   suggestion: string,
-  members: any[]
+  members: any[],
+  excludedMealName: string | null = null,
+  recentMealNames: string[] = []
 ): Promise<{ recipe: any; dietApplied: string | null }> {
   const maxTime = effortLevel === 'low' ? 30 : effortLevel === 'medium' ? 45 : 60
   
@@ -61,15 +94,19 @@ async function getRecipeFromCatalog(
   
   console.log('[generate-plan] Diet focus detected:', dietApplied, '| isVegetarian:', isVegetarian, '| isLowCarb:', isLowCarb)
   
+  // Query recipes from catalog
   let query = supabase
     .from('recipes')
     .select('id, title, description, cuisine, meal_type, prep_time_minutes, cook_time_minutes, servings, ingredients_json, instructions_json, weeknight_score, kid_friendly_score, leftovers_score')
     .eq('meal_type', mealType)
     .eq('active', true)
     .neq('title', 'ilike', '%test%')
+    .neq('title', 'ilike', '%placeholder%')
+    .neq('title', 'ilike', '%tmp%')
+    .neq('title', 'ilike', '%example%')
     .lte('cook_time_minutes', maxTime)
     .order('weeknight_score', { ascending: false })
-    .limit(100)  // Get more to have candidates after dietary filters
+    .limit(100)
   
   const { data: recipes, error } = await query
   
@@ -78,8 +115,47 @@ async function getRecipeFromCatalog(
     return { recipe: null, dietApplied }
   }
   
-  // Filter recipes based on dietary restrictions
-  let filtered = recipes
+  // Filter to only recipes with actual data (JSON strings, not empty arrays)
+  const recipesWithData = recipes.filter((r: any) => {
+    const ing = r.ingredients_json
+    const inst = r.instructions_json
+    // Must have non-empty string data
+    return typeof ing === 'string' && ing.length > 10 && typeof inst === 'string' && inst.length > 10
+  })
+  
+  console.log('[generate-plan] Recipes from DB:', recipes.length, '| with data:', recipesWithData.length)
+  
+  if (recipesWithData.length === 0) {
+    console.log('[generate-plan] ERROR: No valid recipes in catalog - cannot generate meal')
+    return { recipe: null, dietApplied }
+  }
+  
+  // Use only recipes with data
+  let filtered = recipesWithData
+
+  if (excludedMealName) {
+    const excluded = excludedMealName.toLowerCase().trim()
+    filtered = filtered.filter((r: any) => {
+      const title = String(r.title || '').toLowerCase().trim()
+      // Also exclude if title contains the excluded name (partial match)
+      return !title.includes(excluded) && !excluded.includes(title)
+    })
+    console.log('[generate-plan] Excluding current meal:', excludedMealName, '| remaining:', filtered.length)
+  }
+
+  // Also filter out if we have a history of recent meal names
+  if (recentMealNames.length > 0) {
+    const beforeCount = filtered.length
+    filtered = filtered.filter((r: any) => {
+      const title = (r.title || '').toLowerCase()
+      for (const recent of recentMealNames) {
+        const rec = recent.toLowerCase()
+        if (title.includes(rec) || rec.includes(title)) return false
+      }
+      return true
+    })
+    console.log('[generate-plan] Excluding recent meals:', beforeCount, '->', filtered.length)
+  }
   
   // Filter for vegetarian/vegan - exclude meat proteins
   if (isVegetarian) {
@@ -127,28 +203,70 @@ async function getRecipeFromCatalog(
     return { recipe: null, dietApplied }
   }
   
-  // Pick a recipe - prefer variety by selecting based on recipe ID to avoid always picking first
-  // Use a simple hash of mealType + day to rotate through options
-  const selectionIndex = Math.abs((mealType + (suggestion || '')).split('').reduce((a: number, b: string) => ((a << 5) - a) + b.charCodeAt(0), 0)) % filtered.length
-  const recipe = filtered[selectionIndex]
+  // Pick a recipe - use random selection with proper exclusion
+  // If we have excluded meal names, filter them out first
+  let candidates = filtered
+  if (excludedMealName) {
+    const excluded = excludedMealName.toLowerCase().trim()
+    const beforeCount = candidates.length
+    candidates = candidates.filter((r: any) => {
+      const title = (r.title || '').toLowerCase().trim()
+      // Also check by ID if we have recent IDs
+      return title !== excluded
+    })
+    console.log('[generate-plan] After excluding "' + excludedMealName + '":', beforeCount, '->', candidates.length)
+  }
+
+  if (candidates.length === 0) {
+    console.log('[generate-plan] No recipes after exclusion, returning null')
+    return { recipe: null, dietApplied }
+  }
+
+  // Select a random recipe from candidates
+  const selectionIndex = Math.floor(Math.random() * candidates.length)
+  const recipe = candidates[selectionIndex]
+  console.log('[generate-plan] Selected candidate index:', selectionIndex, 'of', candidates.length)
+
+  // Use crypto random for true randomness
+  // GUARDRAIL: Final check - reject recipes with empty data (belt and suspenders)
+  if (!recipe.ingredients_json || !recipe.instructions_json || 
+      recipe.ingredients_json === '' || recipe.instructions_json === '') {
+    console.log('[generate-plan] REJECTED recipe due to empty data:', recipe.title, '| ingredients:', !!recipe.ingredients_json, '| instructions:', !!recipe.instructions_json)
+    return { recipe: null, dietApplied }
+  }
   
-  console.log('[generate-plan] Selected recipe index:', selectionIndex, 'of', filtered.length, '| Recipe:', recipe.title)
+  // Parse ingredients and instructions from JSON
+  let ingredients = []
+  let instructions = []
   
-  const ingredients = typeof recipe.ingredients_json === 'string' ? JSON.parse(recipe.ingredients_json) : recipe.ingredients_json
-  const instructions = typeof recipe.instructions_json === 'string' ? JSON.parse(recipe.instructions_json) : recipe.instructions_json
+  try {
+    ingredients = typeof recipe.ingredients_json === 'string' ? JSON.parse(recipe.ingredients_json) : (recipe.ingredients_json || [])
+    instructions = typeof recipe.instructions_json === 'string' ? JSON.parse(recipe.instructions_json) : (recipe.instructions_json || [])
+  } catch (e) {
+    console.log('[generate-plan] JSON parse error for recipe:', recipe.title, e.message)
+  }
   
+  // Ensure arrays
+  if (!Array.isArray(ingredients)) ingredients = []
+  if (!Array.isArray(instructions)) instructions = []
+  
+  console.log('[generate-plan] Selected recipe:', recipe.title, '| ingredients:', ingredients.length, '| instructions:', instructions.length)
+  
+  // Use the actual parsed ingredients and instructions from DB
   return {
     recipe: {
       name: recipe.title,
       description: recipe.description || '',
       prep_time_minutes: recipe.prep_time_minutes,
       cook_time_minutes: recipe.cook_time_minutes,
-      servings: recipe.servings || 4,
-      ingredients,
-      instructions,
+      servings: (() => { try { return calculateServings(members) } catch(e) { console.log("[serving error]", e.message); return 2 } })() || recipe.servings || 4,
+      ingredients: ingredients,
+      instructions: instructions,
       cuisine: recipe.cuisine,
       recipe_id: recipe.id,
-      from_recipe_library: true
+      from_recipe_library: true,
+      weeknight_score: recipe.weeknight_score,
+      kid_friendly_score: recipe.kid_friendly_score,
     },
     dietApplied
   }
@@ -560,16 +678,73 @@ serve(async (req) => {
           slot.meal || 'dinner',
           slot.effort || 'medium',
           suggestion,
-          payload.members
+          payload.members,
+          payload.replace_slot?.current_meal_name || null,
+          payload.recent_meal_names || []
         )
 
         if (recipe) {
-          console.log('[generate-plan] Using catalog recipe:', recipe.name, '| dietApplied:', dietApplied)
+          console.log('[generate-plan] Using catalog recipe:', recipe.name, '| dietApplied:', dietApplied, '| ingredients:', JSON.stringify(recipe.ingredients).slice(0, 100))
+          
+          // Build meaningful why_this_meal from actual inputs including demographics
+          const householdSize = payload.household?.total_people || 2
+          const effort = slot.effort || 'medium'
+          const dietFocus = payload.household?.diet_focus || dietApplied || ''
+          
+          // Calculate demographics from members
+          const members = payload.members || []
+          const demographics = {
+            totalCount: members.length,
+            adultCount: members.filter((m: any) => m.role === 'adult' || !m.role || m.age >= 18).length,
+            childCount: members.filter((m: any) => m.role === 'child' || (m.age && m.age < 18)).length,
+            adultOnly: members.length > 0 && members.every((m: any) => m.role === 'adult' || !m.role || m.age >= 18),
+            childIncluded: members.some((m: any) => m.role === 'child' || (m.age && m.age < 18)),
+            teenIncluded: members.some((m: any) => m.age && m.age >= 13 && m.age < 18),
+            teenCount: members.filter((m: any) => m.age && m.age >= 13 && m.age < 18).length,
+          }
+          
+          let whyThis = ''
+          
+          // Demographic-aware explanation
+          if (demographics.adultOnly) {
+            if (demographics.totalCount === 1) {
+              whyThis = `A ${recipe.weeknight_score > 7 ? 'quick' : 'balanced'} meal that works well for one adult — ${recipe.weeknight_score > 7 ? 'efficient to make' : 'flavorful and satisfying'}.`
+            } else {
+              whyThis = `This ${recipe.weeknight_score > 7 ? 'quick' : 'flavorful'} option suits ${demographics.adultCount} adult${demographics.adultCount > 1 ? 's' : ''} — more adventurous flavors and textures are fair game.`
+            }
+          } else if (demographics.childIncluded) {
+            whyThis = `Family-friendly meal selected for ${demographics.totalCount} people including younger members. ${recipe.kid_friendly_score > 6 ? 'This recipe has strong kid appeal' : 'Balanced for mixed palates'} — familiar formats and broadly acceptable flavors.`
+          } else if (demographics.teenIncluded) {
+            whyThis = `Selected for a household with teens (${demographics.teenCount}) — hearty portions, bold flavors, and formats teens tend to enjoy.`
+          } else {
+            whyThis = `Matches your ${effort} effort level and ${householdSize} serving${householdSize > 1 ? 's' : ''}.`
+          }
+          
+          if (dietFocus) whyThis += ` Aligned with your ${dietFocus} preference.`
+          if (recipe.weeknight_score && recipe.weeknight_score > 7) whyThis += ` Quick enough for a weeknight.'`
+          
+          // Contextual tips based on demographics
+          const tips = [
+            recipe.prep_time_minutes && recipe.cook_time_minutes ? `Prep: ${recipe.prep_time_minutes}min + Cook: ${recipe.cook_time_minutes}min` : null,
+            demographics.childIncluded && recipe.kid_friendly_score > 6 ? 'Great family pick — kids typically enjoy this one' : null,
+            demographics.adultOnly && recipe.kid_friendly_score < 5 ? 'More nuanced flavors — good for adventurous eaters' : null,
+            `Pairs well with ${recipe.cuisine} sides or salad`
+          ].filter(Boolean)
+          
+          // Contextual swaps based on demographics
+          const swaps = demographics.childIncluded
+            ? ['Use milder seasoning if needed', 'Cut into smaller pieces for easier eating', 'Serve with a familiar side']
+            : demographics.adultOnly
+            ? ['Substitute different protein or vegetable', 'Add more complex aromatics', 'Finish with professional-style plating']
+            : ['Swap protein for tofu or chickpeas', 'Use frozen veggies if fresh unavailable', 'Adjust seasoning to taste']
+          
           catalogMeals.push({
             day: slot.day,
             meal: slot.meal || 'dinner',
             ...recipe,
-            why_this_meal: `${recipe.cuisine} ${slot.meal || 'dinner'} - Great flavor profile`,
+            why_this_meal: whyThis,
+            tips,
+            easy_swaps: swaps,
             diet_applied: dietApplied,
           })
         } else {
