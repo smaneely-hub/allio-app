@@ -23,8 +23,15 @@ export async function invokePlannerFunction(payload) {
 
 // Refine an existing recipe based on feedback
 export async function refineMeal(recipe, feedback) {
-  const { data, error } = await supabase.functions.invoke('refine-meal', {
-    body: { recipe, feedback }
-  })
-  return { data, error }
+  console.log('[plannerFunction] refineMeal called with recipe:', recipe?.name, 'feedback:', feedback)
+  try {
+    const { data, error } = await supabase.functions.invoke('refine-meal', {
+      body: { recipe, feedback }
+    })
+    console.log('[plannerFunction] refine-meal response:', { data, error })
+    return { data, error }
+  } catch (err) {
+    console.error('[plannerFunction] refine-meal exception:', err)
+    return { data: null, error: err }
+  }
 }

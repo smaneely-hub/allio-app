@@ -696,25 +696,45 @@ export function TonightPage() {
 
   // Refine the current meal based on feedback (Phase 1-2)
   const refineCurrentMeal = async () => {
-    if (!meal || !user || !feedback.trim()) {
+    console.log('[TonightPage] refineCurrentMeal called')
+    console.log('[TonightPage]   meal:', meal?.name)
+    console.log('[TonightPage]   user:', user?.id)
+    console.log('[TonightPage]   feedback:', feedback)
+    console.log('[TonightPage]   feedback.trim():', feedback?.trim())
+    
+    if (!meal) {
+      console.error('[TonightPage] Cannot refine: no meal')
+      toast.error('No meal to refine')
+      return
+    }
+    if (!user) {
+      console.error('[TonightPage] Cannot refine: not logged in')
+      toast.error('Please log in first')
+      return
+    }
+    if (!feedback || !feedback.trim()) {
+      console.error('[TonightPage] Cannot refine: empty feedback')
       toast.error('Please enter feedback to refine the meal')
       return
     }
 
-    console.log('[TonightPage] refine started for meal:', meal.name)
-    console.log('[TonightPage] feedback:', feedback)
+    console.log('[TonightPage] refine validation passed, starting...')
     setGenerating(true)
     setRefinementChanges([])
 
     try {
       const { data, error } = await refineMeal(meal, feedback)
+      console.log('[TonightPage] refineMeal returned:', { data, error })
 
       if (error) {
         console.error('[TonightPage] refine error:', error)
+        console.error('[TonightPage] error message:', error.message)
+        console.error('[TonightPage] error code:', error.code)
         throw new Error(error.message || 'Refine failed')
       }
 
       if (!data?.refined) {
+        console.error('[TonightPage] No refinement returned - data:', data)
         throw new Error('No refinement returned')
       }
 
@@ -742,6 +762,7 @@ export function TonightPage() {
 
       toast.success('Meal refined!')
     } catch (err) {
+      console.error('[TonightPage] refine catch error:', err)
       toast.error(err.message || 'Failed to refine')
     } finally {
       setGenerating(false)
@@ -1120,11 +1141,17 @@ export function TonightPage() {
             <button
               type="button"
               onClick={() => {
+                console.log('[TonightPage] Rate/Cooked button clicked, cooked:', cooked)
+                console.log('[TonightPage]   mealInstanceId:', mealInstanceId)
+                console.log('[TonightPage]   members:', members.length)
+                console.log('[TonightPage]   selectedMembers:', selectedMembers)
                 if (cooked) {
                   // Already cooked, show modal to add/edit feedback
+                  console.log('[TonightPage] Opening feedback modal (already cooked)')
                   setShowFeedbackModal(true)
                 } else {
                   // Mark as cooked and prompt for feedback
+                  console.log('[TonightPage] Marking as cooked and opening modal')
                   setCooked(true)
                   setShowFeedbackModal(true)
                 }
@@ -1180,7 +1207,17 @@ export function TonightPage() {
 
   // Phase 3: Feedback modal for per-member ratings
   const submitFeedback = async () => {
-    if (!user) return
+    console.log('[TonightPage] submitFeedback called')
+    console.log('[TonightPage]   user:', user?.id)
+    console.log('[TonightPage]   mealInstanceId:', mealInstanceId)
+    console.log('[TonightPage]   memberFeedback:', memberFeedback)
+    console.log('[TonightPage]   meal:', meal?.name)
+    console.log('[TonightPage]   selectedMembers:', selectedMembers)
+    
+    if (!user) {
+      console.error('[TonightPage] Cannot submit feedback: not logged in')
+      return
+    }
 
     try {
       let instanceId = mealInstanceId
