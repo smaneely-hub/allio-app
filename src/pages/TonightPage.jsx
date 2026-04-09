@@ -988,6 +988,18 @@ export function TonightPage() {
             </button>
           </div>
 
+          {/* Meal Image */}
+          {meal.image && (
+            <div className="mb-4 rounded-xl overflow-hidden bg-gray-100">
+              <img 
+                src={meal.image} 
+                alt={meal.name}
+                className="w-full h-48 object-cover"
+                onError={(e) => { e.target.style.display = 'none' }}
+              />
+            </div>
+          )}
+
           {meal.description && (
             <p className="mb-3 text-sm text-text-primary">{meal.description}</p>
           )}
