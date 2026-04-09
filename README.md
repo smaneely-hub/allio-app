@@ -44,4 +44,4 @@ npx vercel deploy
 - `src/hooks/` - Custom React hooks for data management
 - `src/pages/` - Page components
 - `src/components/` - Reusable UI components
-- `supabase/functions/` - Edge functions
+- `supabase/functions/` - Edge functions# Force redeploy
