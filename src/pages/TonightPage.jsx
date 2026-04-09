@@ -1081,6 +1081,23 @@ export function TonightPage() {
             </div>
           )}
 
+          {/* Feedback input for refining the meal - visible after generation */}
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-text-700 mb-1">
+              Refine this meal
+            </label>
+            <input
+              type="text"
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+              className="input w-full text-sm"
+              placeholder="e.g., make it vegetarian, less spicy, use mushrooms"
+            />
+            <p className="text-xs text-text-muted mt-1">
+              Enter changes and click Refine to get a new version
+            </p>
+          </div>
+
           <div className="flex gap-2">
             <button
               type="button"
@@ -1264,7 +1281,11 @@ export function TonightPage() {
 
   // Render feedback modal
   if (showFeedbackModal) {
-    const selectedMemberData = members.filter(m => selectedMembers.includes(m.id))
+    // Use selected members if any, otherwise fall back to all household members
+    let ratingMembers = members.filter(m => selectedMembers.includes(m.id))
+    if (ratingMembers.length === 0 && members.length > 0) {
+      ratingMembers = members
+    }
 
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -1273,11 +1294,72 @@ export function TonightPage() {
             How was {meal?.name}?
           </h2>
           <p className="text-sm text-text-secondary mb-4">
-            Rate how each person felt about tonight's meal.
+            {ratingMembers.length > 0 
+              ? 'Rate how each person felt about tonight\'s meal.'
+              : 'How was tonight\'s meal?'}
           </p>
 
           <div className="space-y-4 mb-6">
-            {selectedMemberData.map(member => (
+            {ratingMembers.length === 0 ? (
+              /* No members - show generic rating */
+              <div className="border border-divider rounded-xl p-4 text-center">
+                <p className="text-text-secondary mb-3">How was the meal?</p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {[
+                    { value: 'loved_it', label: 'Loved it! ❤️' },
+                    { value: 'liked_it', label: 'Liked it 👍' },
+                    { value: 'it_was_okay', label: 'It was okay 😐' },
+                    { value: 'did_not_like', label: 'Not for me 👎' },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={async () => {
+                        // Submit generic feedback
+                        try {
+                          let instanceId = mealInstanceId
+                          if (!instanceId && user) {
+                            const { data: household } = await supabase
+                              .from('households').select('id').eq('user_id', user.id).limit(1).maybeSingle()
+                            if (household?.id) {
+                              const { data: newInstance } = await supabase
+                                .from('meal_instances')
+                                .insert({
+                                  household_id: household.id,
+                                  user_id: user.id,
+                                  recipe_id: meal?.recipe_id || null,
+                                  recipe_name: meal?.name || 'Unknown',
+                                  status: 'rated',
+                                  cooked_at: new Date().toISOString(),
+                                })
+                                .select('id').single()
+                              if (newInstance) instanceId = newInstance.id
+                            }
+                          }
+                          if (instanceId) {
+                            await supabase.from('meal_member_feedback').insert({
+                              meal_instance_id: instanceId,
+                              household_member_id: null,
+                              recipe_id: meal?.recipe_id || null,
+                              rating: opt.value,
+                              note: null,
+                            })
+                          }
+                          toast.success('Thanks for the feedback!')
+                          setShowFeedbackModal(false)
+                        } catch (e) {
+                          toast.error('Failed to save feedback')
+                        }
+                      }}
+                      className="px-4 py-2 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 transition font-medium"
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              ratingMembers.map(member => (
               <div key={member.id} className="border border-divider rounded-xl p-3">
                 <div className="font-medium text-text-primary mb-2">
                   {member.name || member.label || 'Family member'}
@@ -1320,7 +1402,8 @@ export function TonightPage() {
                   }))}
                 />
               </div>
-            ))}
+            ))
+            )}
           </div>
 
           <div className="flex gap-2">
