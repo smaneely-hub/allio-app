@@ -3,10 +3,10 @@ import { useAuth } from '../hooks/useAuth'
 import { Logo } from './Logo'
 
 const links = [
-  { to: '/dashboard', label: 'Home', icon: '🏠' },
-  { to: '/plan', label: 'Weekly Plan', icon: '📋' },
+  { to: '/', label: 'Tonight', icon: '🍲' },
   { to: '/shop', label: 'Shop', icon: '🛒' },
-  { to: '/settings', label: 'Profile', icon: '👤' },
+  { to: '/settings', label: 'Family', icon: '👨‍👩‍👧' },
+  { to: '/dashboard', label: 'More', icon: '⋯' },
 ]
 
 export function NavBar() {
@@ -84,7 +84,7 @@ export function NavBar() {
       </header>
 
       {/* Mobile header - logo + avatar only */}
-      <header className="md:hidden bg-white shadow-sm px-4 py-3">
+      <header className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white shadow-sm px-4 py-3">
         <div className="flex items-center justify-between">
           <Logo size="sm" />
           {user && (
@@ -101,15 +101,19 @@ export function NavBar() {
         <div className="h-0.5 bg-gradient-to-r from-primary-400 via-teal-400 to-purple-400"></div>
       </header>
 
-      {/* Mobile bottom tab bar - frosted glass, upgraded styling */}
+      {/* Mobile bottom tab bar - frosted glass, safe-area aware */}
       {user && (
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-t border-divider shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
-        <div className="flex items-center justify-around py-2">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-divider shadow-[0_-4px_24px_rgba(0,0,0,0.1)]" style={{ 
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        minHeight: '64px',
+        height: 'auto'
+      }}>
+        <div className="flex items-center justify-around h-14 max-w-xl mx-auto">
           {links.map((link) => (
             <Link
               key={link.to}
               to={link.to}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1 transition-all duration-150 ${
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 transition-all duration-150 relative ${
                 isActive(link.to)
                   ? 'text-primary-400'
                   : 'text-text-muted'
@@ -126,8 +130,8 @@ export function NavBar() {
       </nav>
       )}
 
-      {/* Spacer for mobile bottom bar and header */}
-      <div className="h-20 md:hidden"></div>
+      {/* Spacer for mobile bottom bar - accounts for safe area on notched devices */}
+      <div className="h-16 md:hidden" style={{ height: `calc(4rem + env(safe-area-inset-bottom, 20px))` }}></div>
     </>
   )
 }
