@@ -9,9 +9,9 @@ import { ScheduleSkeleton, EmptyState, PlanGenerationLoading } from '../componen
 import { MealPlanWorkspace } from '../components/plan/MealPlanWorkspace'
 import { PlannerActionSheet } from '../components/plan/PlannerActionSheet'
 import { aggregateShoppingList } from '../lib/aggregateShoppingList'
-import { supabase } from '../lib/supabase'
 import { addDays, DAY_ORDER } from '../lib/planner'
 import { normalizeMealRecord } from '../lib/mealSchema'
+import { upsertShoppingListForDate } from '../lib/tonightPersistence'
 
 const days = DAY_ORDER
 const inputClassName = 'input'
@@ -247,20 +247,11 @@ export function PlannerPage() {
       setShoppingItems(items)
 
       if (generatedMeals.length && household?.id) {
-        const { data: planRow } = await supabase
-          .from('meal_plans')
-          .select('id')
-          .eq('user_id', household.user_id)
-          .eq('schedule_id', schedule?.id)
-          .order('updated_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        await supabase.from('shopping_lists').upsert({
-          user_id: household.user_id,
-          meal_plan_id: planRow?.id || null,
+        await upsertShoppingListForDate({
+          userId: household.user_id,
+          householdId: household.id,
+          weekOf: new Date().toISOString().split('T')[0],
           items,
-          status: 'active',
         })
       }
 

@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { normalizeMealRecord } from '../lib/mealSchema'
 import { invokePlannerFunction, refineMeal } from '../lib/plannerFunction'
+import { buildShoppingItemsFromMeal, upsertShoppingListForDate } from '../lib/tonightPersistence'
 import { calculateServings, logServingsCalculation, getDemographicBucket } from '../hooks/useServings'
 
 function useHouseholdMembers(userId) {
@@ -62,10 +63,73 @@ const DIETARY_OPTIONS = [
   { value: 'keto', label: 'Keto' },
 ]
 
+const MEMBER_FEEDBACK_OPTIONS = [
+  { value: 'loved_it', label: 'Loved it' },
+  { value: 'liked_it', label: 'Liked it' },
+  { value: 'it_was_okay', label: 'It was okay' },
+  { value: 'did_not_like', label: "Didn't like it" },
+  { value: 'did_not_eat', label: "Didn't eat it" },
+]
+
+async function persistTonightMealState({ userId, householdId, meal }) {
+  const today = new Date().toISOString().split('T')[0]
+  const planPayload = {
+    meals: [{ ...meal, id: `${meal.day}-${meal.meal}` }],
+  }
+
+  const { data: existingPlan, error: planLoadError } = await supabase
+    .from('meal_plans')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('week_of', today)
+    .eq('status', 'active')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (planLoadError) throw planLoadError
+
+  if (existingPlan?.id) {
+    const { error } = await supabase
+      .from('meal_plans')
+      .update({
+        household_id: householdId,
+        plan: planPayload,
+        draft_plan: planPayload,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existingPlan.id)
+
+    if (error) throw error
+  } else {
+    const { error } = await supabase
+      .from('meal_plans')
+      .insert({
+        user_id: userId,
+        household_id: householdId,
+        week_of: today,
+        status: 'active',
+        plan: planPayload,
+        draft_plan: planPayload,
+        updated_at: new Date().toISOString(),
+      })
+
+    if (error) throw error
+  }
+
+  const shoppingItems = buildShoppingItemsFromMeal(meal)
+  await upsertShoppingListForDate({
+    userId,
+    householdId,
+    weekOf: today,
+    items: shoppingItems,
+  })
+}
+
 export function TonightPage() {
   useDocumentTitle("Tonight's Meal | Allio")
   const { user } = useAuth()
-  const { members, loading: membersLoading } = useHouseholdMembers(user?.id)
+  const { members } = useHouseholdMembers(user?.id)
 
   const [selectedMembers, setSelectedMembers] = useState([])
   const [effort, setEffort] = useState('medium')
@@ -73,7 +137,6 @@ export function TonightPage() {
   const [feedback, setFeedback] = useState('')
   const [generating, setGenerating] = useState(false)
   const [meal, setMeal] = useState(null)
-  const [saving, setSaving] = useState(false)
   const [cooked, setCooked] = useState(false)
   const [history, setHistory] = useState([])
   // Track recent meal names to avoid repeats
@@ -200,7 +263,7 @@ export function TonightPage() {
       }
     } else {
       // Add to favorites
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('saved_meals')
         .insert({
           user_id: user.id,
@@ -224,6 +287,8 @@ export function TonightPage() {
     setMeal(mealData)
     setIsFavorite(true)
     setRefinementChanges([])
+    setMemberFeedback({})
+    setShowFeedbackModal(false)
     console.log('[TonightPage] loaded saved meal:', savedMeal.recipe_name)
   }
 
@@ -354,6 +419,8 @@ export function TonightPage() {
       setFeedback('')
       setRefinementChanges([])  // Clear refinement state on new generation
       setMealInstanceId(null)   // Clear old instance ID for new meal
+      setMemberFeedback({})
+      setShowFeedbackModal(false)
       setRecentMealNames((prev) => {
         const updated = [normalized.name, ...prev.filter(n => n !== normalized.name)].slice(0, 10)
         console.log('[TonightPage] updated recent meal names:', updated)
@@ -377,51 +444,7 @@ export function TonightPage() {
           .maybeSingle()
 
         if (household?.id) {
-          const planPayload = {
-            meals: [{ ...normalized, id: `${normalized.day}-${normalized.meal}` }],
-          }
-
-          await supabase.from('meal_plans').upsert({
-            user_id: user.id,
-            household_id: household.id,
-            week_of: new Date().toISOString().split('T')[0],
-            status: 'active',
-            plan: planPayload,
-            draft_plan: planPayload,
-            updated_at: new Date().toISOString(),
-          })
-
-          // Auto-create shopping list
-          const shoppingItems = (normalized.ingredients || []).map((ing) => ({
-            name: typeof ing === 'string' ? ing : '',
-            quantity: 1,
-            category: 'groceries',
-            checked: false,
-          }))
-
-          const today = new Date().toISOString().split('T')[0]
-          const { data: existingList } = await supabase
-            .from('shopping_lists')
-            .select('id, items')
-            .eq('user_id', user.id)
-            .eq('week_of', today)
-            .maybeSingle()
-
-          if (existingList?.id) {
-            await supabase
-              .from('shopping_lists')
-              .update({ items: shoppingItems })
-              .eq('id', existingList.id)
-          } else {
-            await supabase
-              .from('shopping_lists')
-              .insert({
-                user_id: user.id,
-                household_id: household.id,
-                week_of: today,
-                items: shoppingItems,
-              })
-          }
+          await persistTonightMealState({ userId: user.id, householdId: household.id, meal: normalized })
         }
       } catch (autoSaveErr) {
         console.warn('[TonightPage] auto-save failed:', autoSaveErr)
@@ -461,7 +484,7 @@ export function TonightPage() {
             console.warn('[TonightPage] meal_instance creation skipped:', instanceError.message)
           }
         }
-      } catch (instanceErr) {
+      } catch {
         // Gracefully handle if table doesn't exist
         console.warn('[TonightPage] meal_instance feature not available yet')
       }
@@ -567,6 +590,8 @@ export function TonightPage() {
       setCooked(false)
       setRefinementChanges([])  // Clear refinement state on swap
       setMealInstanceId(null)   // Clear old instance ID for swapped meal
+      setMemberFeedback({})
+      setShowFeedbackModal(false)
       setRecentMealNames((prev) => {
         const updated = [normalized.name, ...prev.filter(n => n !== normalized.name)].slice(0, 10)
         console.log('[TonightPage] updated recent meal names after swap:', updated)
@@ -599,51 +624,7 @@ export function TonightPage() {
           .maybeSingle()
 
         if (household?.id) {
-          const planPayload = {
-            meals: [{ ...normalized, id: `${normalized.day}-${normalized.meal}` }],
-          }
-
-          await supabase.from('meal_plans').upsert({
-            user_id: user.id,
-            household_id: household.id,
-            week_of: new Date().toISOString().split('T')[0],
-            status: 'active',
-            plan: planPayload,
-            draft_plan: planPayload,
-            updated_at: new Date().toISOString(),
-          })
-
-          // Auto-update shopping list
-          const shoppingItems = (normalized.ingredients || []).map((ing) => ({
-            name: typeof ing === 'string' ? ing : '',
-            quantity: 1,
-            category: 'groceries',
-            checked: false,
-          }))
-
-          const today = new Date().toISOString().split('T')[0]
-          const { data: existingList } = await supabase
-            .from('shopping_lists')
-            .select('id, items')
-            .eq('user_id', user.id)
-            .eq('week_of', today)
-            .maybeSingle()
-
-          if (existingList?.id) {
-            await supabase
-              .from('shopping_lists')
-              .update({ items: shoppingItems })
-              .eq('id', existingList.id)
-          } else {
-            await supabase
-              .from('shopping_lists')
-              .insert({
-                user_id: user.id,
-                household_id: household.id,
-                week_of: today,
-                items: shoppingItems,
-              })
-          }
+          await persistTonightMealState({ userId: user.id, householdId: household.id, meal: normalized })
         }
       } catch (autoSaveErr) {
         console.warn('[TonightPage] auto-save failed:', autoSaveErr)
@@ -682,7 +663,7 @@ export function TonightPage() {
             console.warn('[TonightPage] swap meal_instance skipped:', instanceError.message)
           }
         }
-      } catch (instanceErr) {
+      } catch {
         console.warn('[TonightPage] swap meal_instance feature not available')
       }
 
@@ -769,95 +750,173 @@ export function TonightPage() {
     }
   }
 
-  const saveMeal = async () => {
-    if (!meal || !user) return
-
-    setSaving(true)
+  const markMealCooked = async () => {
+    if (!user || !meal) return false
 
     try {
-      const { data: household } = await supabase
-        .from('households')
-        .select('id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle()
+      let instanceId = mealInstanceId
 
-      if (!household?.id) {
-        throw new Error('No household found')
-      }
+      if (!instanceId) {
+        const { data: household } = await supabase
+          .from('households')
+          .select('id')
+          .eq('user_id', user.id)
+          .limit(1)
+          .maybeSingle()
 
-      const planPayload = {
-        meals: [{ ...meal, id: `${meal.day}-${meal.meal}` }],
-      }
-
-      const { error: saveError } = await supabase.from('meal_plans').upsert({
-        user_id: user.id,
-        household_id: household.id,
-        week_of: new Date().toISOString().split('T')[0],
-        status: 'active',
-        plan: planPayload,
-        draft_plan: planPayload,
-        updated_at: new Date().toISOString(),
-      })
-
-      if (saveError) {
-        throw saveError
-      }
-
-      // Also create shopping list from meal ingredients
-      const shoppingItems = (meal.ingredients || []).map((ing) => {
-        const ingStr = typeof ing === 'string' ? ing : ''
-        return {
-          name: ingStr,
-          quantity: 1,
-          category: 'groceries',
-          checked: false,
+        if (!household?.id) {
+          throw new Error('No household found')
         }
-      })
 
-      // Check if shopping list exists for today
-      const today = new Date().toISOString().split('T')[0]
-      const { data: existingList } = await supabase
-        .from('shopping_lists')
-        .select('id, items')
-        .eq('user_id', user.id)
-        .eq('week_of', today)
-        .maybeSingle()
-
-      if (existingList?.id) {
-        // Append to existing list
-        const existingItems = existingList.items || []
-        const { error: updateError } = await supabase
-          .from('shopping_lists')
-          .update({ items: [...existingItems, ...shoppingItems] })
-          .eq('id', existingList.id)
-        
-        if (updateError) {
-          console.warn('[TonightPage] Could not update shopping list:', updateError)
-        }
-      } else {
-        // Create new shopping list
-        const { error: listError } = await supabase
-          .from('shopping_lists')
+        const { data: instance, error } = await supabase
+          .from('meal_instances')
           .insert({
-            user_id: user.id,
             household_id: household.id,
-            week_of: today,
-            items: shoppingItems,
+            user_id: user.id,
+            recipe_id: meal.recipe_id || null,
+            recipe_name: meal.name,
+            selected_member_ids: selectedMembers,
+            source: 'tonight',
+            effort_level: effort,
+            dietary_focus: dietaryFocus,
+            status: 'cooked',
+            cooked_at: new Date().toISOString(),
           })
+          .select('id')
+          .single()
 
-        if (listError) {
-          console.warn('[TonightPage] Could not create shopping list:', listError)
+        if (error || !instance?.id) {
+          throw error || new Error('Failed to mark meal cooked')
         }
+
+        instanceId = instance.id
+        setMealInstanceId(instanceId)
+      } else {
+        const { error } = await supabase
+          .from('meal_instances')
+          .update({ status: 'cooked', cooked_at: new Date().toISOString() })
+          .eq('id', instanceId)
+
+        if (error) throw error
       }
 
-      toast.success('Meal saved!')
+      setCooked(true)
+      return true
     } catch (err) {
-      toast.error(err.message || 'Failed to save')
-    } finally {
-      setSaving(false)
+      console.error('[TonightPage] markMealCooked error:', err)
+      toast.error(err.message || 'Failed to mark cooked')
+      return false
     }
   }
+
+  const submitFeedback = async () => {
+    if (!user) return
+
+    const ratingMembers = members.filter((member) => selectedMembers.includes(member.id))
+    const effectiveMembers = ratingMembers.length > 0 ? ratingMembers : members
+
+    if (effectiveMembers.length === 0) {
+      toast.error('Add a household member before saving meal feedback')
+      return
+    }
+
+    try {
+      let instanceId = mealInstanceId
+
+      if (!instanceId) {
+        const { data: household } = await supabase
+          .from('households')
+          .select('id')
+          .eq('user_id', user.id)
+          .limit(1)
+          .maybeSingle()
+
+        if (!household?.id) {
+          toast.error('Could not find your household')
+          return
+        }
+
+        const { data: newInstance, error: instanceError } = await supabase
+          .from('meal_instances')
+          .insert({
+            household_id: household.id,
+            user_id: user.id,
+            recipe_id: meal?.recipe_id || null,
+            recipe_name: meal?.name || 'Unknown',
+            selected_member_ids: effectiveMembers.map((member) => member.id),
+            source: 'feedback',
+            effort_level: effort,
+            dietary_focus: dietaryFocus,
+            status: 'rated',
+            cooked_at: new Date().toISOString(),
+          })
+          .select('id')
+          .single()
+
+        if (instanceError || !newInstance?.id) {
+          throw instanceError || new Error('Failed to create meal instance')
+        }
+
+        instanceId = newInstance.id
+        setMealInstanceId(instanceId)
+      } else {
+        const { error: updateError } = await supabase
+          .from('meal_instances')
+          .update({ status: 'rated', cooked_at: new Date().toISOString() })
+          .eq('id', instanceId)
+
+        if (updateError) {
+          console.warn('[TonightPage] Could not update meal_instance:', updateError.message)
+        }
+      }
+
+      const feedbackEntries = effectiveMembers
+        .map((member) => ({
+          memberId: member.id,
+          rating: memberFeedback[member.id]?.rating,
+          note: memberFeedback[member.id]?.note || null,
+        }))
+        .filter((entry) => entry.rating)
+        .map((entry) => ({
+          meal_instance_id: instanceId,
+          household_member_id: entry.memberId,
+          recipe_id: meal?.recipe_id || null,
+          rating: entry.rating,
+          note: entry.note,
+        }))
+
+      if (feedbackEntries.length === 0) {
+        toast.error('Please select a rating for at least one person')
+        return
+      }
+
+      const { error: deleteError } = await supabase
+        .from('meal_member_feedback')
+        .delete()
+        .eq('meal_instance_id', instanceId)
+
+      if (deleteError) {
+        console.warn('[TonightPage] Could not clear old feedback:', deleteError.message)
+      }
+
+      const { error: feedbackError } = await supabase
+        .from('meal_member_feedback')
+        .insert(feedbackEntries)
+
+      if (feedbackError) {
+        throw feedbackError
+      }
+
+      setShowFeedbackModal(false)
+      toast.success('Thanks for the feedback!')
+    } catch (err) {
+      console.error('[TonightPage] Submit feedback error:', err)
+      toast.error(err.message || 'Failed to save feedback')
+    }
+  }
+
+  const ratingMembers = members.filter((member) => selectedMembers.includes(member.id))
+  const effectiveRatingMembers = ratingMembers.length > 0 ? ratingMembers : members
 
   return (
     <div className="mx-auto max-w-xl px-4 md:px-6 pt-2 md:pt-4 pb-32">
@@ -1152,19 +1211,14 @@ export function TonightPage() {
             
             <button
               type="button"
-              onClick={() => {
-                console.log('[TonightPage] Rate/Cooked button clicked, cooked:', cooked)
-                console.log('[TonightPage]   mealInstanceId:', mealInstanceId)
-                console.log('[TonightPage]   members:', members.length)
-                console.log('[TonightPage]   selectedMembers:', selectedMembers)
+              onClick={async () => {
                 if (cooked) {
-                  // Already cooked, show modal to add/edit feedback
-                  console.log('[TonightPage] Opening feedback modal (already cooked)')
                   setShowFeedbackModal(true)
-                } else {
-                  // Mark as cooked and prompt for feedback
-                  console.log('[TonightPage] Marking as cooked and opening modal')
-                  setCooked(true)
+                  return
+                }
+
+                const marked = await markMealCooked()
+                if (marked) {
                   setShowFeedbackModal(true)
                 }
               }}
@@ -1214,265 +1268,84 @@ export function TonightPage() {
           </div>
         </div>
       )}
-    </div>
-  )
 
-  // Phase 3: Feedback modal for per-member ratings
-  const submitFeedback = async () => {
-    console.log('[TonightPage] submitFeedback called')
-    console.log('[TonightPage]   user:', user?.id)
-    console.log('[TonightPage]   mealInstanceId:', mealInstanceId)
-    console.log('[TonightPage]   memberFeedback:', memberFeedback)
-    console.log('[TonightPage]   meal:', meal?.name)
-    console.log('[TonightPage]   selectedMembers:', selectedMembers)
-    
-    if (!user) {
-      console.error('[TonightPage] Cannot submit feedback: not logged in')
-      return
-    }
+      {showFeedbackModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6">
+            <h2 className="mb-2 text-xl font-semibold text-text-primary">
+              How was {meal?.name}?
+            </h2>
+            <p className="mb-4 text-sm text-text-secondary">
+              Rate how each person felt about tonight&apos;s meal.
+            </p>
 
-    try {
-      let instanceId = mealInstanceId
-
-      // FIX: If no mealInstanceId exists, create one now
-      if (!instanceId) {
-        console.log('[TonightPage] No mealInstanceId found, creating new meal_instance for feedback')
-        
-        const { data: household } = await supabase
-          .from('households')
-          .select('id')
-          .eq('user_id', user.id)
-          .limit(1)
-          .maybeSingle()
-
-        if (household?.id) {
-          const { data: newInstance, error: instanceError } = await supabase
-            .from('meal_instances')
-            .insert({
-              household_id: household.id,
-              user_id: user.id,
-              recipe_id: meal?.recipe_id || null,
-              recipe_name: meal?.name || 'Unknown',
-              selected_member_ids: selectedMembers,
-              source: 'feedback',
-              effort_level: effort,
-              dietary_focus: dietaryFocus,
-              status: 'rated',
-              cooked_at: new Date().toISOString(),
-            })
-            .select('id')
-            .single()
-
-          if (newInstance) {
-            instanceId = newInstance.id
-            setMealInstanceId(instanceId)
-            console.log('[TonightPage] Created meal_instance for feedback:', instanceId)
-          } else if (instanceError) {
-            console.error('[TonightPage] Failed to create meal_instance:', instanceError.message)
-            toast.error('Could not save feedback: database error')
-            return
-          }
-        }
-      } else {
-        // Update existing instance status
-        const { error: updateError } = await supabase
-          .from('meal_instances')
-          .update({ status: 'rated', cooked_at: new Date().toISOString() })
-          .eq('id', instanceId)
-
-        if (updateError) {
-          console.warn('[TonightPage] Could not update meal_instance:', updateError.message)
-        }
-      }
-
-      // FIX: Validate that each feedback has a rating before creating entries
-      const feedbackEntries = Object.entries(memberFeedback)
-        .filter(([memberId, feedback]) => {
-          if (!feedback.rating) {
-            console.warn('[TonightPage] Skipping member', memberId, '- no rating selected')
-            return false
-          }
-          return true
-        })
-        .map(([memberId, feedback]) => ({
-          meal_instance_id: instanceId,
-          household_member_id: memberId,
-          recipe_id: meal?.recipe_id || null,
-          rating: feedback.rating,
-          note: feedback.note || null,
-        }))
-
-      if (feedbackEntries.length === 0) {
-        toast.error('Please select a rating for at least one person')
-        return
-      }
-
-      console.log('[TonightPage] Submitting feedback entries:', feedbackEntries)
-
-      const { error: feedbackError } = await supabase
-        .from('meal_member_feedback')
-        .insert(feedbackEntries)
-
-      if (feedbackError) {
-        console.error('[TonightPage] Feedback insert failed:', feedbackError.code, feedbackError.message)
-        toast.error('Failed to save feedback: ' + feedbackError.message)
-        return
-      }
-
-      console.log('[TonightPage] Successfully saved feedback for:', feedbackEntries.length, 'members')
-      setShowFeedbackModal(false)
-      toast.success('Thanks for the feedback!')
-    } catch (err) {
-      console.error('[TonightPage] Submit feedback error:', err)
-      toast.error('Failed to save feedback')
-    }
-  }
-
-  // Render feedback modal
-  if (showFeedbackModal) {
-    // Use selected members if any, otherwise fall back to all household members
-    let ratingMembers = members.filter(m => selectedMembers.includes(m.id))
-    if (ratingMembers.length === 0 && members.length > 0) {
-      ratingMembers = members
-    }
-
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-2xl max-w-md w-full p-6 max-h-[80vh] overflow-y-auto">
-          <h2 className="text-xl font-semibold text-text-primary mb-2">
-            How was {meal?.name}?
-          </h2>
-          <p className="text-sm text-text-secondary mb-4">
-            {ratingMembers.length > 0 
-              ? 'Rate how each person felt about tonight\'s meal.'
-              : 'How was tonight\'s meal?'}
-          </p>
-
-          <div className="space-y-4 mb-6">
-            {ratingMembers.length === 0 ? (
-              /* No members - show generic rating */
-              <div className="border border-divider rounded-xl p-4 text-center">
-                <p className="text-text-secondary mb-3">How was the meal?</p>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {[
-                    { value: 'loved_it', label: 'Loved it! ❤️' },
-                    { value: 'liked_it', label: 'Liked it 👍' },
-                    { value: 'it_was_okay', label: 'It was okay 😐' },
-                    { value: 'did_not_like', label: 'Not for me 👎' },
-                  ].map(opt => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={async () => {
-                        // Submit generic feedback
-                        try {
-                          let instanceId = mealInstanceId
-                          if (!instanceId && user) {
-                            const { data: household } = await supabase
-                              .from('households').select('id').eq('user_id', user.id).limit(1).maybeSingle()
-                            if (household?.id) {
-                              const { data: newInstance } = await supabase
-                                .from('meal_instances')
-                                .insert({
-                                  household_id: household.id,
-                                  user_id: user.id,
-                                  recipe_id: meal?.recipe_id || null,
-                                  recipe_name: meal?.name || 'Unknown',
-                                  status: 'rated',
-                                  cooked_at: new Date().toISOString(),
-                                })
-                                .select('id').single()
-                              if (newInstance) instanceId = newInstance.id
-                            }
-                          }
-                          if (instanceId) {
-                            await supabase.from('meal_member_feedback').insert({
-                              meal_instance_id: instanceId,
-                              household_member_id: null,
-                              recipe_id: meal?.recipe_id || null,
-                              rating: opt.value,
-                              note: null,
-                            })
-                          }
-                          toast.success('Thanks for the feedback!')
-                          setShowFeedbackModal(false)
-                        } catch (e) {
-                          toast.error('Failed to save feedback')
-                        }
-                      }}
-                      className="px-4 py-2 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 transition font-medium"
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
+            {effectiveRatingMembers.length === 0 ? (
+              <div className="mb-6 rounded-xl border border-divider p-4 text-sm text-text-secondary">
+                Add household members first, then you can track who liked tonight&apos;s meal.
               </div>
             ) : (
-              ratingMembers.map(member => (
-              <div key={member.id} className="border border-divider rounded-xl p-3">
-                <div className="font-medium text-text-primary mb-2">
-                  {member.name || member.label || 'Family member'}
-                </div>
-                
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {[
-                    { value: 'loved_it', label: 'Loved it' },
-                    { value: 'liked_it', label: 'Liked it' },
-                    { value: 'it_was_okay', label: 'It was okay' },
-                    { value: 'did_not_like', label: 'Didnt like it' },
-                    { value: 'did_not_eat', label: '😕 Didn\'t eat it' },
-                  ].map(opt => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setMemberFeedback(prev => ({
+              <div className="mb-6 space-y-4">
+                {effectiveRatingMembers.map((member) => (
+                  <div key={member.id} className="rounded-xl border border-divider p-3">
+                    <div className="mb-2 font-medium text-text-primary">
+                      {member.name || member.label || 'Family member'}
+                    </div>
+
+                    <div className="mb-2 flex flex-wrap gap-1">
+                      {MEMBER_FEEDBACK_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setMemberFeedback((prev) => ({
+                            ...prev,
+                            [member.id]: { ...prev[member.id], rating: opt.value },
+                          }))}
+                          className={`rounded-full px-2 py-1 text-xs transition ${
+                            memberFeedback[member.id]?.rating === opt.value
+                              ? 'border border-primary-300 bg-primary-100 text-primary-700'
+                              : 'border border-transparent bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <input
+                      type="text"
+                      placeholder="What should we change next time?"
+                      className="input w-full text-sm"
+                      value={memberFeedback[member.id]?.note || ''}
+                      onChange={(e) => setMemberFeedback((prev) => ({
                         ...prev,
-                        [member.id]: { ...prev[member.id], rating: opt.value }
+                        [member.id]: { ...prev[member.id], note: e.target.value },
                       }))}
-                      className={`text-xs px-2 py-1 rounded-full transition ${
-                        memberFeedback[member.id]?.rating === opt.value
-                          ? 'bg-primary-100 text-primary-700 border border-primary-300'
-                          : 'bg-gray-100 text-gray-600 border border-transparent hover:bg-gray-200'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-
-                <input
-                  type="text"
-                  placeholder="What should we change next time?"
-                  className="input text-sm w-full"
-                  value={memberFeedback[member.id]?.note || ''}
-                  onChange={(e) => setMemberFeedback(prev => ({
-                    ...prev,
-                    [member.id]: { ...prev[member.id], note: e.target.value }
-                  }))}
-                />
+                    />
+                  </div>
+                ))}
               </div>
-            ))
             )}
-          </div>
 
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setShowFeedbackModal(false)}
-              className="flex-1 rounded-full border border-divider bg-white px-4 py-2 text-sm font-semibold text-text-primary"
-            >
-              Skip
-            </button>
-            <button
-              type="button"
-              onClick={submitFeedback}
-              className="flex-1 rounded-full bg-primary-500 px-4 py-2 text-sm font-semibold text-white"
-            >
-              Save feedback
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowFeedbackModal(false)}
+                className="flex-1 rounded-full border border-divider bg-white px-4 py-2 text-sm font-semibold text-text-primary"
+              >
+                Skip
+              </button>
+              <button
+                type="button"
+                onClick={submitFeedback}
+                disabled={effectiveRatingMembers.length === 0}
+                className="flex-1 rounded-full bg-primary-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Save feedback
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    )
-  }
+      )}
+    </div>
+  )
 }

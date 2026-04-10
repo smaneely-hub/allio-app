@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 
-const FUNCTION_CANDIDATES = ['meal-generate', 'generate-plan']
+const FUNCTION_CANDIDATES = ['generate-plan']
 
 export async function invokePlannerFunction(payload) {
   let lastError = null

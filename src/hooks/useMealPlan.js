@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { aggregateShoppingList } from '../lib/aggregateShoppingList'
 import { normalizeMealPlan, normalizeMealRecord } from '../lib/mealSchema'
 import { invokePlannerFunction } from '../lib/plannerFunction'
+import { upsertShoppingListForDate } from '../lib/tonightPersistence'
 import { useAuth } from './useAuth'
 
 function withMealDefaults(plan, fallbackSlots = []) {
@@ -131,25 +132,25 @@ export function useMealPlan(scheduleId) {
       }
 
       if ((nextStatus ?? mealPlan.status) === 'active') {
+        const today = new Date().toISOString().split('T')[0]
         const { data: household } = await supabase
           .from('households')
-          .select('staples_on_hand')
+          .select('id, staples_on_hand')
           .eq('user_id', user.id)
           .limit(1)
           .single()
 
         const items = aggregateShoppingList(nextPlan, household?.staples_on_hand || '')
-        
-        const { error: listError } = await supabase.from('shopping_lists').upsert({
-          user_id: user.id,
-          meal_plan_id: mealPlan.id,
-          items,
-          status: 'active',
-        })
-        
-        if (listError) {
+
+        try {
+          await upsertShoppingListForDate({
+            userId: user.id,
+            householdId: household?.id || null,
+            weekOf: today,
+            items,
+          })
+        } catch (listError) {
           console.error('[useMealPlan] Shopping list error:', listError)
-        } else {
         }
       }
 
@@ -478,6 +479,7 @@ export function useMealPlan(scheduleId) {
       .from('shopping_lists')
       .delete()
       .eq('user_id', user.id)
+      .eq('week_of', new Date().toISOString().split('T')[0])
 
     if (listError) {
       console.error('[useMealPlan] Clear shopping list error:', listError)
