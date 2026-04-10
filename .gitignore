@@ -26,5 +26,7 @@ dist-ssr
 
 # Credentials
 .env.local
-CREDENTIALS.md
 .env.production
+.supabase_token
+credentials.1md
+CREDENTIALS.md
