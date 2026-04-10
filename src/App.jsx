@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { BrowserRouter, Route, Routes, Navigate, useNavigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -37,9 +37,6 @@ import { PricingPage } from './pages/PricingPage'
 import { PrivacyPage } from './pages/PrivacyPage'
 import { TermsPage } from './pages/TermsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
-import { OpenRouterTestPage } from './pages/OpenRouterTestPage'
-import { PlannerTestPage } from './pages/PlannerTestPage'
-import { TokenDebugPage } from './pages/TokenDebugPage'
 
 // Connection check component - skip since we hardcoded Supabase credentials
 function ConnectionCheck({ children }) {
@@ -136,16 +133,6 @@ export default function App() {
                 <Route path="/pricing" element={<PricingPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/terms" element={<TermsPage />} />
-                <Route path="/openrouter-test" element={<OpenRouterTestPage />} />
-                <Route
-                  path="/planner-test"
-                  element={
-                    <ProtectedRoute>
-                      <PlannerTestPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route path="/token-debug" element={<TokenDebugPage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </main>
