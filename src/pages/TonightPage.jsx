@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useAuth } from '../hooks/useAuth'
@@ -7,6 +8,21 @@ import { normalizeMealRecord } from '../lib/mealSchema'
 import { invokePlannerFunction, refineMeal } from '../lib/plannerFunction'
 import { buildShoppingItemsFromMeal, upsertShoppingListForDate } from '../lib/tonightPersistence'
 import { calculateServings, logServingsCalculation, getDemographicBucket } from '../hooks/useServings'
+import { CATEGORY_LABELS, CATEGORY_ORDER, groupItemsByCategory, parseIngredient } from '../lib/shoppingListUtils'
+
+async function getHousehold(userId) {
+  if (!userId) return null
+
+  const { data: household, error } = await supabase
+    .from('households')
+    .select('id, staples_on_hand')
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw error
+  return household || null
+}
 
 function useHouseholdMembers(userId) {
   const [members, setMembers] = useState([])
@@ -71,7 +87,7 @@ const MEMBER_FEEDBACK_OPTIONS = [
   { value: 'did_not_eat', label: "Didn't eat it" },
 ]
 
-async function persistTonightMealState({ userId, householdId, meal }) {
+async function persistTonightMealState({ userId, householdId, meal, staplesOnHand = '' }) {
   const today = new Date().toISOString().split('T')[0]
   const planPayload = {
     meals: [{ ...meal, id: `${meal.day}-${meal.meal}` }],
@@ -117,13 +133,92 @@ async function persistTonightMealState({ userId, householdId, meal }) {
     if (error) throw error
   }
 
-  const shoppingItems = buildShoppingItemsFromMeal(meal)
+  const shoppingItems = buildShoppingItemsFromMeal(meal, staplesOnHand)
   await upsertShoppingListForDate({
     userId,
     householdId,
     weekOf: today,
     items: shoppingItems,
   })
+}
+
+async function persistTonightMealForUser({ userId, meal, staplesOnHand = '' }) {
+  const household = await getHousehold(userId)
+  if (!household?.id) return null
+
+  await persistTonightMealState({
+    userId,
+    householdId: household.id,
+    meal,
+    staplesOnHand: staplesOnHand || household.staples_on_hand || '',
+  })
+  return household
+}
+
+async function loadTonightPreferenceSignals(userId) {
+  if (!userId) {
+    return {
+      likedMeals: [],
+      dislikedMeals: [],
+      favoriteMeals: [],
+      refinementNotes: [],
+      strongAvoidSignals: [],
+    }
+  }
+
+  const [signalsResult, favoritesResult, feedbackResult] = await Promise.all([
+    supabase
+      .from('meal_signals')
+      .select('meal_name, signal_type, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(30),
+    supabase
+      .from('saved_meals')
+      .select('recipe_name, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(10),
+    supabase
+      .from('meal_member_feedback')
+      .select('rating, note, created_at, meal_instances(recipe_name, user_id)')
+      .order('created_at', { ascending: false })
+      .limit(30),
+  ])
+
+  const signals = (signalsResult.data || []).filter(Boolean)
+  const favoriteMeals = (favoritesResult.data || []).map((entry) => entry.recipe_name).filter(Boolean)
+  const feedbackRows = (feedbackResult.data || [])
+    .filter((entry) => entry?.meal_instances?.user_id === userId)
+
+  const likedMeals = [
+    ...signals.filter((entry) => ['rated_positive', 'refined_to'].includes(entry.signal_type)).map((entry) => entry.meal_name),
+    ...feedbackRows
+      .filter((entry) => ['loved_it', 'liked_it'].includes(entry.rating))
+      .map((entry) => entry.meal_instances?.recipe_name),
+  ].filter(Boolean)
+
+  const dislikedMeals = [
+    ...signals.filter((entry) => ['rated_negative', 'swapped_away', 'refined_from'].includes(entry.signal_type)).map((entry) => entry.meal_name),
+    ...feedbackRows
+      .filter((entry) => ['did_not_like', 'did_not_eat'].includes(entry.rating))
+      .map((entry) => entry.meal_instances?.recipe_name),
+  ].filter(Boolean)
+
+  const refinementNotes = feedbackRows
+    .map((entry) => entry.note)
+    .filter((note) => typeof note === 'string' && note.trim())
+    .slice(0, 8)
+
+  const strongAvoidSignals = Array.from(new Set(dislikedMeals)).slice(0, 6)
+
+  return {
+    likedMeals: Array.from(new Set(likedMeals)).slice(0, 8),
+    dislikedMeals: Array.from(new Set(dislikedMeals)).slice(0, 8),
+    favoriteMeals: Array.from(new Set(favoriteMeals)).slice(0, 8),
+    refinementNotes,
+    strongAvoidSignals,
+  }
 }
 
 export function TonightPage() {
@@ -135,6 +230,7 @@ export function TonightPage() {
   const [effort, setEffort] = useState('medium')
   const [dietaryFocus, setDietaryFocus] = useState('')
   const [feedback, setFeedback] = useState('')
+  const [staplesOnHand, setStaplesOnHand] = useState('')
   const [generating, setGenerating] = useState(false)
   const [meal, setMeal] = useState(null)
   const [cooked, setCooked] = useState(false)
@@ -151,6 +247,33 @@ export function TonightPage() {
   // Favorites / saved meals
   const [savedMeals, setSavedMeals] = useState([])
   const [isFavorite, setIsFavorite] = useState(false)
+  const [preferenceSignals, setPreferenceSignals] = useState({
+    likedMeals: [],
+    dislikedMeals: [],
+    favoriteMeals: [],
+    refinementNotes: [],
+    strongAvoidSignals: [],
+  })
+  const [cookingMode, setCookingMode] = useState(false)
+  const [currentStepIndex, setCurrentStepIndex] = useState(0)
+  const [ingredientChecks, setIngredientChecks] = useState({})
+
+  const shoppingPrepItems = useMemo(() => {
+    const parsed = (meal?.ingredients || [])
+      .map((ingredient, index) => {
+        const parsedIngredient = parseIngredient(ingredient)
+        return parsedIngredient ? {
+          id: `${parsedIngredient.normalizedName}-${parsedIngredient.unit}-${index}`,
+          name: parsedIngredient.name,
+          quantity: parsedIngredient.quantity,
+          unit: parsedIngredient.unit,
+          category: parsedIngredient.category,
+        } : null
+      })
+      .filter(Boolean)
+
+    return groupItemsByCategory(parsed)
+  }, [meal])
 
   // Load last saved meal on mount and build recent history
   useEffect(() => {
@@ -224,6 +347,28 @@ export function TonightPage() {
       })
   }, [user])
 
+  useEffect(() => {
+    if (!user) return
+
+    getHousehold(user.id)
+      .then((household) => {
+        if (household?.staples_on_hand) {
+          setStaplesOnHand(household.staples_on_hand)
+        }
+      })
+      .catch((error) => {
+        console.warn('[TonightPage] could not load staples_on_hand:', error)
+      })
+
+    loadTonightPreferenceSignals(user.id)
+      .then((signals) => {
+        setPreferenceSignals(signals)
+      })
+      .catch((error) => {
+        console.warn('[TonightPage] could not load preference signals:', error)
+      })
+  }, [user])
+
   // Load saved favorites
   useEffect(() => {
     if (!user) return
@@ -249,6 +394,22 @@ export function TonightPage() {
     }
   }, [meal, savedMeals])
 
+  useEffect(() => {
+    setCookingMode(false)
+    setCurrentStepIndex(0)
+    setIngredientChecks({})
+  }, [meal?.name])
+
+  const refreshPreferenceSignals = async () => {
+    if (!user?.id) return
+    try {
+      const signals = await loadTonightPreferenceSignals(user.id)
+      setPreferenceSignals(signals)
+    } catch (error) {
+      console.warn('[TonightPage] could not refresh preference signals:', error)
+    }
+  }
+
   const toggleFavorite = async () => {
     if (!user || !meal) return
     
@@ -259,6 +420,7 @@ export function TonightPage() {
         await supabase.from('saved_meals').delete().eq('id', toRemove.id)
         setSavedMeals(prev => prev.filter(s => s.id !== toRemove.id))
         setIsFavorite(false)
+        refreshPreferenceSignals()
         console.log('[TonightPage] removed from favorites:', meal.name)
       }
     } else {
@@ -277,6 +439,7 @@ export function TonightPage() {
       if (data) {
         setSavedMeals(prev => [data, ...prev])
         setIsFavorite(true)
+        refreshPreferenceSignals()
         console.log('[TonightPage] added to favorites:', meal.name)
       }
     }
@@ -364,6 +527,11 @@ export function TonightPage() {
 
       // V1: No leftovers planning enabled yet - placeholder for future use
       const plan_for_leftovers = false
+      const preferenceHints = [
+        ...preferenceSignals.favoriteMeals.map((name) => `favorite: ${name}`),
+        ...preferenceSignals.likedMeals.map((name) => `liked: ${name}`),
+        ...preferenceSignals.refinementNotes.map((note) => `feedback note: ${note}`),
+      ].slice(0, 10)
 
       const payload = {
         household: {
@@ -372,8 +540,8 @@ export function TonightPage() {
           diet_focus: finalDietFocus,
           budget_sensitivity: 'moderate',
           adventurousness: 'mixed',
-          staples_on_hand: '',
-          planning_priorities: ['quick meal'],
+          staples_on_hand: staplesOnHand,
+          planning_priorities: staplesOnHand ? ['quick meal', 'use what we have'] : ['quick meal'],
           cooking_comfort: effort,
           plan_for_leftovers,               // V2: Enable for leftovers-aware planning
         },
@@ -386,15 +554,31 @@ export function TonightPage() {
             planning_notes: [finalDietFocus ? `diet: ${finalDietFocus}` : '', finalFeedback ? `feedback: ${finalFeedback}` : ''].filter(Boolean).join('; '),
           },
         ],
-        week_notes: finalFeedback || '',
+        week_notes: [finalFeedback, ...preferenceHints].filter(Boolean).join('; '),
         locked_meals: [],
         _options: {
           output_format: 'detailed',
         },
-        recent_meal_names: recentMealNames.slice(0, 5), // Pass last 5 to avoid repeats
+        recent_meal_names: [...new Set([...recentMealNames.slice(0, 5), ...preferenceSignals.strongAvoidSignals])], // avoid repeats and disliked meals
+        preference_signals: {
+          favorites: preferenceSignals.favoriteMeals,
+          liked_meals: preferenceSignals.likedMeals,
+          disliked_meals: preferenceSignals.dislikedMeals,
+          refinement_notes: preferenceSignals.refinementNotes,
+        },
       }
 
       console.log('[TonightPage] recent meal history:', recentMealNames.slice(0, 5))
+
+      if (staplesOnHand.trim()) {
+        supabase
+          .from('households')
+          .update({ staples_on_hand: staplesOnHand.trim() })
+          .eq('user_id', user.id)
+          .then(({ error: staplesError }) => {
+            if (staplesError) console.warn('[TonightPage] could not save staples_on_hand:', staplesError.message)
+          })
+      }
 
       // First generation call
       console.log('[TonightPage] invoking generate-plan with payload:', JSON.stringify(payload, null, 2).slice(0, 500))
@@ -436,29 +620,9 @@ export function TonightPage() {
 
       // Auto-save meal and create shopping list
       try {
-        const { data: household } = await supabase
-          .from('households')
-          .select('id')
-          .eq('user_id', user.id)
-          .limit(1)
-          .maybeSingle()
+        const household = await persistTonightMealForUser({ userId: user.id, meal: normalized, staplesOnHand })
 
-        if (household?.id) {
-          await persistTonightMealState({ userId: user.id, householdId: household.id, meal: normalized })
-        }
-      } catch (autoSaveErr) {
-        console.warn('[TonightPage] auto-save failed:', autoSaveErr)
-      }
-
-      // Phase 2: Create meal_instance for tracking (if table exists)
-      try {
-        const { data: household } = await supabase
-          .from('households')
-          .select('id')
-          .eq('user_id', user.id)
-          .limit(1)
-          .maybeSingle()
-
+        // Phase 2: Create meal_instance for tracking (if table exists)
         if (household?.id && selectedMembers.length > 0) {
           const { data: instance, error: instanceError } = await supabase
             .from('meal_instances')
@@ -480,13 +644,11 @@ export function TonightPage() {
             setMealInstanceId(instance.id)
             console.log('[TonightPage] Created meal_instance:', instance.id, 'for members:', selectedMembers)
           } else if (instanceError) {
-            // Table might not exist yet - this is OK for initial deployment
             console.warn('[TonightPage] meal_instance creation skipped:', instanceError.message)
           }
         }
-      } catch {
-        // Gracefully handle if table doesn't exist
-        console.warn('[TonightPage] meal_instance feature not available yet')
+      } catch (autoSaveErr) {
+        console.warn('[TonightPage] auto-save failed:', autoSaveErr)
       }
 
       toast.success('Meal generated!')
@@ -536,6 +698,11 @@ export function TonightPage() {
 
       // V1: No leftovers planning enabled yet - placeholder for future use
       const plan_for_leftovers = false
+      const preferenceHints = [
+        ...preferenceSignals.favoriteMeals.map((name) => `favorite: ${name}`),
+        ...preferenceSignals.likedMeals.map((name) => `liked: ${name}`),
+        ...preferenceSignals.refinementNotes.map((note) => `feedback note: ${note}`),
+      ].slice(0, 10)
 
       const swapPayload = {
         household: {
@@ -544,8 +711,8 @@ export function TonightPage() {
           diet_focus: finalDietFocus,
           budget_sensitivity: 'moderate',
           adventurousness: 'mixed',
-          staples_on_hand: '',
-          planning_priorities: ['quick meal'],
+          staples_on_hand: staplesOnHand,
+          planning_priorities: staplesOnHand ? ['quick meal', 'use what we have'] : ['quick meal'],
           cooking_comfort: effort,
           plan_for_leftovers,
         },
@@ -564,12 +731,18 @@ export function TonightPage() {
           suggestion: finalFeedback || finalDietFocus || '',
           current_meal_name: meal?.name || '',
         },
-        week_notes: finalFeedback || '',
+        week_notes: [finalFeedback, ...preferenceHints].filter(Boolean).join('; '),
         locked_meals: [],
         _options: {
           output_format: 'detailed',
         },
-        recent_meal_names: recentMealNames.slice(0, 5),
+        recent_meal_names: [...new Set([...recentMealNames.slice(0, 5), ...preferenceSignals.strongAvoidSignals])],
+        preference_signals: {
+          favorites: preferenceSignals.favoriteMeals,
+          liked_meals: preferenceSignals.likedMeals,
+          disliked_meals: preferenceSignals.dislikedMeals,
+          refinement_notes: preferenceSignals.refinementNotes,
+        },
       }
 
       console.log('[TonightPage] swap recent history:', recentMealNames.slice(0, 5))
@@ -600,13 +773,13 @@ export function TonightPage() {
 
       console.log('[TonightPage] swapped to meal:', normalized.name)
 
-      // Capture signal: user swapped AWAY from this meal (rejected)
-      console.log('[TonightPage] Signal: swapped away from:', normalized.name)
+      // Capture signal: user swapped away from the previous meal
+      console.log('[TonightPage] Signal: swapped away from:', meal.name)
       try {
         await supabase.from('meal_signals').insert({
           user_id: user.id,
-          meal_name: normalized.name,
-          recipe_id: normalized.recipe_id,
+          meal_name: meal.name,
+          recipe_id: meal.recipe_id,
           signal_type: 'swapped_away',
           created_at: new Date().toISOString()
         })
@@ -616,29 +789,9 @@ export function TonightPage() {
 
       // Auto-save swapped meal and update shopping list
       try {
-        const { data: household } = await supabase
-          .from('households')
-          .select('id')
-          .eq('user_id', user.id)
-          .limit(1)
-          .maybeSingle()
+        const household = await persistTonightMealForUser({ userId: user.id, meal: normalized, staplesOnHand })
 
-        if (household?.id) {
-          await persistTonightMealState({ userId: user.id, householdId: household.id, meal: normalized })
-        }
-      } catch (autoSaveErr) {
-        console.warn('[TonightPage] auto-save failed:', autoSaveErr)
-      }
-
-      // Phase 2: Create meal_instance for swap (new instance since it's a different recipe)
-      try {
-        const { data: household } = await supabase
-          .from('households')
-          .select('id')
-          .eq('user_id', user.id)
-          .limit(1)
-          .maybeSingle()
-
+        // Phase 2: Create meal_instance for swap (new instance since it's a different recipe)
         if (household?.id && selectedMembers.length > 0) {
           const { data: instance, error: instanceError } = await supabase
             .from('meal_instances')
@@ -663,10 +816,11 @@ export function TonightPage() {
             console.warn('[TonightPage] swap meal_instance skipped:', instanceError.message)
           }
         }
-      } catch {
-        console.warn('[TonightPage] swap meal_instance feature not available')
+      } catch (autoSaveErr) {
+        console.warn('[TonightPage] auto-save failed:', autoSaveErr)
       }
 
+      refreshPreferenceSignals()
       toast.success('Meal swapped!')
     } catch (err) {
       toast.error(err.message || 'Failed to swap')
@@ -728,19 +882,35 @@ export function TonightPage() {
       setFeedback('')
       setCooked(false)
 
+      try {
+        await persistTonightMealForUser({ userId: user.id, meal: refined, staplesOnHand })
+      } catch (autoSaveErr) {
+        console.warn('[TonightPage] refine auto-save failed:', autoSaveErr)
+      }
+
       // Track signal: user refined this meal
       try {
-        await supabase.from('meal_signals').insert({
-          user_id: user.id,
-          meal_name: refined.name,
-          recipe_id: refined.recipe_id,
-          signal_type: 'refined',
-          created_at: new Date().toISOString()
-        })
+        await supabase.from('meal_signals').insert([
+          {
+            user_id: user.id,
+            meal_name: meal.name,
+            recipe_id: meal.recipe_id,
+            signal_type: 'refined_from',
+            created_at: new Date().toISOString()
+          },
+          {
+            user_id: user.id,
+            meal_name: refined.name,
+            recipe_id: refined.recipe_id,
+            signal_type: 'refined_to',
+            created_at: new Date().toISOString()
+          }
+        ])
       } catch (e) {
         console.log('[TonightPage] Signal capture error:', e.message)
       }
 
+      refreshPreferenceSignals()
       toast.success('Meal refined!')
     } catch (err) {
       console.error('[TonightPage] refine catch error:', err)
@@ -907,6 +1077,22 @@ export function TonightPage() {
         throw feedbackError
       }
 
+      const likedCount = feedbackEntries.filter((entry) => ['loved_it', 'liked_it'].includes(entry.rating)).length
+      const dislikedCount = feedbackEntries.filter((entry) => ['did_not_like', 'did_not_eat'].includes(entry.rating)).length
+
+      try {
+        await supabase.from('meal_signals').insert({
+          user_id: user.id,
+          meal_name: meal?.name || 'Unknown',
+          recipe_id: meal?.recipe_id || null,
+          signal_type: likedCount >= dislikedCount ? 'rated_positive' : 'rated_negative',
+          created_at: new Date().toISOString()
+        })
+      } catch (signalError) {
+        console.log('[TonightPage] rating signal error:', signalError.message)
+      }
+
+      refreshPreferenceSignals()
       setShowFeedbackModal(false)
       toast.success('Thanks for the feedback!')
     } catch (err) {
@@ -1001,6 +1187,22 @@ export function TonightPage() {
 
         <div>
           <label className="block text-sm font-medium text-text-700 mb-2">
+            What do you already have? (optional)
+          </label>
+          <input
+            type="text"
+            value={staplesOnHand}
+            onChange={(e) => setStaplesOnHand(e.target.value)}
+            className="input w-full"
+            placeholder="e.g., rice, eggs, spinach, tortillas"
+          />
+          <p className="mt-1 text-xs text-text-muted">
+            We&apos;ll try to use these first before adding more to the shopping list.
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-text-700 mb-2">
             Feedback (optional)
           </label>
           <input
@@ -1088,34 +1290,133 @@ export function TonightPage() {
             <p className="mb-4 text-sm text-text-secondary">{meal.notes}</p>
           )}
 
-          <div className="mb-4">
-            <h3 className="mb-2 text-sm font-semibold text-text-primary">Ingredients</h3>
-            <ul className="space-y-1 text-sm text-text-secondary">
-              {(meal.ingredients || []).length > 0 ? (
-                meal.ingredients.map((ing, i) => (
-                  <li key={i}>{typeof ing === 'string' ? ing : ''}</li>
-                ))
-              ) : (
-                <li>No ingredients listed</li>
-              )}
-            </ul>
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCookingMode((prev) => !prev)}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                cookingMode
+                  ? 'bg-primary-500 text-white'
+                  : 'border border-divider bg-white text-text-primary'
+              }`}
+            >
+              {cookingMode ? 'Exit cooking mode' : 'Start cooking mode'}
+            </button>
+            <Link
+              to="/shop"
+              className="rounded-full border border-divider bg-white px-4 py-2 text-sm font-semibold text-text-primary"
+            >
+              View shopping list
+            </Link>
           </div>
 
-          <div className="mb-4">
-            <h3 className="mb-2 text-sm font-semibold text-text-primary">Instructions</h3>
-            <ol className="space-y-2 text-sm text-text-secondary">
-              {(meal.instructions || []).length > 0 ? (
-                meal.instructions.map((step, i) => (
-                  <li key={i} className="flex gap-2">
-                    <span className="font-semibold text-text-primary">{i + 1}.</span>
-                    <span>{typeof step === 'string' ? step : ''}</span>
-                  </li>
-                ))
-              ) : (
-                <li>No instructions listed</li>
+          {cookingMode ? (
+            <div className="mb-4 rounded-2xl border border-primary-200 bg-primary-50 p-4">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary-700">Cooking mode</p>
+                  <h3 className="text-base font-semibold text-text-primary">
+                    Step {Math.min(currentStepIndex + 1, Math.max((meal.instructions || []).length, 1))} of {Math.max((meal.instructions || []).length, 1)}
+                  </h3>
+                </div>
+                <div className="text-sm text-primary-700">
+                  {Object.values(ingredientChecks).filter(Boolean).length} checked
+                </div>
+              </div>
+
+              <div className="mb-4 rounded-xl bg-white p-4 shadow-sm">
+                {(meal.instructions || []).length > 0 ? (
+                  <>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">Current step</div>
+                    <p className="mt-2 text-base text-text-primary">{meal.instructions[currentStepIndex] || meal.instructions[0]}</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-text-secondary">No instructions listed</p>
+                )}
+              </div>
+
+              {CATEGORY_ORDER.filter((category) => shoppingPrepItems[category]?.length).length > 0 && (
+                <div className="mb-4 space-y-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">Prep checklist</div>
+                  {CATEGORY_ORDER.filter((category) => shoppingPrepItems[category]?.length).map((category) => (
+                    <div key={category} className="rounded-xl bg-white p-3 shadow-sm">
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">{CATEGORY_LABELS[category] || 'Other'}</div>
+                      <div className="space-y-2">
+                        {shoppingPrepItems[category].map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => setIngredientChecks((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
+                            className="flex w-full items-center gap-3 text-left"
+                          >
+                            <div className={`flex h-5 w-5 items-center justify-center rounded border ${ingredientChecks[item.id] ? 'border-green-500 bg-green-500 text-white' : 'border-divider bg-white text-transparent'}`}>
+                              ✓
+                            </div>
+                            <div className="flex-1 text-sm text-text-primary">
+                              {item.name}
+                            </div>
+                            <div className="text-xs text-text-muted">
+                              {item.quantity} {item.unit}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
-            </ol>
-          </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentStepIndex((prev) => Math.max(prev - 1, 0))}
+                  disabled={currentStepIndex === 0}
+                  className="flex-1 rounded-full border border-divider bg-white px-4 py-2 text-sm font-semibold text-text-primary disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStepIndex((prev) => Math.min(prev + 1, Math.max((meal.instructions || []).length - 1, 0)))}
+                  disabled={currentStepIndex >= Math.max((meal.instructions || []).length - 1, 0)}
+                  className="flex-1 rounded-full bg-primary-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                >
+                  Next step
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="mb-4">
+                <h3 className="mb-2 text-sm font-semibold text-text-primary">Ingredients</h3>
+                <ul className="space-y-1 text-sm text-text-secondary">
+                  {(meal.ingredients || []).length > 0 ? (
+                    meal.ingredients.map((ing, i) => (
+                      <li key={i}>{typeof ing === 'string' ? ing : ''}</li>
+                    ))
+                  ) : (
+                    <li>No ingredients listed</li>
+                  )}
+                </ul>
+              </div>
+
+              <div className="mb-4">
+                <h3 className="mb-2 text-sm font-semibold text-text-primary">Instructions</h3>
+                <ol className="space-y-2 text-sm text-text-secondary">
+                  {(meal.instructions || []).length > 0 ? (
+                    meal.instructions.map((step, i) => (
+                      <li key={i} className="flex gap-2">
+                        <span className="font-semibold text-text-primary">{i + 1}.</span>
+                        <span>{typeof step === 'string' ? step : ''}</span>
+                      </li>
+                    ))
+                  ) : (
+                    <li>No instructions listed</li>
+                  )}
+                </ol>
+              </div>
+            </>
+          )}
 
           {Array.isArray(meal.visual_cues) && meal.visual_cues.length > 0 && (
             <div className="mb-4 rounded-xl bg-yellow-50 p-3">
