@@ -12,9 +12,20 @@ import { aggregateShoppingList } from '../lib/aggregateShoppingList'
 import { addDays, DAY_ORDER } from '../lib/planner'
 import { normalizeMealRecord } from '../lib/mealSchema'
 import { upsertShoppingListForDate } from '../lib/tonightPersistence'
+import { groupByCategory } from '../utils/groceryCategories'
 
 const days = DAY_ORDER
 const inputClassName = 'input'
+const CATEGORY_EMOJI = {
+  Produce: '🥬',
+  'Meat & Seafood': '🥩',
+  'Dairy & Eggs': '🥚',
+  Bakery: '🍞',
+  Pantry: '🫙',
+  Frozen: '🧊',
+  Beverages: '🥤',
+  Other: '📦',
+}
 
 export function PlannerPage() {
   useDocumentTitle('Weekly Plan | Allio')
@@ -77,15 +88,7 @@ export function PlannerPage() {
   const activeSlots = Object.values(slotState).filter((slot) => slot.active && slot.attendees?.length > 0)
   const primarySlot = activeSlots[0] || null
   const loading = householdLoading || scheduleLoading || (schedule && slots.length > 0 && Object.keys(slotState).length === 0)
-  const groupedShopping = useMemo(() => {
-    const groups = {}
-    shoppingItems.forEach((item) => {
-      const key = item.category || 'other'
-      if (!groups[key]) groups[key] = []
-      groups[key].push(item)
-    })
-    return groups
-  }, [shoppingItems])
+  const groupedShopping = useMemo(() => groupByCategory(shoppingItems), [shoppingItems])
 
   const openSlotEditor = (slotKey) => {
     setEditorKey(slotKey)
@@ -471,13 +474,15 @@ export function PlannerPage() {
         ) : shoppingItems.length === 0 ? (
           <EmptyState emoji="🛒" headline="Shopping list will appear automatically" body="Generate your plan and we’ll build the list immediately." ctaLabel={null} />
         ) : (
-          <div className="space-y-4">
-            {Object.entries(groupedShopping).map(([category, items]) => (
-              <div key={category} className="rounded-xl border border-divider bg-white p-4">
-                <div className="mb-2 text-sm font-semibold capitalize text-text-primary">{category}</div>
+          <div className="rounded-xl border border-divider bg-white p-4">
+            {groupedShopping.map(({ category, items }, groupIndex) => (
+              <div key={category} className={groupIndex > 0 ? 'mt-4' : ''}>
+                <div className="mb-2 border-b border-gray-100 pb-1 text-sm font-semibold text-gray-500">
+                  {`${CATEGORY_EMOJI[category] || '📦'} ${category}`}
+                </div>
                 <ul className="space-y-1 text-sm text-text-secondary">
                   {items.map((item, itemIdx) => (
-                    <li key={itemIdx}>{item.quantity} {item.unit} {item.name}</li>
+                    <li key={`${category}-${itemIdx}`}>{item.quantity} {item.unit} {item.name}</li>
                   ))}
                 </ul>
               </div>
