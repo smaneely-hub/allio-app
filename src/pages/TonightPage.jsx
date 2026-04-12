@@ -607,7 +607,9 @@ export function TonightPage() {
         return
       }
 
-      const { data, error, functionName } = await invokePlannerFunction(payload)
+      const { data, error, functionName } = await invokePlannerFunction(payload, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
 
       console.log('[TonightPage] planner function response:', { functionName, data, error })
 

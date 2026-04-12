@@ -2,11 +2,11 @@ import { supabase } from './supabase'
 
 const FUNCTION_CANDIDATES = ['generate-plan']
 
-async function invokePlannerFunctionOnce(payload) {
+async function invokePlannerFunctionOnce(payload, options = {}) {
   let lastError = null
 
   for (const name of FUNCTION_CANDIDATES) {
-    const { data, error } = await supabase.functions.invoke(name, { body: payload })
+    const { data, error } = await supabase.functions.invoke(name, { body: payload, ...options })
     if (!error) {
       return { data, error: null, functionName: name }
     }
@@ -21,7 +21,7 @@ async function invokePlannerFunctionOnce(payload) {
   return { data: null, error: lastError, functionName: FUNCTION_CANDIDATES[FUNCTION_CANDIDATES.length - 1] }
 }
 
-export async function invokePlannerFunction(payload) {
+export async function invokePlannerFunction(payload, options = {}) {
   const {
     data: { session },
     error: sessionError,
@@ -39,7 +39,7 @@ export async function invokePlannerFunction(payload) {
     }
   }
 
-  let result = await invokePlannerFunctionOnce(payload)
+  let result = await invokePlannerFunctionOnce(payload, options)
 
   const message = String(result?.error?.message || '')
   const context = String(result?.error?.context || '')
@@ -57,7 +57,7 @@ export async function invokePlannerFunction(payload) {
     }
   }
 
-  return invokePlannerFunctionOnce(payload)
+  return invokePlannerFunctionOnce(payload, options)
 }
 
 // Refine an existing recipe based on feedback
