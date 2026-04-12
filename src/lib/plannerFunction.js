@@ -2,7 +2,7 @@ import { supabase } from './supabase'
 
 const FUNCTION_CANDIDATES = ['generate-plan']
 
-export async function invokePlannerFunction(payload) {
+async function invokePlannerFunctionOnce(payload) {
   let lastError = null
 
   for (const name of FUNCTION_CANDIDATES) {
@@ -19,6 +19,25 @@ export async function invokePlannerFunction(payload) {
   }
 
   return { data: null, error: lastError, functionName: FUNCTION_CANDIDATES[FUNCTION_CANDIDATES.length - 1] }
+}
+
+export async function invokePlannerFunction(payload) {
+  let result = await invokePlannerFunctionOnce(payload)
+
+  const message = String(result?.error?.message || '')
+  const context = String(result?.error?.context || '')
+  const shouldRefreshAndRetry = message.includes('non-2xx') || /401|jwt|unauthorized/i.test(`${message} ${context}`)
+
+  if (!result.error || !shouldRefreshAndRetry) {
+    return result
+  }
+
+  const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+  if (refreshError || !refreshData?.session?.access_token) {
+    return result
+  }
+
+  return invokePlannerFunctionOnce(payload)
 }
 
 // Refine an existing recipe based on feedback
