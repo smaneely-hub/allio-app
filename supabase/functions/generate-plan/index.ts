@@ -649,7 +649,8 @@ serve(async (req) => {
   }
 
   try {
-    const authorization = req.headers.get('Authorization')
+    const authorization = req.headers.get('authorization') || req.headers.get('Authorization')
+    console.log('[generate-plan] authorization header present:', Boolean(authorization))
 
     if (!authorization) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -672,6 +673,7 @@ serve(async (req) => {
     } = await authClient.auth.getUser()
 
     if (authError || !user) {
+      console.error('[generate-plan] auth.getUser failed:', authError?.message || 'no user')
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
