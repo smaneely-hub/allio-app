@@ -15,6 +15,7 @@ import { SchedulePage } from './pages/SchedulePage'
 import { PlanPage } from './pages/PlanPage'
 import { PlannerPage } from './pages/PlannerPage'
 import { TonightPage } from './pages/TonightPage'
+import { RecipesPage } from './pages/RecipesPage'
 
 function TonightPageWrapper() {
   const { user, loading } = useAuth()
@@ -119,6 +120,14 @@ export default function App() {
                   element={
                     <ProtectedRoute>
                       <ShopPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/recipes"
+                  element={
+                    <ProtectedRoute>
+                      <RecipesPage />
                     </ProtectedRoute>
                   }
                 />
