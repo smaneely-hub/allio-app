@@ -16,6 +16,7 @@ export function normalizeMealRecord(meal = {}, fallback = {}) {
     name: safeName,
     image: imageUrl,
     description: typeof meal.description === 'string' ? meal.description : '',
+    reason: typeof meal.reason === 'string' ? meal.reason : '',
     why_this_meal: typeof meal.why_this_meal === 'string' ? meal.why_this_meal : '',
     notes: typeof meal.notes === 'string' ? meal.notes : '',
     ingredients: rawIngredients.map((ingredient) => {

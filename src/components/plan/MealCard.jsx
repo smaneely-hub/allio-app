@@ -31,8 +31,12 @@ export function MealCard({ meal, onSwap, onSaveNote }) {
   const cookTime = meal.cook_time_minutes || 30
 
   const planningRationale = useMemo(() => {
-    return String(meal.why_this_works || meal.notes || '').trim()
-  }, [meal.why_this_works, meal.notes])
+    return String(meal.why_this_works || meal.why_this_meal || meal.notes || '').trim()
+  }, [meal.why_this_works, meal.why_this_meal, meal.notes])
+
+  const shortReason = useMemo(() => {
+    return String(meal.reason || meal.why_this_meal || '').trim()
+  }, [meal.reason, meal.why_this_meal])
 
   const variations = useMemo(() => {
     return Array.isArray(meal.variations) ? meal.variations.filter(Boolean).slice(0, 5) : []
@@ -143,6 +147,9 @@ export function MealCard({ meal, onSwap, onSaveNote }) {
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="font-display text-lg text-text-primary">{meal.name}</div>
+            {shortReason ? (
+              <div className="mt-1 line-clamp-2 text-sm text-text-secondary">{shortReason}</div>
+            ) : null}
             {dietaryTags.length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {dietaryTags.map((tag, i) => (

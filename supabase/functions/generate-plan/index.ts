@@ -379,6 +379,7 @@ MEAL INTELLIGENCE FIELDS:
 - format: bowl | plated | handheld | salad | soup | breakfast plate | other
 - protein_type: chicken | beef | fish | pork | eggs | tofu | beans | mixed | none
 - flexibility_level: high | medium | low
+- reason: warm, practical subtitle, 15 words max. Examples: 'Quick one-pot pasta, ready in 25 minutes', 'Uses chicken you may already have', 'Kid-tested comfort food'. Never robotic.
 - why_this_works: 1 practical sentence tied to day, prep time, meal type, and household context
 - variations: array of 0-5 realistic modifications that still fit the same meal use case and format
 - similar_options: array of 0-3 alternate meals that fit the same meal type and same real-world use case
@@ -415,6 +416,7 @@ OUTPUT FORMAT — each meal object must have exactly these fields:
     'Let rest 3 minutes. Squeeze roasted lemon over everything before serving.'
   ],
   notes: 'Full family tonight. Sheet pan = one dish to clean. Kids love broccoli when it is crispy.',
+  reason: 'Quick sheet pan dinner, ready in 40 minutes',
   why_this_works: 'Quick dinner for a busy Monday that keeps prep low and uses familiar ingredients for the family.',
   variations: ['Swap broccoli for green beans', 'Add lemony yogurt sauce', 'Serve over rice instead of on its own'],
   similar_options: ['Sheet pan chicken fajitas', 'Chicken rice bowls', 'Lemon garlic chicken with potatoes'],
@@ -448,7 +450,7 @@ function transformLlmOutput(llmOutput: unknown, scheduledSlots: Array<{ day: str
           if (scheduledSlots.length === 0) return true
           return scheduledSlots.some((s) => s.day === m.day && s.meal === m.meal)
         })
-        .map((m) => ({ ...m, difficulty: m.effort || m.difficulty || 'medium' }))
+        .map((m) => ({ ...m, reason: String(m.reason || m.why_this_meal || m.why_this_works || '').trim(), difficulty: m.effort || m.difficulty || 'medium' }))
       return { meals: result }
     }
 
@@ -532,6 +534,7 @@ function transformLlmOutput(llmOutput: unknown, scheduledSlots: Array<{ day: str
             ingredients: mealIngredients,
             instructions: (mealObj.instructions as Array<string>) || ['Preheat oven to 425°F.', 'Prepare all ingredients by washing and chopping.', 'Season protein with salt, pepper, and desired spices.', 'Heat oil in a large oven-safe skillet over medium-high heat.', 'Sear protein for 3-4 minutes per side.', 'Add vegetables to the pan.', 'Transfer to oven and roast for 15-20 minutes until done.', 'Let rest 5 minutes before serving.'],
             notes: String(mealObj.notes || ''),
+            reason: String(mealObj.reason || mealObj.why_this_meal || mealObj.why_this_works || ''),
             why_this_works: String(mealObj.why_this_works || ''),
             variations: Array.isArray(mealObj.variations) ? mealObj.variations : [],
             similar_options: Array.isArray(mealObj.similar_options) ? mealObj.similar_options : [],
@@ -776,6 +779,7 @@ serve(async (req) => {
           }
           
           let whyThis = ''
+          let shortReason = ''
           
           // Demographic-aware explanation
           if (demographics.adultOnly) {
@@ -793,7 +797,12 @@ serve(async (req) => {
           }
           
           if (dietFocus) whyThis += ` Aligned with your ${dietFocus} preference.`
-          if (recipe.weeknight_score && recipe.weeknight_score > 7) whyThis += ` Quick enough for a weeknight.'`
+          if (recipe.weeknight_score && recipe.weeknight_score > 7) whyThis += ' Quick enough for a weeknight.'
+
+          if (demographics.childIncluded && recipe.kid_friendly_score > 6) shortReason = 'Kid-tested comfort food'
+          else if (recipe.prep_time_minutes && recipe.cook_time_minutes) shortReason = `Ready in ${recipe.prep_time_minutes + recipe.cook_time_minutes} minutes`
+          else if (dietFocus) shortReason = `Fits your ${dietFocus} plan`
+          else shortReason = 'Practical pick for tonight'
           
           // Contextual tips based on demographics
           const tips = [
@@ -815,6 +824,7 @@ serve(async (req) => {
             meal: slot.meal || 'dinner',
             ...recipe,
             why_this_meal: whyThis,
+            reason: shortReason,
             tips,
             easy_swaps: swaps,
             diet_applied: dietApplied,
