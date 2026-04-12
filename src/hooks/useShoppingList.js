@@ -3,6 +3,7 @@ import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { groupItemsByCategory } from '../lib/shoppingListUtils'
 
+/** Load and persist the shopping list for the active week. */
 export function useShoppingList(userId, weekOf) {
   const [shoppingList, setShoppingList] = useState(null)
   const [loading, setLoading] = useState(true)

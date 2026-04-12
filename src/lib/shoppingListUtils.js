@@ -44,6 +44,7 @@ function fractionToNumber(value = '') {
   return Number.isNaN(parsed) ? 1 : parsed
 }
 
+/** Normalize ingredient names for matching and grouping. */
 export function normalizeIngredientName(name = '') {
   const base = String(name)
     .toLowerCase()
@@ -54,6 +55,7 @@ export function normalizeIngredientName(name = '') {
   return synonymMap[base] || base
 }
 
+/** Map an ingredient name to a shopping aisle category. */
 export function categorizeIngredient(name = '') {
   const value = normalizeIngredientName(name)
 
@@ -66,6 +68,7 @@ export function categorizeIngredient(name = '') {
   return 'other'
 }
 
+/** Parse raw ingredient data into a normalized shopping item. */
 export function parseIngredient(rawIngredient) {
   const source = typeof rawIngredient === 'string'
     ? rawIngredient.trim()
@@ -106,6 +109,7 @@ export function parseIngredient(rawIngredient) {
   }
 }
 
+/** Build grouped shopping items from meals while skipping pantry staples. */
 export function buildGroupedShoppingItems(meals = [], staplesOnHand = '') {
   const staples = String(staplesOnHand)
     .toLowerCase()
@@ -152,6 +156,7 @@ export function buildGroupedShoppingItems(meals = [], staplesOnHand = '') {
   })
 }
 
+/** Sort shopping items by category, checked state, and name. */
 export function sortShoppingItems(items = []) {
   return [...items].sort((a, b) => {
     const categoryCompare = CATEGORY_ORDER.indexOf(a.category || 'other') - CATEGORY_ORDER.indexOf(b.category || 'other')
@@ -162,6 +167,7 @@ export function sortShoppingItems(items = []) {
   })
 }
 
+/** Group shopping items by their assigned category. */
 export function groupItemsByCategory(items = []) {
   return sortShoppingItems(items).reduce((acc, item) => {
     const category = item.category || 'other'

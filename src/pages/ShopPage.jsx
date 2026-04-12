@@ -22,6 +22,7 @@ const categoryColors = {
   other: { border: '#6B7280', bg: 'bg-gray-50' },
 }
 
+/** Render the household shopping list with grouped aisle sections. */
 export function ShopPage() {
   useDocumentTitle('Shopping List | Allio')
   const { user } = useAuth()
