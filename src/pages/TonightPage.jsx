@@ -274,6 +274,40 @@ export function TonightPage() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [ingredientChecks, setIngredientChecks] = useState({})
 
+  const mealFitReasons = useMemo(() => {
+    if (!meal) return []
+
+    const reasons = []
+    const totalTime = Number(meal.prep_time_minutes || 0) + Number(meal.cook_time_minutes || 0)
+
+    if (totalTime > 0 && totalTime <= 35) reasons.push(`Ready in about ${totalTime} minutes`)
+    if ((meal.servings || 0) >= Math.max(selectedMembers.length || 0, 4)) reasons.push(`Sized for ${meal.servings} servings`)
+    if (selectedMembers.length > 0) reasons.push(`Adjusted for your selected household members`)
+    if (staplesOnHand.trim()) reasons.push('Takes your on-hand staples into account')
+    if (Array.isArray(meal.tags) && meal.tags.length > 0) {
+      if (meal.tags.includes('weeknight')) reasons.push('Built for a smoother weeknight')
+      if (meal.tags.includes('kid-friendly')) reasons.push('A good fit for family dinner')
+      if (meal.tags.includes('under-30-min')) reasons.push('Fast enough for a busy evening')
+    }
+
+    return reasons.slice(0, 4)
+  }, [meal, selectedMembers.length, staplesOnHand])
+
+  const cookingProgress = useMemo(() => {
+    const totalSteps = Math.max((meal?.instructions || []).length, 1)
+    const checkedIngredients = Object.values(ingredientChecks).filter(Boolean).length
+    const prepTotal = Object.values(shoppingPrepItems).flat().length
+    const currentStepNumber = Math.min(currentStepIndex + 1, totalSteps)
+
+    return {
+      totalSteps,
+      currentStepNumber,
+      percent: Math.round((currentStepNumber / totalSteps) * 100),
+      checkedIngredients,
+      prepTotal,
+    }
+  }, [meal, ingredientChecks, shoppingPrepItems, currentStepIndex])
+
   const shoppingPrepItems = useMemo(() => {
     const parsed = (meal?.ingredients || [])
       .map((ingredient, index) => {
@@ -1294,13 +1328,25 @@ export function TonightPage() {
           )}
 
           {/* Prominent "Why this meal" - make it stand out */}
-          {(meal.why_this_meal || meal.notes) && (
-            <div className="mb-4 rounded-xl bg-gradient-to-r from-primary-50 to-teal-50 border border-primary-100 p-4">
+          {((meal.why_this_meal || meal.notes) || mealFitReasons.length > 0) && (
+            <div className="mb-4 rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50 to-teal-50 p-4">
               <div className="flex items-start gap-2">
                 <span className="text-lg">💡</span>
-                <div>
+                <div className="flex-1">
                   <p className="text-sm font-medium text-primary-800">Why this meal works</p>
-                  <p className="text-sm text-primary-700 mt-1">{meal.why_this_meal || meal.notes}</p>
+                  {(meal.why_this_meal || meal.notes) && (
+                    <p className="mt-1 text-sm text-primary-700">{meal.why_this_meal || meal.notes}</p>
+                  )}
+                  {mealFitReasons.length > 0 && (
+                    <ul className="mt-3 space-y-1 text-sm text-primary-700">
+                      {mealFitReasons.map((reason) => (
+                        <li key={reason} className="flex items-start gap-2">
+                          <span className="mt-0.5 text-xs">•</span>
+                          <span>{reason}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
             </div>
@@ -1344,11 +1390,36 @@ export function TonightPage() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-primary-700">Cooking mode</p>
                   <h3 className="text-base font-semibold text-text-primary">
-                    Step {Math.min(currentStepIndex + 1, Math.max((meal.instructions || []).length, 1))} of {Math.max((meal.instructions || []).length, 1)}
+                    Step {cookingProgress.currentStepNumber} of {cookingProgress.totalSteps}
                   </h3>
                 </div>
                 <div className="text-sm text-primary-700">
-                  {Object.values(ingredientChecks).filter(Boolean).length} checked
+                  {cookingProgress.checkedIngredients} checked
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <div className="mb-2 flex items-center justify-between text-xs font-medium uppercase tracking-wide text-primary-700">
+                  <span>Cooking progress</span>
+                  <span>{cookingProgress.percent}%</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-white/80">
+                  <div className="h-full rounded-full bg-primary-500 transition-all duration-300" style={{ width: `${cookingProgress.percent}%` }} />
+                </div>
+              </div>
+
+              <div className="mb-4 grid gap-3 md:grid-cols-3">
+                <div className="rounded-xl bg-white p-3 shadow-sm">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">Prep time</div>
+                  <div className="mt-1 text-sm font-semibold text-text-primary">{meal.prep_time_minutes || 0} min</div>
+                </div>
+                <div className="rounded-xl bg-white p-3 shadow-sm">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">Cook time</div>
+                  <div className="mt-1 text-sm font-semibold text-text-primary">{meal.cook_time_minutes || 0} min</div>
+                </div>
+                <div className="rounded-xl bg-white p-3 shadow-sm">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">Prep checklist</div>
+                  <div className="mt-1 text-sm font-semibold text-text-primary">{cookingProgress.checkedIngredients}/{cookingProgress.prepTotal || 0}</div>
                 </div>
               </div>
 
@@ -1356,7 +1427,7 @@ export function TonightPage() {
                 {(meal.instructions || []).length > 0 ? (
                   <>
                     <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">Current step</div>
-                    <p className="mt-2 text-base text-text-primary">{meal.instructions[currentStepIndex] || meal.instructions[0]}</p>
+                    <p className="mt-2 text-lg font-medium leading-7 text-text-primary">{meal.instructions[currentStepIndex] || meal.instructions[0]}</p>
                   </>
                 ) : (
                   <p className="text-sm text-text-secondary">No instructions listed</p>
