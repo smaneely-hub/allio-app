@@ -1028,6 +1028,758 @@ const seedRecipes = [
     active: true
   }
 
+  ,{
+    title: 'Berry Banana Yogurt Smoothie',
+    slug: 'breakfast-1-berry-banana-yogurt-smoothie',
+    description: 'A creamy berry smoothie with banana and yogurt makes a fast breakfast for busy mornings.',
+    cuisine: 'American',
+    meal_type: 'breakfast',
+    prep_time_minutes: 5,
+    cook_time_minutes: 0,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'frozen mixed berries', quantity: '2', unit: 'cups' },
+      { item: 'banana', quantity: '2', unit: 'whole' },
+      { item: 'plain Greek yogurt', quantity: '1 1/2', unit: 'cups' },
+      { item: 'milk', quantity: '1 1/2', unit: 'cups' },
+      { item: 'honey', quantity: '2', unit: 'tbsp' },
+      { item: 'chia seeds', quantity: '1', unit: 'tbsp' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Add the berries, bananas, yogurt, milk, honey, and chia seeds to a blender.',
+      'Blend on high until completely smooth and creamy.',
+      'Pour into glasses and serve immediately.'
+    ]),
+    tags_json: JSON.stringify(['breakfast', 'quick', 'kid-friendly', 'high-protein']),
+    difficulty: 'easy',
+    kid_friendly_score: 9,
+    weeknight_score: 10,
+    active: true
+  },
+  {
+    title: 'Apple Cinnamon Overnight Oats',
+    slug: 'breakfast-2-apple-cinnamon-overnight-oats',
+    description: 'These creamy oats are packed with apples and cinnamon and are ready straight from the fridge.',
+    cuisine: 'American',
+    meal_type: 'breakfast',
+    prep_time_minutes: 10,
+    cook_time_minutes: 0,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'old-fashioned oats', quantity: '2', unit: 'cups' },
+      { item: 'milk', quantity: '2', unit: 'cups' },
+      { item: 'plain Greek yogurt', quantity: '1', unit: 'cup' },
+      { item: 'apple', quantity: '1', unit: 'large', notes: 'finely diced' },
+      { item: 'maple syrup', quantity: '2', unit: 'tbsp' },
+      { item: 'ground cinnamon', quantity: '1', unit: 'tsp' },
+      { item: 'chia seeds', quantity: '2', unit: 'tbsp' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Stir together the oats, milk, yogurt, maple syrup, cinnamon, and chia seeds in a bowl or container.',
+      'Fold in the diced apple until evenly distributed.',
+      'Cover and refrigerate overnight, then stir and serve cold in the morning.'
+    ]),
+    tags_json: JSON.stringify(['breakfast', 'quick', 'meal-prep', 'make-ahead']),
+    difficulty: 'easy',
+    kid_friendly_score: 8,
+    weeknight_score: 10,
+    active: true
+  },
+  {
+    title: 'Peanut Butter Banana Toast',
+    slug: 'breakfast-3-peanut-butter-banana-toast',
+    description: 'Warm toast layered with peanut butter and banana slices is simple, filling, and fast.',
+    cuisine: 'American',
+    meal_type: 'breakfast',
+    prep_time_minutes: 5,
+    cook_time_minutes: 3,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'whole grain bread', quantity: '8', unit: 'slices' },
+      { item: 'peanut butter', quantity: '1/2', unit: 'cup' },
+      { item: 'banana', quantity: '2', unit: 'whole', notes: 'sliced' },
+      { item: 'honey', quantity: '2', unit: 'tbsp' },
+      { item: 'ground cinnamon', quantity: '1/2', unit: 'tsp' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Toast the bread until golden and crisp.',
+      'Spread peanut butter over each slice of toast.',
+      'Top with banana slices, drizzle with honey, sprinkle with cinnamon, and serve.'
+    ]),
+    tags_json: JSON.stringify(['breakfast', 'quick', 'kid-friendly', 'vegetarian']),
+    difficulty: 'easy',
+    kid_friendly_score: 9,
+    weeknight_score: 10,
+    active: true
+  },
+  {
+    title: 'Strawberry Almond Yogurt Bowls',
+    slug: 'breakfast-4-strawberry-almond-yogurt-bowls',
+    description: 'Cool yogurt bowls with strawberries, almonds, and granola come together in minutes.',
+    cuisine: 'American',
+    meal_type: 'breakfast',
+    prep_time_minutes: 8,
+    cook_time_minutes: 0,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'plain Greek yogurt', quantity: '3', unit: 'cups' },
+      { item: 'strawberries', quantity: '2', unit: 'cups', notes: 'sliced' },
+      { item: 'granola', quantity: '1', unit: 'cup' },
+      { item: 'sliced almonds', quantity: '1/4', unit: 'cup' },
+      { item: 'honey', quantity: '2', unit: 'tbsp' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Divide the yogurt among four bowls.',
+      'Top each bowl with strawberries, granola, and sliced almonds.',
+      'Drizzle with honey and serve right away.'
+    ]),
+    tags_json: JSON.stringify(['breakfast', 'quick', 'high-protein', 'vegetarian']),
+    difficulty: 'easy',
+    kid_friendly_score: 8,
+    weeknight_score: 10,
+    active: true
+  },
+  {
+    title: 'Avocado Egg Breakfast Toasts',
+    slug: 'breakfast-5-avocado-egg-toasts',
+    description: 'Mashed avocado and jammy eggs on toast make a satisfying breakfast in under 15 minutes.',
+    cuisine: 'American',
+    meal_type: 'breakfast',
+    prep_time_minutes: 8,
+    cook_time_minutes: 7,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'whole grain bread', quantity: '8', unit: 'slices' },
+      { item: 'avocado', quantity: '2', unit: 'large' },
+      { item: 'eggs', quantity: '4', unit: 'whole' },
+      { item: 'lemon juice', quantity: '1', unit: 'tbsp' },
+      { item: 'kosher salt', quantity: '1/2', unit: 'tsp' },
+      { item: 'black pepper', quantity: '1/4', unit: 'tsp' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Bring a small pot of water to a boil and cook the eggs for 7 minutes, then transfer them to cold water and peel.',
+      'Toast the bread until crisp.',
+      'Mash the avocado with lemon juice, salt, and pepper, then spread it over the toast.',
+      'Slice the eggs and layer them on top before serving.'
+    ]),
+    tags_json: JSON.stringify(['breakfast', 'quick', 'high-protein', 'vegetarian']),
+    difficulty: 'easy',
+    kid_friendly_score: 7,
+    weeknight_score: 9,
+    active: true
+  },
+  {
+    title: 'Spinach and Cheese Egg Muffins',
+    slug: 'breakfast-6-spinach-cheese-egg-muffins',
+    description: 'These make-ahead egg muffins are packed with spinach and cheese for grab-and-go mornings.',
+    cuisine: 'American',
+    meal_type: 'breakfast',
+    prep_time_minutes: 15,
+    cook_time_minutes: 20,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'eggs', quantity: '10', unit: 'whole' },
+      { item: 'baby spinach', quantity: '2', unit: 'cups', notes: 'chopped' },
+      { item: 'shredded cheddar cheese', quantity: '1', unit: 'cup' },
+      { item: 'milk', quantity: '1/4', unit: 'cup' },
+      { item: 'bell pepper', quantity: '1', unit: 'small', notes: 'diced' },
+      { item: 'kosher salt', quantity: '1/2', unit: 'tsp' },
+      { item: 'black pepper', quantity: '1/4', unit: 'tsp' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Preheat the oven to 375°F and grease a 12-cup muffin tin.',
+      'Whisk together the eggs, milk, salt, and pepper in a large bowl.',
+      'Stir in the spinach, bell pepper, and cheddar cheese.',
+      'Divide the mixture among the muffin cups and bake for 18 to 20 minutes until set.',
+      'Cool slightly before serving or refrigerating for later.'
+    ]),
+    tags_json: JSON.stringify(['breakfast', 'meal-prep', 'make-ahead', 'high-protein']),
+    difficulty: 'easy',
+    kid_friendly_score: 8,
+    weeknight_score: 9,
+    active: true
+  },
+  {
+    title: 'Blueberry Baked Oatmeal Squares',
+    slug: 'breakfast-7-blueberry-baked-oatmeal-squares',
+    description: 'Soft baked oatmeal with blueberries slices into easy breakfast squares for the week.',
+    cuisine: 'American',
+    meal_type: 'breakfast',
+    prep_time_minutes: 15,
+    cook_time_minutes: 30,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'old-fashioned oats', quantity: '2', unit: 'cups' },
+      { item: 'milk', quantity: '2', unit: 'cups' },
+      { item: 'eggs', quantity: '2', unit: 'whole' },
+      { item: 'blueberries', quantity: '1 1/2', unit: 'cups' },
+      { item: 'maple syrup', quantity: '1/4', unit: 'cup' },
+      { item: 'ground cinnamon', quantity: '1', unit: 'tsp' },
+      { item: 'baking powder', quantity: '1', unit: 'tsp' },
+      { item: 'vanilla extract', quantity: '1', unit: 'tsp' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Preheat the oven to 375°F and grease an 8-inch baking dish.',
+      'Whisk together the milk, eggs, maple syrup, and vanilla in a bowl.',
+      'Stir in the oats, cinnamon, baking powder, and blueberries.',
+      'Pour the mixture into the baking dish and bake for 28 to 30 minutes until set and lightly golden.',
+      'Cool slightly, slice into squares, and serve or store for later.'
+    ]),
+    tags_json: JSON.stringify(['breakfast', 'meal-prep', 'make-ahead', 'vegetarian']),
+    difficulty: 'easy',
+    kid_friendly_score: 8,
+    weeknight_score: 8,
+    active: true
+  },
+  {
+    title: 'Freezer Breakfast Burritos',
+    slug: 'breakfast-8-freezer-breakfast-burritos',
+    description: 'Eggs, potatoes, and cheese roll into hearty burritos that freeze and reheat beautifully.',
+    cuisine: 'Tex-Mex',
+    meal_type: 'breakfast',
+    prep_time_minutes: 15,
+    cook_time_minutes: 20,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'large flour tortillas', quantity: '8', unit: 'pieces' },
+      { item: 'eggs', quantity: '8', unit: 'whole' },
+      { item: 'frozen diced potatoes', quantity: '2', unit: 'cups' },
+      { item: 'breakfast sausage', quantity: '8', unit: 'oz' },
+      { item: 'shredded cheddar cheese', quantity: '1', unit: 'cup' },
+      { item: 'milk', quantity: '1/4', unit: 'cup' },
+      { item: 'olive oil', quantity: '1', unit: 'tbsp' },
+      { item: 'kosher salt', quantity: '1/2', unit: 'tsp' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Heat the olive oil in a skillet over medium heat and cook the sausage and potatoes for 8 to 10 minutes until browned.',
+      'Whisk the eggs with milk and salt, then scramble them in the skillet until just set.',
+      'Warm the tortillas, then divide the egg mixture and cheese among them.',
+      'Roll the tortillas into burritos and serve warm or wrap and freeze for later.'
+    ]),
+    tags_json: JSON.stringify(['breakfast', 'meal-prep', 'make-ahead', 'high-protein']),
+    difficulty: 'easy',
+    kid_friendly_score: 8,
+    weeknight_score: 9,
+    active: true
+  },
+  {
+    title: 'Ham and Swiss Breakfast Sliders',
+    slug: 'breakfast-9-ham-swiss-breakfast-sliders',
+    description: 'Soft sliders layered with eggs, ham, and melty Swiss are perfect for prepping ahead.',
+    cuisine: 'American',
+    meal_type: 'breakfast',
+    prep_time_minutes: 15,
+    cook_time_minutes: 20,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'slider rolls', quantity: '12', unit: 'pieces' },
+      { item: 'eggs', quantity: '6', unit: 'whole' },
+      { item: 'deli ham', quantity: '8', unit: 'oz' },
+      { item: 'Swiss cheese', quantity: '6', unit: 'slices' },
+      { item: 'butter', quantity: '2', unit: 'tbsp', notes: 'melted' },
+      { item: 'milk', quantity: '2', unit: 'tbsp' },
+      { item: 'kosher salt', quantity: '1/2', unit: 'tsp' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Preheat the oven to 350°F and place the bottom halves of the rolls in a baking dish.',
+      'Whisk the eggs, milk, and salt, then scramble in a skillet until softly set.',
+      'Layer the scrambled eggs, ham, and Swiss over the rolls, then add the tops.',
+      'Brush with melted butter and bake for 10 to 12 minutes until warm and melty.',
+      'Slice and serve.'
+    ]),
+    tags_json: JSON.stringify(['breakfast', 'meal-prep', 'make-ahead', 'kid-friendly']),
+    difficulty: 'easy',
+    kid_friendly_score: 9,
+    weeknight_score: 8,
+    active: true
+  },
+  {
+    title: 'Sausage Hash Brown Breakfast Casserole',
+    slug: 'breakfast-10-sausage-hash-brown-casserole',
+    description: 'This hearty breakfast casserole is easy to bake ahead and reheat for a crowd or a few busy mornings.',
+    cuisine: 'American',
+    meal_type: 'breakfast',
+    prep_time_minutes: 15,
+    cook_time_minutes: 35,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'frozen hash browns', quantity: '4', unit: 'cups' },
+      { item: 'breakfast sausage', quantity: '1', unit: 'lb' },
+      { item: 'eggs', quantity: '8', unit: 'whole' },
+      { item: 'milk', quantity: '1', unit: 'cup' },
+      { item: 'shredded cheddar cheese', quantity: '1 1/2', unit: 'cups' },
+      { item: 'green onions', quantity: '2', unit: 'whole', notes: 'sliced' },
+      { item: 'kosher salt', quantity: '1/2', unit: 'tsp' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Preheat the oven to 375°F and grease a baking dish.',
+      'Brown the sausage in a skillet over medium heat, then drain any excess grease.',
+      'Spread the hash browns and sausage in the baking dish and sprinkle with cheddar and green onions.',
+      'Whisk together the eggs, milk, and salt, then pour over the top.',
+      'Bake for 30 to 35 minutes until the center is set, then cool slightly before serving.'
+    ]),
+    tags_json: JSON.stringify(['breakfast', 'meal-prep', 'make-ahead', 'high-protein']),
+    difficulty: 'easy',
+    kid_friendly_score: 8,
+    weeknight_score: 7,
+    active: true
+  },
+  {
+    title: 'Buttermilk Pancakes with Maple Butter',
+    slug: 'breakfast-11-buttermilk-pancakes-maple-butter',
+    description: 'Fluffy pancakes and maple butter make weekend breakfast feel extra special.',
+    cuisine: 'American',
+    meal_type: 'breakfast',
+    prep_time_minutes: 15,
+    cook_time_minutes: 20,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'all-purpose flour', quantity: '2', unit: 'cups' },
+      { item: 'buttermilk', quantity: '2', unit: 'cups' },
+      { item: 'eggs', quantity: '2', unit: 'whole' },
+      { item: 'baking powder', quantity: '2', unit: 'tsp' },
+      { item: 'sugar', quantity: '2', unit: 'tbsp' },
+      { item: 'butter', quantity: '4', unit: 'tbsp', notes: 'melted, plus more for serving' },
+      { item: 'maple syrup', quantity: '1/4', unit: 'cup' },
+      { item: 'kosher salt', quantity: '1/2', unit: 'tsp' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Whisk together the flour, baking powder, sugar, and salt in a bowl.',
+      'In another bowl, whisk the buttermilk, eggs, and melted butter, then stir into the dry ingredients just until combined.',
+      'Heat a griddle or skillet over medium heat and cook the pancakes for 2 to 3 minutes per side until golden.',
+      'Mix softened butter with the maple syrup.',
+      'Serve the pancakes warm with maple butter.'
+    ]),
+    tags_json: JSON.stringify(['breakfast', 'weekend', 'kid-friendly', 'vegetarian']),
+    difficulty: 'medium',
+    kid_friendly_score: 10,
+    weeknight_score: 6,
+    active: true
+  },
+  {
+    title: 'Brioche French Toast Bake',
+    slug: 'breakfast-12-brioche-french-toast-bake',
+    description: 'Custardy baked French toast with cinnamon and vanilla is perfect for a relaxed morning.',
+    cuisine: 'American',
+    meal_type: 'breakfast',
+    prep_time_minutes: 15,
+    cook_time_minutes: 35,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'brioche bread', quantity: '1', unit: 'loaf', notes: 'cubed' },
+      { item: 'eggs', quantity: '6', unit: 'whole' },
+      { item: 'milk', quantity: '1 1/2', unit: 'cups' },
+      { item: 'heavy cream', quantity: '1/2', unit: 'cup' },
+      { item: 'brown sugar', quantity: '1/4', unit: 'cup' },
+      { item: 'ground cinnamon', quantity: '1', unit: 'tsp' },
+      { item: 'vanilla extract', quantity: '1', unit: 'tsp' },
+      { item: 'butter', quantity: '2', unit: 'tbsp', notes: 'melted' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Preheat the oven to 350°F and grease a baking dish.',
+      'Spread the brioche cubes in the dish.',
+      'Whisk together the eggs, milk, cream, brown sugar, cinnamon, vanilla, and melted butter.',
+      'Pour the custard over the bread and let it soak for 10 minutes.',
+      'Bake for 30 to 35 minutes until golden and set, then serve warm.'
+    ]),
+    tags_json: JSON.stringify(['breakfast', 'weekend', 'comfort-food', 'vegetarian']),
+    difficulty: 'medium',
+    kid_friendly_score: 9,
+    weeknight_score: 5,
+    active: true
+  },
+  {
+    title: 'Skillet Shakshuka with Feta',
+    slug: 'breakfast-13-skillet-shakshuka-feta',
+    description: 'Eggs poached in a spiced tomato sauce make a cozy weekend breakfast with big flavor.',
+    cuisine: 'Mediterranean',
+    meal_type: 'breakfast',
+    prep_time_minutes: 15,
+    cook_time_minutes: 20,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'eggs', quantity: '6', unit: 'whole' },
+      { item: 'crushed tomatoes', quantity: '28', unit: 'oz' },
+      { item: 'yellow onion', quantity: '1', unit: 'medium', notes: 'diced' },
+      { item: 'bell pepper', quantity: '1', unit: 'medium', notes: 'diced' },
+      { item: 'garlic', quantity: '3', unit: 'cloves', notes: 'minced' },
+      { item: 'olive oil', quantity: '2', unit: 'tbsp' },
+      { item: 'paprika', quantity: '1', unit: 'tsp' },
+      { item: 'ground cumin', quantity: '1', unit: 'tsp' },
+      { item: 'feta cheese', quantity: '1/2', unit: 'cup', notes: 'crumbled' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Heat the olive oil in a large skillet over medium heat. Add the onion and bell pepper and cook for 5 minutes.',
+      'Stir in the garlic, paprika, and cumin and cook for 30 seconds.',
+      'Pour in the crushed tomatoes and simmer for 10 minutes until slightly thickened.',
+      'Make small wells in the sauce and crack in the eggs. Cover and cook for 5 to 7 minutes until the whites are set.',
+      'Sprinkle with feta and serve.'
+    ]),
+    tags_json: JSON.stringify(['breakfast', 'weekend', 'vegetarian', 'gluten-free']),
+    difficulty: 'medium',
+    kid_friendly_score: 6,
+    weeknight_score: 6,
+    active: true
+  },
+  {
+    title: 'Mushroom and Spinach Frittata',
+    slug: 'breakfast-14-mushroom-spinach-frittata',
+    description: 'A fluffy frittata with mushrooms, spinach, and cheese is a simple but special brunch favorite.',
+    cuisine: 'Italian',
+    meal_type: 'breakfast',
+    prep_time_minutes: 15,
+    cook_time_minutes: 20,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'eggs', quantity: '8', unit: 'whole' },
+      { item: 'mushrooms', quantity: '8', unit: 'oz', notes: 'sliced' },
+      { item: 'baby spinach', quantity: '3', unit: 'cups' },
+      { item: 'parmesan cheese', quantity: '1/2', unit: 'cup', notes: 'grated' },
+      { item: 'milk', quantity: '1/4', unit: 'cup' },
+      { item: 'olive oil', quantity: '1', unit: 'tbsp' },
+      { item: 'kosher salt', quantity: '1/2', unit: 'tsp' },
+      { item: 'black pepper', quantity: '1/4', unit: 'tsp' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Preheat the broiler and whisk the eggs with milk, salt, pepper, and Parmesan.',
+      'Heat the olive oil in an oven-safe skillet over medium heat. Cook the mushrooms for 5 minutes until browned.',
+      'Add the spinach and cook until wilted.',
+      'Pour in the egg mixture and cook for 3 minutes until the edges begin to set.',
+      'Transfer the skillet to the broiler for 2 to 3 minutes until the top is puffed and cooked through, then slice and serve.'
+    ]),
+    tags_json: JSON.stringify(['breakfast', 'weekend', 'vegetarian', 'high-protein']),
+    difficulty: 'medium',
+    kid_friendly_score: 7,
+    weeknight_score: 6,
+    active: true
+  },
+  {
+    title: 'Biscuits and Sausage Gravy Skillet',
+    slug: 'breakfast-15-biscuits-sausage-gravy-skillet',
+    description: 'Flaky biscuits smothered in creamy sausage gravy make a hearty weekend breakfast.',
+    cuisine: 'Southern',
+    meal_type: 'breakfast',
+    prep_time_minutes: 15,
+    cook_time_minutes: 20,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'refrigerated biscuits', quantity: '8', unit: 'pieces' },
+      { item: 'breakfast sausage', quantity: '1', unit: 'lb' },
+      { item: 'all-purpose flour', quantity: '3', unit: 'tbsp' },
+      { item: 'milk', quantity: '2 1/2', unit: 'cups' },
+      { item: 'black pepper', quantity: '1', unit: 'tsp' },
+      { item: 'kosher salt', quantity: '1/2', unit: 'tsp' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Bake the biscuits according to package directions.',
+      'Meanwhile, brown the sausage in a skillet over medium heat, breaking it up as it cooks.',
+      'Sprinkle in the flour and stir for 1 minute.',
+      'Slowly whisk in the milk, then simmer for 4 to 5 minutes until thickened. Season with pepper and salt.',
+      'Split the biscuits and spoon the sausage gravy over the top to serve.'
+    ]),
+    tags_json: JSON.stringify(['breakfast', 'weekend', 'comfort-food', 'kid-friendly']),
+    difficulty: 'medium',
+    kid_friendly_score: 8,
+    weeknight_score: 5,
+    active: true
+  },
+  {
+    title: 'Turkey Hummus Lunch Wraps',
+    slug: 'lunch-1-turkey-hummus-wraps',
+    description: 'These fresh turkey wraps with hummus and crunchy veggies pack well for school or work.',
+    cuisine: 'American',
+    meal_type: 'lunch',
+    prep_time_minutes: 12,
+    cook_time_minutes: 0,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'large tortillas', quantity: '4', unit: 'pieces' },
+      { item: 'sliced turkey', quantity: '12', unit: 'oz' },
+      { item: 'hummus', quantity: '1/2', unit: 'cup' },
+      { item: 'lettuce', quantity: '2', unit: 'cups', notes: 'shredded' },
+      { item: 'carrots', quantity: '1', unit: 'cup', notes: 'shredded' },
+      { item: 'cucumber', quantity: '1', unit: 'medium', notes: 'thinly sliced' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Lay the tortillas flat on a work surface.',
+      'Spread hummus over each tortilla.',
+      'Layer the turkey, lettuce, carrots, and cucumber over the hummus.',
+      'Roll up the wraps tightly, slice in half, and serve or pack for later.'
+    ]),
+    tags_json: JSON.stringify(['lunch', 'packable', 'lunchbox-friendly', 'high-protein']),
+    difficulty: 'easy',
+    kid_friendly_score: 8,
+    weeknight_score: 9,
+    active: true
+  },
+  {
+    title: 'Mediterranean Chickpea Lunch Bowls',
+    slug: 'lunch-2-mediterranean-chickpea-bowls',
+    description: 'Chickpeas, cucumbers, and feta build a bright grain bowl that travels well.',
+    cuisine: 'Mediterranean',
+    meal_type: 'lunch',
+    prep_time_minutes: 15,
+    cook_time_minutes: 0,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'cooked quinoa', quantity: '4', unit: 'cups' },
+      { item: 'chickpeas', quantity: '2', unit: 'cups' },
+      { item: 'cucumber', quantity: '1', unit: 'large', notes: 'diced' },
+      { item: 'cherry tomatoes', quantity: '1', unit: 'cup', notes: 'halved' },
+      { item: 'feta cheese', quantity: '1/2', unit: 'cup', notes: 'crumbled' },
+      { item: 'olive oil', quantity: '2', unit: 'tbsp' },
+      { item: 'lemon juice', quantity: '2', unit: 'tbsp' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Stir the olive oil and lemon juice into the quinoa and chickpeas.',
+      'Divide the quinoa mixture among bowls or containers.',
+      'Top with cucumber, tomatoes, and feta.',
+      'Serve chilled or pack for later.'
+    ]),
+    tags_json: JSON.stringify(['lunch', 'packable', 'grain-bowl', 'vegetarian']),
+    difficulty: 'easy',
+    kid_friendly_score: 7,
+    weeknight_score: 9,
+    active: true
+  },
+  {
+    title: 'Chicken Caesar Pasta Salad',
+    slug: 'lunch-3-chicken-caesar-pasta-salad',
+    description: 'Chicken, pasta, and crisp romaine turn Caesar salad into a filling packable lunch.',
+    cuisine: 'American',
+    meal_type: 'lunch',
+    prep_time_minutes: 12,
+    cook_time_minutes: 10,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'rotini pasta', quantity: '8', unit: 'oz' },
+      { item: 'cooked chicken', quantity: '2', unit: 'cups', notes: 'shredded' },
+      { item: 'romaine lettuce', quantity: '4', unit: 'cups', notes: 'chopped' },
+      { item: 'Caesar dressing', quantity: '1/2', unit: 'cup' },
+      { item: 'parmesan cheese', quantity: '1/3', unit: 'cup', notes: 'grated' },
+      { item: 'croutons', quantity: '1', unit: 'cup' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Cook the rotini according to package directions, then drain and cool.',
+      'Combine the pasta, chicken, romaine, Caesar dressing, and Parmesan in a large bowl.',
+      'Toss until evenly coated.',
+      'Top with croutons just before serving or packing.'
+    ]),
+    tags_json: JSON.stringify(['lunch', 'packable', 'high-protein', 'pasta-salad']),
+    difficulty: 'easy',
+    kid_friendly_score: 8,
+    weeknight_score: 8,
+    active: true
+  },
+  {
+    title: 'Rainbow Veggie Ranch Pinwheels',
+    slug: 'lunch-4-rainbow-veggie-ranch-pinwheels',
+    description: 'Colorful veggie pinwheels with ranch cream cheese are easy to pack and fun to eat.',
+    cuisine: 'American',
+    meal_type: 'lunch',
+    prep_time_minutes: 15,
+    cook_time_minutes: 0,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'large tortillas', quantity: '4', unit: 'pieces' },
+      { item: 'cream cheese', quantity: '8', unit: 'oz', notes: 'softened' },
+      { item: 'ranch seasoning', quantity: '1', unit: 'tbsp' },
+      { item: 'shredded carrots', quantity: '1', unit: 'cup' },
+      { item: 'baby spinach', quantity: '2', unit: 'cups' },
+      { item: 'red bell pepper', quantity: '1', unit: 'medium', notes: 'thinly sliced' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Mix the cream cheese and ranch seasoning until smooth.',
+      'Spread the mixture evenly over the tortillas.',
+      'Layer the carrots, spinach, and bell pepper over the cream cheese.',
+      'Roll the tortillas tightly, chill for 10 minutes if you like, then slice into pinwheels.'
+    ]),
+    tags_json: JSON.stringify(['lunch', 'packable', 'lunchbox-friendly', 'vegetarian']),
+    difficulty: 'easy',
+    kid_friendly_score: 9,
+    weeknight_score: 9,
+    active: true
+  },
+  {
+    title: 'Black Bean and Cheese Quesadillas',
+    slug: 'lunch-5-black-bean-cheese-quesadillas',
+    description: 'Crispy quesadillas with black beans and cheese make a hot lunch in minutes.',
+    cuisine: 'Mexican',
+    meal_type: 'lunch',
+    prep_time_minutes: 8,
+    cook_time_minutes: 10,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'flour tortillas', quantity: '8', unit: 'pieces' },
+      { item: 'black beans', quantity: '1', unit: 'can', notes: 'drained and rinsed' },
+      { item: 'shredded cheddar cheese', quantity: '2', unit: 'cups' },
+      { item: 'ground cumin', quantity: '1/2', unit: 'tsp' },
+      { item: 'olive oil', quantity: '1', unit: 'tbsp' },
+      { item: 'salsa', quantity: '1/2', unit: 'cup' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Mash the black beans lightly with the cumin.',
+      'Spread the beans and cheddar over half of the tortillas, then top with the remaining tortillas.',
+      'Heat the olive oil in a skillet over medium heat and cook the quesadillas for 2 to 3 minutes per side until golden and melty.',
+      'Slice and serve with salsa.'
+    ]),
+    tags_json: JSON.stringify(['lunch', 'quick-hot-lunch', 'vegetarian', 'kid-friendly']),
+    difficulty: 'easy',
+    kid_friendly_score: 9,
+    weeknight_score: 10,
+    active: true
+  },
+  {
+    title: 'Tomato Basil Grilled Cheese',
+    slug: 'lunch-6-tomato-basil-grilled-cheese',
+    description: 'This upgraded grilled cheese with tomato and basil is fast, melty, and comforting.',
+    cuisine: 'American',
+    meal_type: 'lunch',
+    prep_time_minutes: 8,
+    cook_time_minutes: 10,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'sourdough bread', quantity: '8', unit: 'slices' },
+      { item: 'mozzarella cheese', quantity: '8', unit: 'oz', notes: 'sliced' },
+      { item: 'tomato', quantity: '1', unit: 'large', notes: 'thinly sliced' },
+      { item: 'fresh basil', quantity: '1/4', unit: 'cup' },
+      { item: 'butter', quantity: '3', unit: 'tbsp', notes: 'softened' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Butter one side of each bread slice.',
+      'Layer mozzarella, tomato, and basil between the bread slices with the buttered sides facing out.',
+      'Cook the sandwiches in a skillet over medium heat for 3 to 4 minutes per side until golden and the cheese is melted.',
+      'Slice and serve warm.'
+    ]),
+    tags_json: JSON.stringify(['lunch', 'quick-hot-lunch', 'vegetarian', 'comfort-food']),
+    difficulty: 'easy',
+    kid_friendly_score: 8,
+    weeknight_score: 10,
+    active: true
+  },
+  {
+    title: 'Chicken Tortilla Soup',
+    slug: 'lunch-7-chicken-tortilla-soup',
+    description: 'This quick tortilla soup is loaded with chicken, beans, and Tex-Mex flavor for a warm lunch.',
+    cuisine: 'Tex-Mex',
+    meal_type: 'lunch',
+    prep_time_minutes: 10,
+    cook_time_minutes: 15,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'cooked chicken', quantity: '2', unit: 'cups', notes: 'shredded' },
+      { item: 'black beans', quantity: '1', unit: 'can', notes: 'drained and rinsed' },
+      { item: 'diced tomatoes', quantity: '14', unit: 'oz' },
+      { item: 'chicken broth', quantity: '3', unit: 'cups' },
+      { item: 'corn', quantity: '1', unit: 'cup' },
+      { item: 'taco seasoning', quantity: '1', unit: 'tbsp' },
+      { item: 'tortilla chips', quantity: '2', unit: 'cups', notes: 'crushed' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Combine the chicken, black beans, tomatoes, broth, corn, and taco seasoning in a pot.',
+      'Bring to a simmer and cook for 12 to 15 minutes.',
+      'Taste and adjust seasoning if needed.',
+      'Serve the soup hot topped with crushed tortilla chips.'
+    ]),
+    tags_json: JSON.stringify(['lunch', 'quick-hot-lunch', 'high-protein', 'soup']),
+    difficulty: 'easy',
+    kid_friendly_score: 7,
+    weeknight_score: 9,
+    active: true
+  },
+  {
+    title: 'Chicken Fried Rice Meal Prep Bowls',
+    slug: 'lunch-8-chicken-fried-rice-bowls',
+    description: 'Chicken fried rice bowls reheat well and make a practical leftover-friendly lunch.',
+    cuisine: 'Asian',
+    meal_type: 'lunch',
+    prep_time_minutes: 12,
+    cook_time_minutes: 15,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'cooked rice', quantity: '4', unit: 'cups' },
+      { item: 'cooked chicken', quantity: '2', unit: 'cups', notes: 'diced' },
+      { item: 'frozen peas and carrots', quantity: '2', unit: 'cups' },
+      { item: 'eggs', quantity: '2', unit: 'whole' },
+      { item: 'soy sauce', quantity: '3', unit: 'tbsp' },
+      { item: 'sesame oil', quantity: '1', unit: 'tbsp' },
+      { item: 'green onions', quantity: '2', unit: 'whole', notes: 'sliced' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Heat the sesame oil in a large skillet over medium-high heat.',
+      'Scramble the eggs, then add the peas and carrots and cook for 2 minutes.',
+      'Stir in the chicken, rice, and soy sauce and cook for 4 to 5 minutes until hot.',
+      'Finish with green onions and divide into containers or bowls.'
+    ]),
+    tags_json: JSON.stringify(['lunch', 'leftover-friendly', 'meal-prep', 'high-protein']),
+    difficulty: 'easy',
+    kid_friendly_score: 8,
+    weeknight_score: 9,
+    active: true
+  },
+  {
+    title: 'Turkey and Sweet Potato Chili',
+    slug: 'lunch-9-turkey-sweet-potato-chili',
+    description: 'This hearty turkey chili reheats beautifully and keeps lunch satisfying all week.',
+    cuisine: 'American',
+    meal_type: 'lunch',
+    prep_time_minutes: 12,
+    cook_time_minutes: 25,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'ground turkey', quantity: '1', unit: 'lb' },
+      { item: 'sweet potato', quantity: '1', unit: 'large', notes: 'peeled and diced' },
+      { item: 'kidney beans', quantity: '1', unit: 'can', notes: 'drained and rinsed' },
+      { item: 'diced tomatoes', quantity: '14', unit: 'oz' },
+      { item: 'chicken broth', quantity: '2', unit: 'cups' },
+      { item: 'yellow onion', quantity: '1', unit: 'medium', notes: 'diced' },
+      { item: 'chili powder', quantity: '2', unit: 'tsp' },
+      { item: 'olive oil', quantity: '1', unit: 'tbsp' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Heat the olive oil in a pot over medium heat and cook the onion for 3 minutes.',
+      'Add the turkey and chili powder and cook for 5 minutes until browned.',
+      'Stir in the sweet potato, beans, tomatoes, and broth.',
+      'Simmer for 18 to 20 minutes until the sweet potato is tender, then serve or store for later.'
+    ]),
+    tags_json: JSON.stringify(['lunch', 'leftover-friendly', 'high-protein', 'one-pot']),
+    difficulty: 'easy',
+    kid_friendly_score: 7,
+    weeknight_score: 8,
+    active: true
+  },
+  {
+    title: 'Baked Mac and Cheese with Broccoli',
+    slug: 'lunch-10-baked-mac-cheese-broccoli',
+    description: 'Creamy mac and cheese with broccoli is a comforting lunch that reheats especially well.',
+    cuisine: 'American',
+    meal_type: 'lunch',
+    prep_time_minutes: 12,
+    cook_time_minutes: 20,
+    servings: 4,
+    ingredients_json: JSON.stringify([
+      { item: 'elbow macaroni', quantity: '8', unit: 'oz' },
+      { item: 'broccoli florets', quantity: '3', unit: 'cups' },
+      { item: 'milk', quantity: '2', unit: 'cups' },
+      { item: 'shredded cheddar cheese', quantity: '2', unit: 'cups' },
+      { item: 'butter', quantity: '2', unit: 'tbsp' },
+      { item: 'all-purpose flour', quantity: '2', unit: 'tbsp' },
+      { item: 'breadcrumbs', quantity: '1/3', unit: 'cup' }
+    ]),
+    instructions_json: JSON.stringify([
+      'Preheat the oven to 400°F and cook the macaroni according to package directions, adding the broccoli during the last 2 minutes.',
+      'Melt the butter in a saucepan, whisk in the flour, then slowly whisk in the milk and cook until slightly thickened.',
+      'Stir in the cheddar until smooth, then toss with the drained pasta and broccoli.',
+      'Transfer to a baking dish, top with breadcrumbs, and bake for 10 minutes until bubbly.',
+      'Serve warm or cool and reheat later.'
+    ]),
+    tags_json: JSON.stringify(['lunch', 'leftover-friendly', 'kid-friendly', 'vegetarian']),
+    difficulty: 'medium',
+    kid_friendly_score: 9,
+    weeknight_score: 7,
+    active: true
+  }
+
 ]
 
 Deno.serve(async (req) => {
