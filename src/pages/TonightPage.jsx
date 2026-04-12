@@ -601,17 +601,19 @@ export function TonightPage() {
       // First generation call
       console.log('[TonightPage] invoking generate-plan with payload:', JSON.stringify(payload, null, 2).slice(0, 500))
 
-      if (!session?.access_token) {
-        toast.error('Session expired, please log in again.')
-        navigate('/login', { replace: true })
+      if (!session) {
+        console.error('[TonightPage] No active session, cannot invoke generate-plan')
         return
       }
 
-      const { data, error, functionName } = await invokePlannerFunction(payload, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+      const { data, error } = await supabase.functions.invoke('generate-plan', {
+        body: payload,
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       })
 
-      console.log('[TonightPage] planner function response:', { functionName, data, error })
+      console.log('[TonightPage] planner function response:', { functionName: 'generate-plan', data, error })
 
       if (error) {
         console.error('[TonightPage] generate-plan error:', error)
