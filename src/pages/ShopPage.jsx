@@ -14,8 +14,8 @@ import { CATEGORY_LABELS, CATEGORY_ORDER } from '../lib/shoppingListUtils'
 
 const categoryColors = {
   produce: { border: '#22C55E', bg: 'bg-green-50' },
-  protein: { border: '#F97316', bg: 'bg-orange-50' },
   dairy: { border: '#3B82F6', bg: 'bg-blue-50' },
+  meat: { border: '#F97316', bg: 'bg-orange-50' },
   pantry: { border: '#EAB308', bg: 'bg-yellow-50' },
   frozen: { border: '#06B6D4', bg: 'bg-cyan-50' },
   bakery: { border: '#D97706', bg: 'bg-amber-50' },
@@ -60,7 +60,12 @@ export function ShopPage() {
   const progress = useMemo(() => {
     const items = shoppingList?.items || []
     const checked = items.filter((item) => item.checked).length
-    return { checked, total: items.length, percent: items.length > 0 ? Math.round((checked / items.length) * 100) : 0 }
+    return {
+      checked,
+      total: items.length,
+      percent: items.length > 0 ? Math.round((checked / items.length) * 100) : 0,
+      label: `${items.length} items (${checked} checked)`
+    }
   }, [shoppingList])
 
   const toggleItem = async (itemKey) => {
@@ -178,8 +183,22 @@ export function ShopPage() {
       </div>
 
       <div className="card p-4 mb-3 shadow-sm hover:shadow-md transition-shadow duration-200">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <div className="inline-flex items-center rounded-full bg-primary-50 px-3 py-1 text-sm font-medium text-text-secondary">
+              {progress.label}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={clearAllChecks}
+            className="rounded-full border border-divider bg-white px-3 py-1.5 text-sm font-medium text-text-secondary transition-colors hover:bg-warm-50"
+          >
+            Uncheck All
+          </button>
+        </div>
         <div className="flex justify-between text-sm mb-2">
-          <span className="text-text-secondary font-medium">{progress.checked} of {progress.total} items</span>
+          <span className="text-text-secondary font-medium">{progress.checked} of {progress.total} checked</span>
           <span className="text-text-muted">{progress.percent}%</span>
         </div>
         <div className="h-2 bg-primary-100 rounded-full overflow-hidden">
@@ -220,10 +239,7 @@ export function ShopPage() {
 
             {isOpen && (
               <div className={`mt-1 rounded-xl ${colors.bg}`}>
-                {items
-                  .slice()
-                  .sort((a, b) => a.checked - b.checked || a.name.localeCompare(b.name))
-                  .map((item) => {
+                {items.map((item) => {
                     return (
                       <button
                         key={item.__itemKey}
@@ -261,9 +277,6 @@ export function ShopPage() {
       })}
 
       <div className="flex gap-3 mt-4">
-        <button type="button" onClick={clearAllChecks} className="btn-ghost text-text-muted hover:bg-warm-100 flex-1">
-          Clear all
-        </button>
         <button type="button" onClick={handleShare} className="btn-primary flex-1">
           Copy list
         </button>

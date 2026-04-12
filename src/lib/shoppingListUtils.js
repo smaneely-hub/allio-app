@@ -7,12 +7,12 @@ const UNIT_WORDS = new Set([
   'slice', 'slices', 'bottle', 'bottles'
 ])
 
-const CATEGORY_ORDER = ['produce', 'protein', 'dairy', 'pantry', 'frozen', 'bakery', 'other']
+const CATEGORY_ORDER = ['produce', 'dairy', 'meat', 'pantry', 'frozen', 'bakery', 'other']
 
 const CATEGORY_LABELS = {
   produce: 'Produce',
-  protein: 'Protein',
-  dairy: 'Dairy & Eggs',
+  dairy: 'Dairy',
+  meat: 'Meat',
   pantry: 'Pantry',
   frozen: 'Frozen',
   bakery: 'Bakery',
@@ -58,8 +58,8 @@ export function categorizeIngredient(name = '') {
   const value = normalizeIngredientName(name)
 
   if (/(apple|banana|orange|lemon|lime|tomato|onion|garlic|potato|carrot|broccoli|spinach|lettuce|cucumber|pepper|celery|mushroom|avocado|cilantro|parsley|basil|ginger|berry|grape|melon|mango|peach|pear|cabbage|zucchini|squash|asparagus|green bean|corn|pea|leek|shallot|beet|radish|arugula|kale|chard|fruit|herb|cauliflower)/.test(value)) return 'produce'
-  if (/(chicken|beef|pork|fish|salmon|tuna|shrimp|tofu|tempeh|turkey|lamb|bacon|sausage|ham|egg|steak|ground meat|ground chicken|ground pork)/.test(value)) return 'protein'
-  if (/(milk|cheese|yogurt|butter|cream|sour cream|cottage cheese|parmesan|mozzarella|cheddar|feta|ricotta|half and half)/.test(value)) return 'dairy'
+  if (/(milk|cheese|yogurt|butter|cream|sour cream|cottage cheese|parmesan|mozzarella|cheddar|feta|ricotta|half and half|egg)/.test(value)) return 'dairy'
+  if (/(chicken|beef|pork|fish|salmon|tuna|shrimp|tofu|tempeh|turkey|lamb|bacon|sausage|ham|steak|ground meat|ground chicken|ground pork)/.test(value)) return 'meat'
   if (/(bread|bagel|muffin|croissant|bun|roll|tortilla|pita|naan)/.test(value)) return 'bakery'
   if (/(frozen|ice cream|hash brown)/.test(value)) return 'frozen'
   if (/(pasta|rice|noodle|flour|sugar|oil|vinegar|sauce|stock|broth|can|bean|lentil|chickpea|oat|cereal|honey|syrup|spice|seasoning|salt|pepper|mustard|ketchup|mayo|mayonnaise|soy sauce|breadcrumb|quinoa|couscous|tortilla chips|cracker)/.test(value)) return 'pantry'
@@ -152,8 +152,18 @@ export function buildGroupedShoppingItems(meals = [], staplesOnHand = '') {
   })
 }
 
+export function sortShoppingItems(items = []) {
+  return [...items].sort((a, b) => {
+    const categoryCompare = CATEGORY_ORDER.indexOf(a.category || 'other') - CATEGORY_ORDER.indexOf(b.category || 'other')
+    if (categoryCompare !== 0) return categoryCompare
+    const checkedCompare = Number(Boolean(a.checked)) - Number(Boolean(b.checked))
+    if (checkedCompare !== 0) return checkedCompare
+    return String(a.name || '').localeCompare(String(b.name || ''))
+  })
+}
+
 export function groupItemsByCategory(items = []) {
-  return items.reduce((acc, item) => {
+  return sortShoppingItems(items).reduce((acc, item) => {
     const category = item.category || 'other'
     if (!acc[category]) acc[category] = []
     acc[category].push(item)
