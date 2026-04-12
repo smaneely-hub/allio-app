@@ -133,6 +133,19 @@ export function MealCard({ meal, onSwap, onSaveNote }) {
     )
   }
 
+  if (meal.swap_pending) {
+    return (
+      <div className="rounded-2xl border border-divider bg-white p-4 shadow-sm">
+        <div className="h-36 -mx-4 -mt-4 mb-4 animate-pulse rounded-t-2xl bg-gradient-to-br from-slate-100 to-slate-200" />
+        <div className="space-y-3 animate-pulse">
+          <div className="h-5 w-2/3 rounded bg-slate-200" />
+          <div className="h-4 w-1/2 rounded bg-slate-200" />
+          <div className="h-4 w-1/3 rounded bg-slate-200" />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={`rounded-2xl border p-4 shadow-sm transition-all duration-200 hover:shadow-md ${meal.locked ? 'border-green-300 bg-green-50' : meal.is_leftover ? 'border-dashed border-divider bg-bg-primary' : 'border-divider bg-white'}`}>
       {/* Meal image / visual */}

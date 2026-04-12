@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { aggregateShoppingList } from '../lib/aggregateShoppingList'
@@ -83,7 +83,15 @@ export function useMealPlan(scheduleId) {
   const [mealPlan, setMealPlan] = useState(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [swappingMealId, setSwappingMealId] = useState(null)
   const [error, setError] = useState(null)
+
+  const recentSwappedMealNames = useMemo(() => (
+    (mealPlan?.draft_plan?.meals || [])
+      .filter((meal) => meal.swapped && (meal.original_name || meal.name))
+      .map((meal) => meal.original_name || meal.name)
+      .slice(-3)
+  ), [mealPlan])
 
   const loadMealPlan = useCallback(async () => {
     if (!user || !scheduleId) {
@@ -354,6 +362,26 @@ export function useMealPlan(scheduleId) {
   }, [mealPlan, persistPlan])
 
   const swapMeal = useCallback(async (mealToReplace, suggestion = '') => {
+    const optimisticPlan = mealPlan?.draft_plan
+      ? {
+          ...mealPlan.draft_plan,
+          meals: mealPlan.draft_plan.meals.map((meal) =>
+            meal.id === mealToReplace.id
+              ? {
+                  ...meal,
+                  swap_pending: true,
+                  reason: 'Finding a better fit…',
+                }
+              : meal,
+          ),
+        }
+      : null
+
+    if (optimisticPlan) {
+      setMealPlan((current) => current ? { ...current, draft_plan: optimisticPlan, plan: optimisticPlan } : current)
+    }
+    setSwappingMealId(mealToReplace.id)
+
     try {
       const { data: household } = await supabase.from('households').select('*').eq('user_id', user.id).limit(1).single()
       const { data: members } = await supabase.from('household_members').select('*').eq('user_id', user.id).eq('household_id', household.id)
@@ -399,6 +427,7 @@ export function useMealPlan(scheduleId) {
           .filter((slot) => slot.day && slot.meal),
         week_notes: schedule?.week_notes || '',
         existing_plan: mealPlan.draft_plan,
+        recent_meal_names: recentSwappedMealNames,
         replace_slot: {
           day: mealToReplace.day,
           meal: mealToReplace.meal,
@@ -459,10 +488,25 @@ export function useMealPlan(scheduleId) {
 
       return persistPlan(nextPlan)
     } catch (err) {
-      toast.error("Something went wrong swapping that meal. Want to try again?")
+      if (optimisticPlan) {
+        setMealPlan((current) => current ? {
+          ...current,
+          draft_plan: {
+            ...mealPlan.draft_plan,
+            meals: mealPlan.draft_plan.meals.map((meal) => ({ ...meal, swap_pending: false })),
+          },
+          plan: {
+            ...mealPlan.draft_plan,
+            meals: mealPlan.draft_plan.meals.map((meal) => ({ ...meal, swap_pending: false })),
+          },
+        } : current)
+      }
+      toast.error("Couldn't swap, try again.")
       throw err
+    } finally {
+      setSwappingMealId(null)
     }
-  }, [mealPlan, persistPlan, scheduleId, user])
+  }, [mealPlan, persistPlan, recentSwappedMealNames, scheduleId, user])
 
   const clearMealPlan = useCallback(async () => {
     if (!user || !scheduleId) throw new Error('Schedule is required before clearing a meal plan.')
@@ -503,6 +547,7 @@ export function useMealPlan(scheduleId) {
     toggleMealLock,
     saveMealNote,
     swapMeal,
+    swappingMealId,
     clearMealPlan,
     finalizePlan,
   }

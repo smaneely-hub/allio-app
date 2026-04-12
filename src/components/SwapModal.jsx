@@ -2,14 +2,17 @@ import { useState, useCallback } from 'react'
 
 export function SwapModal({ isOpen, onClose, onSwap, mealName, loading = false }) {
   const [suggestion, setSuggestion] = useState('')
+  const [selectedReason, setSelectedReason] = useState('')
   
   if (!isOpen) return null
   
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (loading) return
-    await onSwap(suggestion)
+    const combinedSuggestion = [selectedReason, suggestion].filter(Boolean).join('. ')
+    await onSwap(combinedSuggestion)
     setSuggestion('')
+    setSelectedReason('')
   }
   
   const quickOptions = [
@@ -19,6 +22,12 @@ export function SwapModal({ isOpen, onClose, onSwap, mealName, loading = false }
     'Something Mexican',
     'Something Italian',
     'Lighter meal',
+  ]
+
+  const reasonOptions = [
+    'Too complex',
+    "Don't like this protein",
+    'Want something faster',
   ]
   
   return (
@@ -56,6 +65,23 @@ export function SwapModal({ isOpen, onClose, onSwap, mealName, loading = false }
             autoFocus
           />
           
+          <div className="mb-4">
+            <p className="mb-2 text-xs text-text-muted">Why swap? (optional)</p>
+            <div className="flex flex-wrap gap-2">
+              {reasonOptions.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setSelectedReason(option)}
+                  disabled={loading}
+                  className={`text-xs px-3 py-1.5 rounded-full transition-colors disabled:opacity-50 ${selectedReason === option ? 'bg-primary-500 text-white' : 'bg-warm-100 text-text-secondary hover:bg-warm-200'}`}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Quick options */}
           <div className="mb-4">
             <p className="text-xs text-text-muted mb-2">Quick suggestions:</p>

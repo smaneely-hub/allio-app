@@ -426,9 +426,102 @@ OUTPUT FORMAT — each meal object must have exactly these fields:
 ${restrictions ? `Dietary restrictions to respect: ${restrictions}` : ''}`
 }
 
-function validatePlan(plan: unknown) {
-  // More lenient validation - just check for meals array
-  return true
+const ACTION_VERB_PATTERN = /^(preheat|heat|bring|cook|bake|roast|saute|sauté|sear|stir|whisk|mix|combine|add|pour|season|pat|slice|chop|dice|mince|drain|rinse|toss|spread|arrange|place|boil|simmer|grill|broil|serve|garnish|top|transfer|reduce|marinate|wrap|reheat)\b/i
+const NON_NUMERIC_QUANTITY_PATTERN = /\b(some|few|several|handful|pinch|dash|to taste|as needed)\b/i
+
+function getSlotTimeExpectation(slot: Record<string, unknown> = {}) {
+  const effort = String(slot.effort || slot.effort_level || 'medium').toLowerCase()
+  if (effort === 'low') return 30
+  if (effort === 'high' || effort === 'full') return 75
+  return 50
+}
+
+function createShortReason(meal: Record<string, unknown>) {
+  const existing = String(meal.reason || '').trim()
+  if (existing) return existing.split(/[.!?]/)[0].trim().slice(0, 90)
+
+  const totalTime = Number(meal.prep_time_minutes || 0) + Number(meal.cook_time_minutes || 0)
+  const protein = String(meal.protein_type || '').trim().toLowerCase()
+  if (totalTime > 0 && totalTime <= 30) return `Quick ${protein || 'family'} meal, ready in ${totalTime} minutes`
+  if (protein && protein !== 'none' && protein !== 'mixed') return `Comforting ${protein} dinner that keeps tonight simple`
+  return 'Practical pick for a busy night'
+}
+
+function scoreMealQuality(meal: Record<string, unknown>, slot: Record<string, unknown> = {}) {
+  const ingredients = Array.isArray(meal.ingredients) ? meal.ingredients : []
+  const instructions = Array.isArray(meal.instructions) ? meal.instructions : []
+  const servings = Number(meal.servings || 0)
+  const totalTime = Number(meal.prep_time_minutes || 0) + Number(meal.cook_time_minutes || 0)
+  const maxTime = getSlotTimeExpectation(slot)
+
+  const ingredientCountOk = ingredients.length > 0
+  const stepCountOk = instructions.length >= 3
+  const servingsOk = servings > 0
+  const timeOk = totalTime === 0 || totalTime <= maxTime
+  const quantitiesNumeric = ingredients.every((ingredient) => {
+    if (!ingredient || typeof ingredient !== 'object') return false
+    const quantity = (ingredient as Record<string, unknown>).quantity
+    if (typeof quantity === 'number') return Number.isFinite(quantity)
+    if (typeof quantity === 'string') {
+      const trimmed = quantity.trim()
+      if (!trimmed || NON_NUMERIC_QUANTITY_PATTERN.test(trimmed)) return false
+      return /^\d+(?:\.\d+)?(?:\s*\/\s*\d+)?$/.test(trimmed)
+    }
+    return false
+  })
+  const instructionsActionable = instructions.every((step) => typeof step === 'string' && ACTION_VERB_PATTERN.test(step.trim()))
+
+  const checks = {
+    ingredientCountOk,
+    stepCountOk,
+    servingsOk,
+    timeOk,
+    quantitiesNumeric,
+    instructionsActionable,
+  }
+
+  const passed = Object.values(checks).filter(Boolean).length
+  const qualityScore = Math.round((passed / Object.keys(checks).length) * 100)
+
+  return { qualityScore, checks, valid: passed === Object.keys(checks).length }
+}
+
+function validatePlan(plan: unknown, scheduledSlots: Array<Record<string, unknown>> = []) {
+  const normalized = transformLlmOutput(plan, scheduledSlots)
+  const meals = normalized.meals || []
+  const failures: string[] = []
+
+  if (meals.length === 0) {
+    failures.push('No meals returned')
+    return { valid: false, meals, failures }
+  }
+
+  meals.forEach((meal) => {
+    const slot = scheduledSlots.find((candidate) => candidate.day === meal.day && candidate.meal === meal.meal) || {}
+    const assessment = scoreMealQuality(meal, slot)
+    if (!assessment.valid) {
+      const failedChecks = Object.entries(assessment.checks)
+        .filter(([, value]) => !value)
+        .map(([key]) => key)
+        .join(', ')
+      failures.push(`${String(meal.name || 'Meal')}: ${failedChecks}`)
+    }
+  })
+
+  return { valid: failures.length === 0, meals, failures }
+}
+
+function ensureMealMetadata(meal: Record<string, unknown>, slot: Record<string, unknown> = {}) {
+  const assessment = scoreMealQuality(meal, slot)
+  return {
+    ...meal,
+    reason: createShortReason(meal),
+    quality_score: assessment.qualityScore,
+  }
+}
+
+function buildRetryPrompt(basePrompt: string, failures: string[]) {
+  return `${basePrompt}\n\nRETRY INSTRUCTIONS:\nThe last attempt failed validation. Fix every issue below and return a complete corrected JSON response.\n- Missing ingredients are not allowed.\n- Every recipe needs at least 3 actionable instruction steps.\n- Keep total time within the slot expectation.\n- Servings count is required.\n- Every ingredient quantity must be numeric. Avoid words like some, handful, pinch, dash, or to taste.\n- Every instruction must start with an action verb.\n- Keep reason warm, practical, and under 15 words.\nValidation failures: ${failures.join(' | ')}`
 }
 
 // Transform LLM output to frontend format - simplified
@@ -860,12 +953,52 @@ serve(async (req) => {
         ]
         let llmJson = await callLlm(llmMessages)
         let parsedPlan = JSON.parse(llmJson.choices[0].message.content)
+        let validation = validatePlan(parsedPlan, remainingSlots)
+
+        if (!validation.valid) {
+          console.warn('[generate-plan] Hybrid LLM validation failed, retrying once:', validation.failures)
+          const retryMessages = [
+            { role: 'system', content: buildRetryPrompt(buildSystemPrompt(remainingSlots, payload.members, payload.household, payload.replace_slot?.suggestion, payload.week_notes), validation.failures) },
+            { role: 'user', content: JSON.stringify({ ...payload, slots: remainingSlots }) },
+          ]
+          llmJson = await callLlm(retryMessages)
+          parsedPlan = JSON.parse(llmJson.choices[0].message.content)
+          validation = validatePlan(parsedPlan, remainingSlots)
+        }
+
         let llmTransformed
-        try {
-          llmTransformed = transformLlmOutput(parsedPlan, remainingSlots)
-        } catch (e) {
-          console.error('[transform] Error in hybrid LLM fallback:', e)
-          llmTransformed = { meals: [] }
+        if (validation.valid) {
+          llmTransformed = {
+            meals: validation.meals.map((meal) => {
+              const slot = remainingSlots.find((candidate) => candidate.day === meal.day && candidate.meal === meal.meal) || {}
+              return ensureMealMetadata(meal, slot)
+            }),
+          }
+        } else {
+          console.warn('[generate-plan] Hybrid LLM validation failed after retry, falling back to catalog where possible:', validation.failures)
+          const fallbackMeals = []
+          for (const slot of remainingSlots) {
+            const { recipe, dietApplied: fallbackDiet } = await getRecipeFromCatalog(
+              supabaseClient,
+              String(slot.meal || 'dinner'),
+              String(slot.effort || slot.effort_level || 'medium'),
+              String(slot.suggestion || ''),
+              payload.members,
+              payload.replace_slot?.current_meal_name || null,
+              payload.recent_meal_names || [],
+            )
+            if (recipe) {
+              fallbackMeals.push(ensureMealMetadata({
+                day: slot.day,
+                meal: slot.meal || 'dinner',
+                ...recipe,
+                why_this_meal: `Fallback to a trusted library recipe for a more reliable ${slot.meal || 'meal'}.`,
+                reason: createShortReason(recipe),
+                diet_applied: fallbackDiet,
+              }, slot))
+            }
+          }
+          llmTransformed = { meals: fallbackMeals }
         }
         
         // Save LLM-generated recipes to database for future reuse
@@ -899,16 +1032,56 @@ serve(async (req) => {
     let llmJson = await callLlm(messages)
     console.log('[generate-plan] LLM raw response:', JSON.stringify(llmJson).slice(0, 300))
     let parsedPlan = JSON.parse(llmJson.choices[0].message.content)
+    let validation = validatePlan(parsedPlan, payload.slots)
+
+    if (!validation.valid) {
+      console.warn('[generate-plan] LLM validation failed, retrying once:', validation.failures)
+      const retryMessages = [
+        { role: 'system', content: buildRetryPrompt(buildSystemPrompt(payload.slots, payload.members, payload.household, payload.replace_slot?.suggestion, payload.week_notes), validation.failures) },
+        { role: 'user', content: JSON.stringify(payload) },
+      ]
+      llmJson = await callLlm(retryMessages)
+      parsedPlan = JSON.parse(llmJson.choices[0].message.content)
+      validation = validatePlan(parsedPlan, payload.slots)
+    }
 
     // Transform LLM output to frontend format - filter to only scheduled slots
     let transformedPlan
-    try {
+    if (validation.valid) {
       console.log('[generate-plan] About to transform, scheduledSlots:', JSON.stringify(payload.slots))
-      transformedPlan = transformLlmOutput(parsedPlan, payload.slots)
+      transformedPlan = {
+        meals: validation.meals.map((meal) => {
+          const slot = payload.slots.find((candidate) => candidate.day === meal.day && candidate.meal === meal.meal) || {}
+          return ensureMealMetadata(meal, slot)
+        }),
+      }
       console.log('[generate-plan] After transform, meals count:', transformedPlan.meals?.length)
-    } catch (e) {
-      console.error('[transform] Error:', e)
-      transformedPlan = { meals: [] }
+    } else {
+      console.warn('[generate-plan] LLM validation failed after retry, falling back to library recipes:', validation.failures)
+      const supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+      const fallbackMeals = []
+      for (const slot of payload.slots) {
+        const { recipe, dietApplied } = await getRecipeFromCatalog(
+          supabaseClient,
+          String(slot.meal || 'dinner'),
+          String(slot.effort || slot.effort_level || 'medium'),
+          String(slot.suggestion || ''),
+          payload.members,
+          payload.replace_slot?.current_meal_name || null,
+          payload.recent_meal_names || [],
+        )
+        if (recipe) {
+          fallbackMeals.push(ensureMealMetadata({
+            day: slot.day,
+            meal: slot.meal || 'dinner',
+            ...recipe,
+            why_this_meal: `Fallback to a trusted library recipe for a more reliable ${slot.meal || 'meal'}.`,
+            reason: createShortReason(recipe),
+            diet_applied: dietApplied,
+          }, slot))
+        }
+      }
+      transformedPlan = { meals: fallbackMeals }
     }
     console.log('[generate-plan] Transformed plan:', JSON.stringify(transformedPlan).slice(0, 200))
 
