@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useAuth } from '../hooks/useAuth'
@@ -237,6 +237,9 @@ async function loadTonightPreferenceSignals(userId) {
 export function TonightPage() {
   useDocumentTitle("Tonight's Meal | Allio")
   const { user } = useAuth()
+  const navigate = useNavigate()
+  const initialDataLoadedRef = useRef(false)
+  const savedMealsLoadedRef = useRef(false)
   const { members } = useHouseholdMembers(user?.id)
 
   const [selectedMembers, setSelectedMembers] = useState([])
@@ -290,7 +293,8 @@ export function TonightPage() {
 
   // Load last saved meal on mount and build recent history
   useEffect(() => {
-    if (!user) return
+    if (!user || initialDataLoadedRef.current) return
+    initialDataLoadedRef.current = true
 
     const today = new Date().toISOString().split('T')[0]
 
@@ -361,7 +365,7 @@ export function TonightPage() {
   }, [user])
 
   useEffect(() => {
-    if (!user) return
+    if (!user || !initialDataLoadedRef.current) return
 
     getHousehold(user.id)
       .then((household) => {
@@ -384,7 +388,8 @@ export function TonightPage() {
 
   // Load saved favorites
   useEffect(() => {
-    if (!user) return
+    if (!user || savedMealsLoadedRef.current) return
+    savedMealsLoadedRef.current = true
     supabase
       .from('saved_meals')
       .select('*')
@@ -595,6 +600,12 @@ export function TonightPage() {
 
       // First generation call
       console.log('[TonightPage] invoking generate-plan with payload:', JSON.stringify(payload, null, 2).slice(0, 500))
+
+      if (!session?.access_token) {
+        toast.error('Session expired, please log in again.')
+        navigate('/login', { replace: true })
+        return
+      }
 
       const { data, error, functionName } = await invokePlannerFunction(payload)
 
