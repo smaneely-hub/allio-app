@@ -166,13 +166,26 @@ async function loadTonightPreferenceSignals(userId) {
     }
   }
 
-  const [signalsResult, favoritesResult, feedbackResult] = await Promise.all([
-    supabase
+  let signalsResult = { data: [], error: null }
+  try {
+    const result = await supabase
       .from('meal_signals')
       .select('meal_name, signal_type, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
-      .limit(30),
+      .limit(30)
+
+    if (result.error && (result.error.code === 'PGRST205' || String(result.error.message || '').includes('meal_signals'))) {
+      console.warn('[TonightPage] meal_signals unavailable, continuing without it')
+      signalsResult = { data: [], error: null }
+    } else {
+      signalsResult = result
+    }
+  } catch (err) {
+    console.warn('[TonightPage] meal_signals lookup failed, continuing without it', err)
+  }
+
+  const [favoritesResult, feedbackResult] = await Promise.all([
     supabase
       .from('saved_meals')
       .select('recipe_name, created_at')

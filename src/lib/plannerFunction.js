@@ -22,6 +22,23 @@ async function invokePlannerFunctionOnce(payload) {
 }
 
 export async function invokePlannerFunction(payload) {
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession()
+
+  if (sessionError) {
+    return { data: null, error: sessionError, functionName: FUNCTION_CANDIDATES[0] }
+  }
+
+  if (!session?.access_token) {
+    return {
+      data: null,
+      error: { message: 'Session expired, please log in again.' },
+      functionName: FUNCTION_CANDIDATES[0],
+    }
+  }
+
   let result = await invokePlannerFunctionOnce(payload)
 
   const message = String(result?.error?.message || '')
@@ -34,7 +51,10 @@ export async function invokePlannerFunction(payload) {
 
   const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
   if (refreshError || !refreshData?.session?.access_token) {
-    return result
+    return {
+      ...result,
+      error: { message: 'Session expired, please log in again.' },
+    }
   }
 
   return invokePlannerFunctionOnce(payload)
