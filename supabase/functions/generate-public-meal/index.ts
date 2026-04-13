@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
 
 const LLM_API_KEY = Deno.env.get('LLM_API_KEY') || ''
 const LLM_ENDPOINT = Deno.env.get('LLM_ENDPOINT') || 'https://openrouter.ai/api/v1/chat/completions'
-const LLM_MODEL = Deno.env.get('LLM_PUBLIC_MODEL') || Deno.env.get('LLM_MODEL') || 'google/gemini-2.5-flash-preview'
+const LLM_MODEL = Deno.env.get('LLM_PUBLIC_MODEL') || Deno.env.get('LLM_MODEL') || 'google/gemini-2.5-flash'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
