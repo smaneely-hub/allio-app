@@ -3,6 +3,7 @@ import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { normalizeMealRecord } from '../lib/mealSchema'
+import { normalizeRecipe } from '../lib/recipeSchema'
 
 const quickPrefs = ['High protein', 'Comfort food', 'Low carb', 'Vegetarian', 'Fast cleanup']
 
@@ -21,6 +22,19 @@ export function PublicMealGeneratorPage() {
   const [dailyAttempts, setDailyAttempts] = useState(0)
 
   const canGenerate = useMemo(() => dailyAttempts < 6, [dailyAttempts])
+  const recipe = useMemo(() => (meal ? normalizeRecipe({
+    ...meal,
+    title: meal.title || meal.name,
+    prepTime: meal.prep_time_minutes,
+    cookTime: meal.cook_time_minutes,
+    totalTime: meal.total_time_minutes,
+    ingredientGroups: meal.ingredientGroups,
+    instructionGroups: meal.instructionGroups,
+    substitutions: meal.substitutions,
+    nutrition: meal.nutrition,
+    tags: meal.recipeTags,
+    sourceNote: meal.sourceNote,
+  }) : null), [meal])
 
   const updateField = (key, value) => setForm((current) => ({ ...current, [key]: value }))
 
@@ -188,9 +202,9 @@ export function PublicMealGeneratorPage() {
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-wide text-primary-700">Tonight’s pick</div>
                   <h2 className="mt-2 font-display text-2xl text-text-primary">{meal.name}</h2>
-                  {meal.reason ? <p className="mt-2 text-sm text-text-secondary">{meal.reason}</p> : null}
+                  <p className="mt-2 text-sm text-text-secondary">{recipe?.description || meal.reason}</p>
                   {meal.why_this_meal ? <p className="mt-3 rounded-2xl bg-primary-50 p-3 text-sm text-primary-800">{meal.why_this_meal}</p> : null}
-                  <div className="mt-3 text-sm text-text-secondary">{meal.servings} servings • {meal.prep_time_minutes} min prep • {meal.cook_time_minutes} min cook</div>
+                  <div className="mt-3 text-sm text-text-secondary">{recipe?.yield || `${meal.servings} servings`} • {meal.prep_time_minutes} min prep • {meal.cook_time_minutes} min cook</div>
                 </div>
 
                 <div>
@@ -206,23 +220,40 @@ export function PublicMealGeneratorPage() {
 
                 <div>
                   <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Ingredients</div>
-                  <ul className="space-y-2 text-sm text-text-primary">
-                    {meal.ingredients.map((ingredient) => (
-                      <li key={ingredient} className="rounded-xl bg-warm-50 px-3 py-2">{ingredient}</li>
+                  <div className="space-y-4 text-sm text-text-primary">
+                    {(recipe?.ingredientGroups || []).map((group, groupIndex) => (
+                      <div key={`${group.label || 'ingredients'}-${groupIndex}`}>
+                        {group.label ? <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">{group.label}</div> : null}
+                        <ul className="space-y-2">
+                          {group.ingredients.map((ingredient, index) => (
+                            <li key={`${ingredient.item}-${index}`} className="rounded-xl bg-warm-50 px-3 py-2">{[ingredient.amount, ingredient.unit, ingredient.item].filter(Boolean).join(' ')}</li>
+                          ))}
+                        </ul>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </div>
 
                 <div>
                   <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Instructions</div>
-                  <ol className="space-y-3 text-sm text-text-primary">
-                    {meal.instructions.map((step, index) => (
-                      <li key={`${index}-${step}`} className="flex gap-3">
-                        <span className="font-semibold text-primary-500">{index + 1}.</span>
-                        <span>{step}</span>
-                      </li>
+                  <div className="space-y-4 text-sm text-text-primary">
+                    {(recipe?.instructionGroups || []).map((group, groupIndex) => (
+                      <div key={`${group.label || 'steps'}-${groupIndex}`}>
+                        {group.label ? <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">{group.label}</div> : null}
+                        <ol className="space-y-3">
+                          {group.steps.map((step, index) => (
+                            <li key={`${index}-${step.text}`} className="flex gap-3">
+                              <span className="font-semibold text-primary-500">{index + 1}.</span>
+                              <div>
+                                <span>{step.text}</span>
+                                {step.tip ? <div className="mt-1 text-xs text-text-muted">Tip: {step.tip}</div> : null}
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
                     ))}
-                  </ol>
+                  </div>
                 </div>
 
                 <div className="rounded-2xl border border-primary-100 bg-primary-50 p-4">

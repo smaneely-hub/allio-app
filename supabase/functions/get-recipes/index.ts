@@ -55,7 +55,7 @@ serve(async (req) => {
     
     let query = supabase
       .from('recipes')
-      .select('id, title, slug, description, cuisine, meal_type, prep_time_minutes, cook_time_minutes, servings, ingredients_json, instructions_json, nutrition_json, dietary_flags_json, allergen_flags_json, tags_json, kid_friendly_score, weeknight_score, leftovers_score, difficulty, active, source_name')
+      .select('id, title, slug, description, cuisine, meal_type, prep_time_minutes, cook_time_minutes, total_time_minutes, servings, yield_text, ingredients_json, instructions_json, ingredient_groups_json, instruction_groups_json, nutrition_json, dietary_flags_json, allergen_flags_json, tags_json, tags_v2_json, tips_json, substitutions_json, kid_friendly_score, weeknight_score, leftovers_score, difficulty, active, source_name, source_note, image_prompt, created_at, updated_at')
       .eq('meal_type', meal_type)
       .eq('active', true)
       .neq('title', 'ilike', '%test%')
@@ -130,21 +130,42 @@ serve(async (req) => {
 
     const topRecipe = topRecipes[0]
 
+    const ingredientGroups = typeof topRecipe.ingredient_groups_json === 'string'
+      ? JSON.parse(topRecipe.ingredient_groups_json)
+      : (topRecipe.ingredient_groups_json || [])
+    const instructionGroups = typeof topRecipe.instruction_groups_json === 'string'
+      ? JSON.parse(topRecipe.instruction_groups_json)
+      : (topRecipe.instruction_groups_json || [])
+    const ingredients = typeof topRecipe.ingredients_json === 'string' 
+      ? JSON.parse(topRecipe.ingredients_json) 
+      : topRecipe.ingredients_json
+    const instructions = typeof topRecipe.instructions_json === 'string' 
+      ? JSON.parse(topRecipe.instructions_json) 
+      : topRecipe.instructions_json
+
     const meal = {
       id: `generated-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       meal: meal_type,
       name: topRecipe.title,
+      title: topRecipe.title,
+      slug: topRecipe.slug,
       description: topRecipe.description || '',
       prep_time_minutes: topRecipe.prep_time_minutes,
       cook_time_minutes: topRecipe.cook_time_minutes,
+      total_time_minutes: topRecipe.total_time_minutes || ((topRecipe.prep_time_minutes || 0) + (topRecipe.cook_time_minutes || 0)),
       servings: topRecipe.servings || 4,
-      ingredients: typeof topRecipe.ingredients_json === 'string' 
-        ? JSON.parse(topRecipe.ingredients_json) 
-        : topRecipe.ingredients_json,
-      instructions: typeof topRecipe.instructions_json === 'string' 
-        ? JSON.parse(topRecipe.instructions_json) 
-        : topRecipe.instructions_json,
+      yield: topRecipe.yield_text || `${topRecipe.servings || 4} servings`,
+      ingredients,
+      instructions,
+      ingredientGroups: Array.isArray(ingredientGroups) && ingredientGroups.length > 0 ? ingredientGroups : [{ ingredients }],
+      instructionGroups: Array.isArray(instructionGroups) && instructionGroups.length > 0 ? instructionGroups : [{ steps: instructions.map((step: any) => typeof step === 'string' ? { text: step } : step) }],
+      nutrition: topRecipe.nutrition_json || undefined,
+      substitutions: topRecipe.substitutions_json || [],
+      tips: topRecipe.tips_json || [],
       cuisine: topRecipe.cuisine,
+      recipeTags: topRecipe.tags_v2_json || undefined,
+      sourceNote: topRecipe.source_note || topRecipe.source_name || undefined,
+      imagePrompt: topRecipe.image_prompt || undefined,
       why_this_meal: `${topRecipe.cuisine} ${meal_type} - Quick weeknight dinner`,
       from_recipe_library: true,
       recipe_id: topRecipe.id,

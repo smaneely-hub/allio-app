@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { FilterBar } from '../components/FilterBar'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { filterRecipesByTags, getAvailableTags } from '../lib/recipeFilters'
+import { normalizeRecipe } from '../lib/recipeSchema'
 import { supabase } from '../lib/supabase'
 
 /** Render a minimal browse view for recipes with tag-based filtering. */
@@ -16,7 +17,7 @@ export function RecipesPage() {
       setLoading(true)
       const { data } = await supabase
         .from('recipes')
-        .select('id, title, description, cuisine, meal_type, prep_time_minutes, cook_time_minutes, servings, difficulty, tags_json, active')
+        .select('id, title, slug, description, cuisine, meal_type, prep_time_minutes, cook_time_minutes, total_time_minutes, servings, yield_text, difficulty, ingredients_json, instructions_json, ingredient_groups_json, instruction_groups_json, nutrition_json, tips_json, substitutions_json, tags_json, tags_v2_json, source_note, image_prompt, created_at, updated_at, active')
         .eq('active', true)
         .order('title', { ascending: true })
 
@@ -53,12 +54,24 @@ export function RecipesPage() {
         <div className="card p-6 text-sm text-text-muted">Loading recipes...</div>
       ) : (
         <div className="space-y-3">
-          {filteredRecipes.map((recipe) => {
-            const tags = Array.isArray(recipe.tags_json)
-              ? recipe.tags_json
-              : typeof recipe.tags_json === 'string'
-                ? JSON.parse(recipe.tags_json)
-                : []
+          {filteredRecipes.map((recipeRow) => {
+            const recipe = normalizeRecipe({
+              ...recipeRow,
+              yield: recipeRow.yield_text,
+              prepTime: recipeRow.prep_time_minutes,
+              cookTime: recipeRow.cook_time_minutes,
+              totalTime: recipeRow.total_time_minutes,
+              ingredientGroups: recipeRow.ingredient_groups_json,
+              instructionGroups: recipeRow.instruction_groups_json,
+              ingredients: recipeRow.ingredients_json,
+              instructions: recipeRow.instructions_json,
+              substitutions: recipeRow.substitutions_json,
+              tags: recipeRow.tags_v2_json,
+              dietary_flags_json: recipeRow.dietary_flags_json,
+              sourceNote: recipeRow.source_note,
+              imagePrompt: recipeRow.image_prompt,
+            })
+            const tags = [recipe.tags.cuisine, recipe.tags.mealType, ...recipe.tags.dietary, ...(recipe.tags.cookingMethod || [])].filter(Boolean)
 
             return (
               <div key={recipe.id} className="card p-4 shadow-sm transition-shadow duration-200 hover:shadow-md">
@@ -66,6 +79,7 @@ export function RecipesPage() {
                   <div>
                     <h2 className="font-display text-xl text-text-primary">{recipe.title}</h2>
                     <p className="mt-1 text-sm text-text-secondary">{recipe.description}</p>
+                    {recipe.sourceNote ? <p className="mt-2 text-xs text-text-muted">{recipe.sourceNote}</p> : null}
                   </div>
                   <div className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary-600">
                     {recipe.difficulty}
@@ -73,11 +87,14 @@ export function RecipesPage() {
                 </div>
 
                 <div className="mt-3 flex flex-wrap gap-2 text-xs text-text-muted">
-                  <span className="rounded-full bg-warm-100 px-3 py-1">{recipe.cuisine}</span>
-                  <span className="rounded-full bg-warm-100 px-3 py-1">Prep {recipe.prep_time_minutes} min</span>
-                  <span className="rounded-full bg-warm-100 px-3 py-1">Cook {recipe.cook_time_minutes} min</span>
-                  <span className="rounded-full bg-warm-100 px-3 py-1">Serves {recipe.servings}</span>
+                  {recipe.tags.cuisine ? <span className="rounded-full bg-warm-100 px-3 py-1">{recipe.tags.cuisine}</span> : null}
+                  <span className="rounded-full bg-warm-100 px-3 py-1">Prep {recipe.prepTime} min</span>
+                  <span className="rounded-full bg-warm-100 px-3 py-1">Cook {recipe.cookTime} min</span>
+                  <span className="rounded-full bg-warm-100 px-3 py-1">Total {recipe.totalTime} min</span>
+                  <span className="rounded-full bg-warm-100 px-3 py-1">{recipe.yield || 'Yield varies'}</span>
                 </div>
+
+                {recipe.tips.length > 0 ? <p className="mt-3 text-sm text-text-secondary">{recipe.tips[0]}</p> : null}
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   {tags.map((tag) => (

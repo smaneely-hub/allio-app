@@ -40,6 +40,7 @@ Frontend deploy state, Vercel project selection, and Supabase function deploymen
 
 ### Prevention Rule
 Never assume GitHub state equals production state.
+Never use Vercel CLI for this project. Production deployment happens only through GitHub integration by pushing `master` with `git push origin master`.
 
 ### Verification Steps
 For production debugging always verify all three independently:

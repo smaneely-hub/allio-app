@@ -1,6 +1,22 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+function toLegacyIngredients(recipe: any) {
+  if (Array.isArray(recipe.ingredients_json)) return recipe.ingredients_json
+  if (Array.isArray(recipe.ingredientGroups)) {
+    return recipe.ingredientGroups.flatMap((group: any) => Array.isArray(group?.ingredients) ? group.ingredients : [])
+  }
+  return Array.isArray(recipe.ingredients) ? recipe.ingredients : []
+}
+
+function toLegacyInstructions(recipe: any) {
+  if (Array.isArray(recipe.instructions_json)) return recipe.instructions_json
+  if (Array.isArray(recipe.instructionGroups)) {
+    return recipe.instructionGroups.flatMap((group: any) => Array.isArray(group?.steps) ? group.steps : [])
+  }
+  return Array.isArray(recipe.instructions) ? recipe.instructions : []
+}
+
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -26,7 +42,22 @@ serve(async (req) => {
       })
     }
 
-    const { data, error } = await supabase.from('recipes').insert(recipe).select()
+    const payload = {
+      ...recipe,
+      yield_text: recipe.yield_text || recipe.yield || null,
+      total_time_minutes: recipe.total_time_minutes || recipe.totalTime || ((recipe.prep_time_minutes || recipe.prepTime || 0) + (recipe.cook_time_minutes || recipe.cookTime || 0)),
+      ingredient_groups_json: recipe.ingredient_groups_json || recipe.ingredientGroups || null,
+      instruction_groups_json: recipe.instruction_groups_json || recipe.instructionGroups || null,
+      ingredients_json: recipe.ingredients_json || toLegacyIngredients(recipe),
+      instructions_json: recipe.instructions_json || toLegacyInstructions(recipe),
+      tips_json: recipe.tips_json || recipe.tips || [],
+      substitutions_json: recipe.substitutions_json || recipe.substitutions || [],
+      tags_v2_json: recipe.tags_v2_json || recipe.tags || null,
+      source_note: recipe.source_note || recipe.sourceNote || null,
+      image_prompt: recipe.image_prompt || recipe.imagePrompt || null,
+    }
+
+    const { data, error } = await supabase.from('recipes').insert(payload).select()
     
     if (error) {
       return new Response(JSON.stringify({ error: error.message }), {
