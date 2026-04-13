@@ -351,15 +351,18 @@ COOKING COMPLEXITY: ${complexity}
 STAPLES ON HAND (do NOT include in shopping list): ${staplesOnHand}
 
 RECIPE QUALITY RULES:
-- Every recipe must be something a real person would find on a popular food blog or in a family cookbook. No invented combinations that sound plausible but nobody actually makes.
-- Instructions must be specific and actionable. Include exact temperatures (425°F, not just 'hot oven'), exact times ('sauté 4-5 minutes until golden', not 'cook until done'), exact quantities ('1.5 lbs chicken thighs' not 'chicken').
+- Every recipe must feel editorially tested, like a strong Mealime, NYT Cooking, or modern food blog recipe. No generic AI filler, no vague mashups, no weak shortcuts that hurt texture.
+- Instructions must be specific and actionable. Include exact temperatures (425°F, not just 'hot oven'), exact times ('sauté 4-5 minutes until golden', not 'cook until done'), exact quantities ('1.5 lbs chicken thighs' not 'chicken'), and pan or pot guidance when it matters.
 - Instructions should be 5-8 steps for most meals. A simple pasta might be 4. A roast might be 8. Never fewer than 4.
-- Include small practical tips that a home cook would appreciate: 'Pat the chicken dry for crispier skin', 'Let rest 5 minutes before slicing', 'Save the pasta water'.
+- At least 2 instruction steps must include a concrete sensory cue or doneness cue, such as 'until onions are translucent', 'until the sauce coats the back of a spoon', or 'until chicken reaches 165°F'.
+- Include small practical tips that a home cook would appreciate: 'Pat the chicken dry for better browning', 'Reserve 1/2 cup pasta water', 'Let rest 5 minutes before slicing'.
+- Use realistic ingredient pairings and technique. Favor proven crowd-pleasers over novelty.
 
 INGREDIENT RULES:
 - List ONLY ingredients the person needs to BUY. Do NOT list: salt, pepper, olive oil, cooking spray, water, garlic powder, or other common pantry staples: ${staplesOnHand}
 - Quantities must be in practical shopping units: '1 lb ground beef' not '453g ground beef'. '1 can (14 oz) diced tomatoes' not '14 oz tomatoes'. '1 bunch cilantro' not '0.25 cup cilantro'.
 - Include the form factor when it matters: 'boneless skinless chicken thighs' not just 'chicken thighs'. '1 block extra-firm tofu' not just 'tofu'.
+- Avoid weak ingredient names. Say 'English cucumber', 'low-sodium chicken broth', 'freshly grated Parmesan', 'shredded mozzarella', '90% lean ground beef' when useful.
 
 MEAL VARIETY RULES:
 - Never repeat a protein across consecutive days. If Monday is chicken, Tuesday should NOT be chicken.
@@ -426,8 +429,10 @@ OUTPUT FORMAT — each meal object must have exactly these fields:
 ${restrictions ? `Dietary restrictions to respect: ${restrictions}` : ''}`
 }
 
-const ACTION_VERB_PATTERN = /^(preheat|heat|bring|cook|bake|roast|saute|sauté|sear|stir|whisk|mix|combine|add|pour|season|pat|slice|chop|dice|mince|drain|rinse|toss|spread|arrange|place|boil|simmer|grill|broil|serve|garnish|top|transfer|reduce|marinate|wrap|reheat)\b/i
+const ACTION_VERB_PATTERN = /^(preheat|heat|bring|cook|bake|roast|saute|sauté|sear|stir|whisk|mix|combine|add|pour|season|pat|slice|chop|dice|mince|drain|rinse|toss|spread|arrange|place|boil|simmer|grill|broil|serve|garnish|top|transfer|reduce|marinate|wrap|reheat|toast|melt|brown|nestle|return|scrape|fold)\b/i
 const NON_NUMERIC_QUANTITY_PATTERN = /\b(some|few|several|handful|pinch|dash|to taste|as needed)\b/i
+const DONENESS_CUE_PATTERN = /(golden|golden-brown|translucent|fragrant|wilted|tender|tender-crisp|charred|crisp|crispy|thickens|thickened|coats|bubbling|flaky|flakes easily|165°f|160°f|fork-tender|softened|lightly browned)/i
+const SPECIFIC_INGREDIENT_PATTERN = /(boneless|skinless|fresh|grated|shredded|low-sodium|whole milk|baby|roma|english|large|medium|small|extra-firm|lean|freshly)/i
 
 function getSlotTimeExpectation(slot: Record<string, unknown> = {}) {
   const effort = String(slot.effort || slot.effort_level || 'medium').toLowerCase()
@@ -470,6 +475,13 @@ function scoreMealQuality(meal: Record<string, unknown>, slot: Record<string, un
     return false
   })
   const instructionsActionable = instructions.every((step) => typeof step === 'string' && ACTION_VERB_PATTERN.test(step.trim()))
+  const donenessCueCount = instructions.filter((step) => typeof step === 'string' && DONENESS_CUE_PATTERN.test(step)).length
+  const donenessCueOk = donenessCueCount >= Math.min(2, instructions.length)
+  const ingredientSpecificityOk = ingredients.filter((ingredient) => {
+    if (!ingredient || typeof ingredient !== 'object') return false
+    const item = String((ingredient as Record<string, unknown>).item || (ingredient as Record<string, unknown>).name || '')
+    return SPECIFIC_INGREDIENT_PATTERN.test(item)
+  }).length >= Math.max(1, Math.floor(ingredients.length / 3))
 
   const checks = {
     ingredientCountOk,
@@ -478,6 +490,8 @@ function scoreMealQuality(meal: Record<string, unknown>, slot: Record<string, un
     timeOk,
     quantitiesNumeric,
     instructionsActionable,
+    donenessCueOk,
+    ingredientSpecificityOk,
   }
 
   const passed = Object.values(checks).filter(Boolean).length
