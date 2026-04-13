@@ -203,6 +203,14 @@ Return valid JSON matching this exact structure:
  "note": "string or null (substitution note)",
  "optional": boolean
  }
+
+CRITICAL INGREDIENT FORMATTING RULE:
+- The "unit" field contains ONLY the unit: "pound", "cup", "tablespoon", "teaspoon", "clove", "ounce"
+- The "item" field must NOT repeat the unit. It contains only the ingredient and prep.
+- WRONG: { "amount": "2", "unit": "cups", "item": "cups cherry tomatoes, halved" }
+- RIGHT: { "amount": "2", "unit": "cups", "item": "cherry tomatoes, halved" }
+- WRONG: { "amount": "2", "unit": "cloves", "item": "cloves garlic, minced" }
+- RIGHT: { "amount": "2", "unit": "cloves", "item": "garlic, minced" }
  ]
  }
  ],

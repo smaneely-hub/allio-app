@@ -69,12 +69,6 @@ export function RecipeDetail({ meal, onClose }) {
     ...(recipe.tags.cookingMethod || []),
     recipe.tags.season,
   ].filter(Boolean)
-  const instructionGroupsWithOffsets = recipe.instructionGroups.reduce((acc, group) => {
-    const previous = acc[acc.length - 1]
-    const offset = previous ? previous.offset + previous.group.steps.length : 0
-    acc.push({ group, offset })
-    return acc
-  }, [])
 
   return (
     <div className="min-h-screen bg-[#faf7f2] text-text-primary">
@@ -146,27 +140,33 @@ export function RecipeDetail({ meal, onClose }) {
 
           <CollapsibleSection title="Instructions" expanded={sections.instructions} onToggle={() => toggleSection('instructions')}>
             <div className="space-y-6">
-              {instructionGroupsWithOffsets.map(({ group, offset }, groupIndex) => (
-                <div key={`${group.label || 'instructions'}-${groupIndex}`}>
-                  {group.label ? <div className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-text-muted">{group.label}</div> : null}
-                  <ol className="space-y-6">
-                    {group.steps.map((step, index) => (
-                      <li key={`${step.text}-${index}`} className="flex gap-4">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-warm-100 text-sm font-semibold text-text-primary">{offset + index + 1}</div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[16px] leading-8 text-text-primary">{step.text}</p>
-                          {step.tip ? (
-                            <div className="mt-3 rounded-2xl bg-[#f4efe6] px-4 py-3 text-sm leading-6 text-text-secondary">
-                              <div className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">💡 Tip</div>
-                              {step.tip}
+              {(() => {
+                let stepCounter = 0
+                return recipe.instructionGroups.map((group, groupIndex) => (
+                  <div key={`${group.label || 'instructions'}-${groupIndex}`}>
+                    {group.label ? <div className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-text-muted">{group.label}</div> : null}
+                    <ol className="space-y-6">
+                      {group.steps.map((step, index) => {
+                        stepCounter += 1
+                        return (
+                          <li key={`${step.text}-${index}`} className="flex gap-4">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-warm-100 text-sm font-semibold text-text-primary">{stepCounter}</div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[16px] leading-8 text-text-primary">{step.text}</p>
+                              {step.tip ? (
+                                <div className="mt-3 rounded-2xl bg-[#f4efe6] px-4 py-3 text-sm leading-6 text-text-secondary">
+                                  <div className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">💡 Tip</div>
+                                  {step.tip}
+                                </div>
+                              ) : null}
                             </div>
-                          ) : null}
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              ))}
+                          </li>
+                        )
+                      })}
+                    </ol>
+                  </div>
+                ))
+              })()}
             </div>
           </CollapsibleSection>
 

@@ -243,9 +243,8 @@ export function PublicMealGeneratorPage() {
               </div>
             ) : (
               <div className="flex h-full min-h-[420px] flex-col items-center justify-center text-center">
-                <div className="text-5xl">🍽️</div>
-                <h2 className="mt-4 font-display text-2xl text-text-primary">Your first meal goes here</h2>
-                <p className="mt-3 max-w-sm text-sm text-text-secondary">This is perfect for prospects, browser testing, and beta feedback because it skips account setup.</p>
+                <h2 className="font-display text-2xl text-text-primary">We’ll build your dinner here</h2>
+                <p className="mt-3 max-w-sm text-sm text-text-secondary">Add what you have on hand, set a few preferences, and get one strong dinner idea you can cook tonight.</p>
               </div>
             )}
           </div>
