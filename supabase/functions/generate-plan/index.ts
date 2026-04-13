@@ -762,35 +762,41 @@ serve(async (req) => {
     const authorization = req.headers.get('authorization') || req.headers.get('Authorization')
     console.log('[generate-plan] authorization header present:', Boolean(authorization))
 
-    if (!authorization) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: {
-        headers: {
-          Authorization: authorization,
-        },
-      },
-    })
-
-    const {
-      data: { user },
-      error: authError,
-    } = await authClient.auth.getUser()
-
-    if (authError || !user) {
-      console.error('[generate-plan] auth.getUser failed:', authError?.message || 'no user')
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
     const payload = await req.json()
+    const publicMode = payload?.public_mode === true
+    let user = null
+
+    if (!publicMode) {
+      if (!authorization) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        global: {
+          headers: {
+            Authorization: authorization,
+          },
+        },
+      })
+
+      const {
+        data: { user: authUser },
+        error: authError,
+      } = await authClient.auth.getUser()
+
+      if (authError || !authUser) {
+        console.error('[generate-plan] auth.getUser failed:', authError?.message || 'no user')
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      user = authUser
+    }
     if (!payload?.household || !Array.isArray(payload?.members) || !Array.isArray(payload?.slots)) {
       return new Response(JSON.stringify({ error: 'Payload must include household, members, and slots' }), {
         status: 400,
@@ -835,6 +841,12 @@ serve(async (req) => {
             attendees: fallbackAttendees
           }]
       console.log('[generate-plan] Swap mode: narrowed to single slot', swapDay, swapMeal, swapSuggestion || '(no suggestion)')
+    }
+
+    if (publicMode) {
+      payload.slots = payload.slots.slice(0, 1)
+      payload.members = Array.isArray(payload.members) ? payload.members.slice(0, 6) : []
+      payload.recent_meal_names = Array.isArray(payload.recent_meal_names) ? payload.recent_meal_names.slice(0, 3) : []
     }
 
     // HYBRID MODE: Try catalog first for each slot
@@ -1016,7 +1028,7 @@ serve(async (req) => {
         }
         
         // Save LLM-generated recipes to database for future reuse
-        if (llmTransformed.meals?.length > 0) {
+        if (!publicMode && llmTransformed.meals?.length > 0) {
           const dietFromSlot = remainingSlots[0]?.suggestion || dietApplied || ''
           for (const meal of llmTransformed.meals) {
             await saveGeneratedRecipe(supabaseClient, meal, payload.members, dietFromSlot)
@@ -1100,7 +1112,7 @@ serve(async (req) => {
     console.log('[generate-plan] Transformed plan:', JSON.stringify(transformedPlan).slice(0, 200))
 
     // Save LLM-generated recipes to database for future reuse
-    if (transformedPlan.meals?.length > 0) {
+    if (!publicMode && transformedPlan.meals?.length > 0) {
       const dietFromPayload = payload.household?.diet_focus || ''
       for (const meal of transformedPlan.meals) {
         await saveGeneratedRecipe(supabaseClient, meal, payload.members, dietFromPayload)

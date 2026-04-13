@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { BrowserRouter, Route, Routes, Navigate, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { EmailVerificationBanner } from './components/EmailVerificationBanner'
@@ -35,6 +35,7 @@ function TonightPageWrapper() {
 import { ShopPage } from './pages/ShopPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { PricingPage } from './pages/PricingPage'
+import { PublicMealGeneratorPage } from './pages/PublicMealGeneratorPage'
 import { PrivacyPage } from './pages/PrivacyPage'
 import { TermsPage } from './pages/TermsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -75,6 +76,7 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<TonightPageWrapper />} />
                 <Route path="/login" element={<LoginPage />} />
+                <Route path="/try" element={<PublicMealGeneratorPage />} />
                 <Route
                   path="/onboarding"
                   element={

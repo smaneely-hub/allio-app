@@ -34,10 +34,16 @@ export function LandingPage() {
           <p className="mt-4 text-base text-gray-400">
             Built for busy professionals who want to show up for their family without spending hours planning meals.
           </p>
-          <div className="mt-10 flex flex-col items-center justify-center">
+          <div className="mt-10 flex flex-col items-center justify-center gap-3">
+            <Link
+              to="/try"
+              className="rounded-full bg-green-600 px-8 py-4 text-lg font-semibold text-white shadow-lg transition-all hover:bg-green-700 hover:shadow-xl"
+            >
+              Try a meal right now
+            </Link>
             <Link
               to="/login"
-              className="rounded-full bg-green-600 px-8 py-4 text-lg font-semibold text-white shadow-lg transition-all hover:bg-green-700 hover:shadow-xl"
+              className="rounded-full border border-green-200 bg-white px-8 py-4 text-lg font-semibold text-green-700 transition-all hover:bg-green-50"
             >
               Plan my week in 30 seconds
             </Link>
@@ -205,6 +211,7 @@ export function LandingPage() {
             Get started
           </Link>
           <p className="mt-4 text-sm text-green-200">Free to start. No credit card required.</p>
+          <Link to="/try" className="mt-3 inline-block text-sm font-semibold text-white underline-offset-4 hover:underline">Or try one dinner without signing up</Link>
         </div>
       </section>
 
