@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -17,10 +17,19 @@ export function PublicMealGeneratorPage() {
   })
   const [loading, setLoading] = useState(false)
   const [meal, setMeal] = useState(null)
+  const [recentMeals, setRecentMeals] = useState([])
+  const [dailyAttempts, setDailyAttempts] = useState(0)
+
+  const canGenerate = useMemo(() => dailyAttempts < 6, [dailyAttempts])
 
   const updateField = (key, value) => setForm((current) => ({ ...current, [key]: value }))
 
-  const generateMeal = async () => {
+  const generateMeal = async (override = {}) => {
+    if (!canGenerate) {
+      toast.error('Free preview limit reached for now. Try again later or create an account.')
+      return
+    }
+
     setLoading(true)
     try {
       const payload = {
@@ -53,7 +62,11 @@ export function PublicMealGeneratorPage() {
           },
         ],
         week_notes: 'Public first-meal generation experience. Return one strong dinner only.',
-        recent_meal_names: [],
+        recent_meal_names: recentMeals.slice(-3),
+      }
+
+      if (override?.suggestion) {
+        payload.slots[0].suggestion = [payload.slots[0].suggestion, override.suggestion].filter(Boolean).join('. ')
       }
 
       const { data, error } = await supabase.functions.invoke('generate-plan', { body: payload })
@@ -61,7 +74,10 @@ export function PublicMealGeneratorPage() {
 
       const generated = data?.plan?.meals?.[0]
       if (!generated) throw new Error('No meal returned')
-      setMeal(normalizeMealRecord(generated))
+      const normalized = normalizeMealRecord(generated)
+      setMeal(normalized)
+      setRecentMeals((current) => [...current.slice(-2), normalized.name])
+      setDailyAttempts((current) => current + 1)
     } catch (err) {
       console.error('[PublicMealGeneratorPage] generate failed', err)
       toast.error(err?.message || 'Could not generate a meal right now.')
@@ -69,6 +85,8 @@ export function PublicMealGeneratorPage() {
       setLoading(false)
     }
   }
+
+  const regenerateWithReason = (reason) => generateMeal({ suggestion: reason })
 
   return (
     <div className="min-h-screen bg-bg-primary px-4 py-10">
@@ -157,9 +175,10 @@ export function PublicMealGeneratorPage() {
                 <input type="checkbox" checked={form.kidFriendly} onChange={(e) => updateField('kidFriendly', e.target.checked)} className="h-5 w-5" />
               </label>
 
-              <button type="button" onClick={generateMeal} disabled={loading} className="btn-primary w-full py-3 text-base">
+              <button type="button" onClick={() => generateMeal()} disabled={loading || !canGenerate} className="btn-primary w-full py-3 text-base disabled:opacity-50">
                 {loading ? 'Generating dinner…' : 'Generate my dinner'}
               </button>
+              <p className="text-xs text-text-muted">Preview generations left right now: {Math.max(0, 6 - dailyAttempts)}</p>
             </div>
           </div>
 
@@ -172,6 +191,17 @@ export function PublicMealGeneratorPage() {
                   {meal.reason ? <p className="mt-2 text-sm text-text-secondary">{meal.reason}</p> : null}
                   {meal.why_this_meal ? <p className="mt-3 rounded-2xl bg-primary-50 p-3 text-sm text-primary-800">{meal.why_this_meal}</p> : null}
                   <div className="mt-3 text-sm text-text-secondary">{meal.servings} servings • {meal.prep_time_minutes} min prep • {meal.cook_time_minutes} min cook</div>
+                </div>
+
+                <div>
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Try a different angle</div>
+                  <div className="flex flex-wrap gap-2">
+                    {['Want something faster', 'Too complex', 'Different protein'].map((option) => (
+                      <button key={option} type="button" onClick={() => regenerateWithReason(option)} disabled={loading || !canGenerate} className="rounded-full border border-divider bg-white px-3 py-1.5 text-xs font-semibold text-text-primary disabled:opacity-50">
+                        {option}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
@@ -200,7 +230,7 @@ export function PublicMealGeneratorPage() {
                   <p className="mt-1 text-sm text-text-secondary">Create a profile and Allio can turn this into a full household plan.</p>
                   <div className="mt-3 flex flex-wrap gap-3">
                     <Link to="/login" className="rounded-full bg-primary-500 px-4 py-2 text-sm font-semibold text-white">Create free account</Link>
-                    <button type="button" onClick={generateMeal} disabled={loading} className="rounded-full border border-divider bg-white px-4 py-2 text-sm font-semibold text-text-primary">Try another meal</button>
+                    <button type="button" onClick={() => generateMeal()} disabled={loading || !canGenerate} className="rounded-full border border-divider bg-white px-4 py-2 text-sm font-semibold text-text-primary disabled:opacity-50">Try another meal</button>
                   </div>
                 </div>
               </div>

@@ -17,21 +17,6 @@ import { PlannerPage } from './pages/PlannerPage'
 import { TonightPage } from './pages/TonightPage'
 import { RecipesPage } from './pages/RecipesPage'
 
-function TonightPageWrapper() {
-  const { user, loading } = useAuth()
-  const navigate = useNavigate()
-  
-  useEffect(() => {
-    if (!loading && !user) {
-      navigate('/login')
-    }
-  }, [user, loading, navigate])
-  
-  if (loading) return <div className="p-8 text-center">Loading...</div>
-  if (!user) return null
-  
-  return <TonightPage />
-}
 import { ShopPage } from './pages/ShopPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { PricingPage } from './pages/PricingPage'
@@ -74,7 +59,7 @@ export default function App() {
             <EmailVerificationBanner />
             <main className="min-h-screen bg-bg-primary animate-fadeIn">
               <Routes>
-                <Route path="/" element={<TonightPageWrapper />} />
+                <Route path="/" element={<HomePage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/try" element={<PublicMealGeneratorPage />} />
                 <Route
