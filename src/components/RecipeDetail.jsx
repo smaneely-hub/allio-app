@@ -145,11 +145,11 @@ export function RecipeDetail({ meal, onClose }) {
                 return recipe.instructionGroups.map((group, groupIndex) => (
                   <div key={`${group.label || 'instructions'}-${groupIndex}`}>
                     {group.label ? <div className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-text-muted">{group.label}</div> : null}
-                    <ol className="space-y-6">
+                    <div className="space-y-6">
                       {group.steps.map((step, index) => {
                         stepCounter += 1
                         return (
-                          <li key={`${step.text}-${index}`} className="flex gap-4">
+                          <div key={`${step.text}-${index}`} className="flex gap-4">
                             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-warm-100 text-sm font-semibold text-text-primary">{stepCounter}</div>
                             <div className="min-w-0 flex-1">
                               <p className="text-[16px] leading-8 text-text-primary">{step.text}</p>
@@ -160,10 +160,10 @@ export function RecipeDetail({ meal, onClose }) {
                                 </div>
                               ) : null}
                             </div>
-                          </li>
+                          </div>
                         )
                       })}
-                    </ol>
+                    </div>
                   </div>
                 ))
               })()}
