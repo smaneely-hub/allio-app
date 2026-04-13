@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { buildPlannerWeek, formatDayLabel, formatWeekLabel, getStartOfWeek, MEAL_SLOTS, DAY_ORDER } from '../../lib/planner'
+import { MealCard } from './MealCard'
 
 function IconButton({ children, ...props }) {
   return (
@@ -40,26 +41,15 @@ function UnplannedDayState({ onGenerateDay, onCopyPreviousDay, onCreateBlankDay 
 }
 
 function MealRow({ meal, onOpenMeal }) {
-  const hero = meal.image_url ? (
-    <img src={meal.image_url} alt={meal.title} className="h-14 w-14 rounded-2xl object-cover" />
-  ) : (
-    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-100 to-teal-100 text-xl">🍽️</div>
-  )
-
-  const subtitle = [meal.items?.[0]?.amount, meal.items?.[0]?.subtitle].filter(Boolean).join(' • ')
-
   return (
-    <button
-      type="button"
-      onClick={() => onOpenMeal(meal)}
-      className="flex w-full items-start gap-3 rounded-2xl bg-warm-50/60 p-3 text-left transition hover:bg-warm-100"
-    >
-      {hero}
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold text-text-primary">{meal.title}</div>
-        {subtitle ? <div className="mt-1 text-xs text-text-secondary">{subtitle}</div> : null}
-      </div>
-    </button>
+    <div className="min-w-0 overflow-hidden">
+      <MealCard
+        meal={meal}
+        onSwap={async () => {}}
+        onSaveNote={async () => {}}
+        onOpenMeal={onOpenMeal}
+      />
+    </div>
   )
 }
 

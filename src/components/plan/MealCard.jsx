@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { SwapModal } from '../SwapModal'
 import { useSubscription } from '../../hooks/useSubscription'
 import { UpgradePrompt } from '../UpgradePrompt'
+import { normalizeRecipe } from '../../lib/recipeSchema'
+import { MealDetailModal } from './MealDetailModal'
 
 // Vibrant gradient backgrounds by meal type
 const mealTypeStyles = {
@@ -12,7 +14,7 @@ const mealTypeStyles = {
 }
 
 
-export function MealCard({ meal, onSwap, onSaveNote }) {
+export function MealCard({ meal, onSwap = async () => {}, onSaveNote = async () => {}, onOpenMeal }) {
   const { isPremium } = useSubscription()
   const [expanded, setExpanded] = useState(false)
   const [cookingMode, setCookingMode] = useState(false)
@@ -23,12 +25,27 @@ export function MealCard({ meal, onSwap, onSaveNote }) {
   const [showSwapModal, setShowSwapModal] = useState(false)
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
   const [selectedVariation, setSelectedVariation] = useState(null)
+  const [showDetail, setShowDetail] = useState(false)
 
   const mealType = (meal.meal || '').toLowerCase()
   const style = mealTypeStyles[mealType] || mealTypeStyles.dinner
-  const totalSteps = meal.instructions?.length || 0
-  const prepTime = meal.prep_time_minutes || Math.max(10, Math.round((meal.cook_time_minutes || 30) * 0.35))
-  const cookTime = meal.cook_time_minutes || 30
+  const recipe = useMemo(() => normalizeRecipe({
+    ...meal,
+    title: meal.title || meal.name,
+    prepTime: meal.prep_time_minutes,
+    cookTime: meal.cook_time_minutes,
+    totalTime: meal.total_time_minutes,
+    ingredientGroups: meal.ingredientGroups,
+    instructionGroups: meal.instructionGroups,
+    substitutions: meal.substitutions,
+    nutrition: meal.nutrition,
+    tags: meal.recipeTags,
+    sourceNote: meal.sourceNote,
+    imagePrompt: meal.imagePrompt,
+  }), [meal])
+  const totalSteps = meal.instructions?.length || recipe.instructionGroups.flatMap((group) => group.steps).length || 0
+  const prepTime = recipe.prepTime || Math.max(10, Math.round((recipe.cookTime || meal.cook_time_minutes || 30) * 0.35))
+  const cookTime = recipe.cookTime || meal.cook_time_minutes || 30
 
   const planningRationale = useMemo(() => {
     return String(meal.why_this_works || meal.why_this_meal || meal.notes || '').trim()
@@ -116,7 +133,7 @@ export function MealCard({ meal, onSwap, onSaveNote }) {
           <div className="flex flex-wrap gap-2">
             {(meal.ingredients || []).slice(0, 6).map((ing, i) => (
               <span key={i} className="px-3 py-1 bg-text-secondary text-white/80 text-sm rounded-full">
-                {ing.quantity} {ing.unit} {ing.item}
+                {ing}
               </span>
             ))}
           </div>
@@ -156,13 +173,11 @@ export function MealCard({ meal, onSwap, onSaveNote }) {
         </div>
       </div>
       
-      <button type="button" onClick={() => setExpanded(!expanded)} className="w-full text-left">
+      <button type="button" onClick={() => { setShowDetail(true); onOpenMeal?.(meal) }} className="w-full text-left rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-200">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="font-display text-lg text-text-primary">{meal.name}</div>
-            {shortReason ? (
-              <div className="mt-1 line-clamp-2 text-sm text-text-secondary">{shortReason}</div>
-            ) : null}
+            <div className="mt-1 line-clamp-1 text-sm text-text-secondary">{recipe.description || shortReason}</div>
             {dietaryTags.length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {dietaryTags.map((tag, i) => (
@@ -170,11 +185,13 @@ export function MealCard({ meal, onSwap, onSaveNote }) {
                 ))}
               </div>
             )}
-            <div className="mt-1.5 text-sm text-text-secondary">{meal.servings} servings · {prepTime} min prep • {cookTime} min cook</div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-secondary"><span>{prepTime} min prep</span><span>•</span><span>{cookTime} min cook</span><span className="rounded-full bg-primary-50 px-2 py-0.5 text-xs font-semibold text-primary-700">{recipe.difficulty}</span></div>
           </div>
-          <div className="text-xs font-medium text-text-muted">{expanded ? 'Collapse' : 'Expand'}</div>
+          <div className="text-xs font-medium text-text-muted">Open recipe</div>
         </div>
       </button>
+
+      <MealDetailModal meal={meal} isOpen={showDetail} onClose={() => setShowDetail(false)} />
 
       {/* Action buttons - icon-only on mobile */}
       <div className="mt-4 flex flex-wrap gap-2">
@@ -202,6 +219,10 @@ export function MealCard({ meal, onSwap, onSaveNote }) {
         mealName={meal.name}
         loading={swapping}
       />
+
+      <button type="button" onClick={() => setExpanded(!expanded)} className="mt-3 text-xs font-semibold uppercase tracking-wide text-text-muted min-h-[44px]">
+        {expanded ? 'Hide quick view' : 'Show quick view'}
+      </button>
 
       {/* Expanded content */}
       {expanded && (
@@ -232,26 +253,43 @@ export function MealCard({ meal, onSwap, onSaveNote }) {
 
           <div className="rounded-xl border border-divider bg-white p-4">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">Ingredients</div>
-            <ul className="space-y-1 text-sm text-text-primary">
-              {(meal.ingredients || []).map((ing, i) => (
-                <li key={i} className="flex justify-between gap-4">
-                  <span>{ing.item}</span>
-                  <span className="shrink-0 text-text-muted">{ing.quantity} {ing.unit}</span>
-                </li>
+            <div className="space-y-4">
+              {recipe.ingredientGroups.map((group, groupIndex) => (
+                <div key={`${group.label || 'group'}-${groupIndex}`}>
+                  {group.label ? <div className="mb-2 text-xs font-semibold text-text-muted">{group.label}</div> : null}
+                  <ul className="space-y-1 text-sm text-text-primary">
+                    {group.ingredients.map((ing, i) => (
+                      <li key={`${ing.item}-${i}`} className="flex justify-between gap-4">
+                        <span>{ing.item}{ing.note ? ` (${ing.note})` : ''}</span>
+                        <span className="shrink-0 text-text-muted">{[ing.amount, ing.unit].filter(Boolean).join(' ')}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
 
           <div className="rounded-xl border border-divider bg-white p-4">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">Instructions</div>
-            <ol className="space-y-3 text-sm text-text-primary">
-              {(meal.instructions || []).map((step, i) => (
-                <li key={i} className="flex gap-3">
-                  <span className="mt-0.5 text-primary-500 font-semibold">{i + 1}.</span>
-                  <span>{step}</span>
-                </li>
+            <div className="space-y-4 text-sm text-text-primary">
+              {recipe.instructionGroups.map((group, groupIndex) => (
+                <div key={`${group.label || 'steps'}-${groupIndex}`}>
+                  {group.label ? <div className="mb-2 text-xs font-semibold text-text-muted">{group.label}</div> : null}
+                  <ol className="space-y-3">
+                    {group.steps.map((step, i) => (
+                      <li key={`${step.text}-${i}`} className="flex gap-3">
+                        <span className="mt-0.5 text-primary-500 font-semibold">{i + 1}.</span>
+                        <div>
+                          <span>{step.text}</span>
+                          {step.tip ? <div className="mt-1 text-xs text-text-muted">Tip: {step.tip}</div> : null}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
               ))}
-            </ol>
+            </div>
           </div>
 
           {similarOptions.length > 0 && (

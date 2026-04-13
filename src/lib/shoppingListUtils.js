@@ -110,6 +110,14 @@ export function parseIngredient(rawIngredient) {
 }
 
 /** Build grouped shopping items from meals while skipping pantry staples. */
+function unwrapMealIngredients(meal = {}) {
+  if (Array.isArray(meal.ingredients) && meal.ingredients.length > 0) return meal.ingredients
+  if (Array.isArray(meal.ingredientGroups)) {
+    return meal.ingredientGroups.flatMap((group) => Array.isArray(group?.ingredients) ? group.ingredients : [])
+  }
+  return []
+}
+
 export function buildGroupedShoppingItems(meals = [], staplesOnHand = '') {
   const staples = String(staplesOnHand)
     .toLowerCase()
@@ -124,7 +132,7 @@ export function buildGroupedShoppingItems(meals = [], staplesOnHand = '') {
 
     const usageKey = `${meal?.day || 'tonight'}_${meal?.meal || 'dinner'}`
 
-    for (const rawIngredient of meal?.ingredients || []) {
+    for (const rawIngredient of unwrapMealIngredients(meal)) {
       const parsed = parseIngredient(rawIngredient)
       if (!parsed) continue
       if (staples.some((staple) => parsed.normalizedName.includes(staple))) continue

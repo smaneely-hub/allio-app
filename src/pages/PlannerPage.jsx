@@ -395,77 +395,7 @@ export function PlannerPage() {
         ] : []}
       />
 
-      {selectedMealDetail ? (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4" onClick={() => setSelectedMealDetail(null)}>
-          <div className="mx-auto max-w-2xl rounded-3xl border border-divider bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">{typeof selectedMealDetail.day === 'string' ? selectedMealDetail.day : 'mon'} · {typeof selectedMealDetail.meal === 'string' ? selectedMealDetail.meal : 'dinner'}</div>
-                <h2 className="mt-1 text-2xl font-semibold text-text-primary">{typeof selectedMealDetail.name === 'string' ? selectedMealDetail.name : 'Generated meal'}</h2>
-                <div className="mt-2 text-sm text-text-secondary">{selectedMealDetail.servings || 1} servings · {selectedMealDetail.prep_time_minutes || 0} min prep · {selectedMealDetail.cook_time_minutes || 0} min cook</div>
-              </div>
-              <button type="button" onClick={() => setSelectedMealDetail(null)} className="text-sm font-medium text-text-secondary">Close</button>
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button type="button" onClick={() => handleToggleLock(selectedMealDetail)} className={`rounded-full px-4 py-2 text-sm font-semibold ${selectedMealDetail.locked ? 'bg-green-100 text-green-700' : 'border border-divider bg-white text-text-primary'}`}>
-                {selectedMealDetail.locked ? 'Unlock meal' : 'Lock meal'}
-              </button>
-              <button type="button" onClick={() => handleSwapMeal(selectedMealDetail)} disabled={mealDetailMode === 'swapping' || selectedMealDetail.locked} className="rounded-full border border-divider bg-white px-4 py-2 text-sm font-semibold text-text-primary disabled:opacity-50">
-                {mealDetailMode === 'swapping' ? 'Swapping…' : 'Swap meal'}
-              </button>
-            </div>
-
-            {selectedMealDetail.swapped && selectedMealDetail.original_name ? (
-              <div className="mt-4 rounded-2xl bg-warm-50 p-3 text-sm text-text-secondary">Originally: {selectedMealDetail.original_name}</div>
-            ) : null}
-
-            {selectedMealDetail.notes ? (
-              <div className="mt-4 rounded-2xl border border-divider bg-bg-primary p-4 text-sm text-text-primary">
-                {selectedMealDetail.notes}
-              </div>
-            ) : null}
-
-            <div className="mt-5 grid gap-5 md:grid-cols-2">
-              <div>
-                <div className="mb-2 text-sm font-semibold text-text-primary">Ingredients</div>
-                <ul className="space-y-2 text-sm text-text-secondary">
-                  {(Array.isArray(selectedMealDetail.ingredients) ? selectedMealDetail.ingredients : []).length > 0 ? selectedMealDetail.ingredients.map((ingredient, index) => (
-                    <li key={`ingredient-${index}`}>
-                      {typeof ingredient === 'string' ? ingredient : [ingredient?.quantity, ingredient?.unit, ingredient?.name || ingredient?.item].filter(Boolean).join(' ')}
-                    </li>
-                  )) : <li>No ingredients saved.</li>}
-                </ul>
-              </div>
-              <div>
-                <div className="mb-2 text-sm font-semibold text-text-primary">Instructions</div>
-                <ol className="space-y-2 text-sm text-text-secondary">
-                  {(Array.isArray(selectedMealDetail.instructions) ? selectedMealDetail.instructions : []).length > 0 ? selectedMealDetail.instructions.map((step, index) => (
-                    <li key={`step-${index}`} className="flex gap-2"><span className="font-semibold text-text-primary">{index + 1}.</span><span>{typeof step === 'string' ? step : ''}</span></li>
-                  )) : <li>No instructions saved.</li>}
-                </ol>
-              </div>
-            </div>
-
-            <div className="mt-5">
-              <label className="mb-2 block text-sm font-semibold text-text-primary">Meal note</label>
-              <textarea
-                className="input min-h-[96px] w-full"
-                value={selectedMealDetail.user_note || ''}
-                onChange={(e) => setSelectedMealDetail((current) => ({ ...current, user_note: e.target.value }))}
-                placeholder="Add a note for this meal"
-              />
-              <button
-                type="button"
-                onClick={() => handleSaveMealNote(selectedMealDetail, selectedMealDetail.user_note || '')}
-                className="mt-3 rounded-full border border-divider bg-white px-4 py-2 text-sm font-semibold text-text-primary"
-              >
-                Save note
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {selectedMealDetail ? null : null}
 
       <div className="card">
         <div className="mb-3 font-display text-xl text-text-primary">Shopping List</div>

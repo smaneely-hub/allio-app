@@ -1,3 +1,5 @@
+import { normalizeRecipe } from './recipeSchema'
+
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const DAY_SHORT = {
   Monday: 'mon',
@@ -139,13 +141,45 @@ export function normalizeMealItems(meal = {}) {
   }]
 }
 
+function flattenMealIngredients(recipe) {
+  return recipe.ingredientGroups.flatMap((group, groupIndex) =>
+    group.ingredients.map((ingredient, index) => ({
+      id: `${groupIndex}-${index}-${ingredient.item || 'ingredient'}`,
+      name: ingredient.item || 'Ingredient',
+      descriptor: ingredient.note || '',
+      quantity: ingredient.amount || '',
+      unit: ingredient.unit || '',
+      grams: null,
+      image_url: null,
+    })),
+  )
+}
+
+function flattenMealDirections(recipe) {
+  return recipe.instructionGroups.flatMap((group) =>
+    group.steps.map((step) => ({ text: step.text, tip: step.tip || '' })),
+  )
+}
+
 export function normalizeMeal(meal = {}, weekStart = getStartOfWeek()) {
   const slot = normalizeMealSlotName(meal.meal || meal.meal_type || meal.slot || '')
   const dayName = normalizeDayName(meal.day)
   const mealDate = getDateForDayName(weekStart, dayName)
-  const items = normalizeMealItems(meal)
-  const macros = getMealMacros(meal)
-  const calories = getMealCalories(meal)
+  const recipe = normalizeRecipe({
+    ...meal,
+    title: meal.title || meal.name,
+    prepTime: meal.prep_time_minutes,
+    cookTime: meal.cook_time_minutes,
+    totalTime: meal.total_time_minutes,
+    ingredientGroups: meal.ingredientGroups,
+    instructionGroups: meal.instructionGroups,
+    ingredients: meal.ingredients,
+    instructions: meal.instructions,
+    nutrition: meal.nutrition,
+  })
+  const items = normalizeMealItems({ ...meal, nutrition: meal.nutrition || recipe.nutrition })
+  const macros = recipe.nutrition || getMealMacros(meal)
+  const calories = getMealCalories({ ...meal, nutrition: recipe.nutrition || meal.nutrition }) || recipe.nutrition?.calories || 0
 
   return {
     ...meal,
@@ -155,22 +189,24 @@ export function normalizeMeal(meal = {}, weekStart = getStartOfWeek()) {
     date: mealDate.toISOString().slice(0, 10),
     meal: slot,
     slot,
-    title: meal.title || meal.name || 'Meal',
+    title: recipe.title || meal.title || meal.name || 'Meal',
     image_url: meal.image_url || items[0]?.image_url || null,
     amount_to_eat: meal.amount_to_eat || 1,
     amount_unit: meal.amount_unit || 'serving',
     servings: Number(meal.servings || meal.recipe_servings || 1) || 1,
-    prep_time_minutes: Number(meal.prep_time_minutes || 0) || 0,
-    cook_time_minutes: Number(meal.cook_time_minutes || 0) || 0,
+    prep_time_minutes: recipe.prepTime || Number(meal.prep_time_minutes || 0) || 0,
+    cook_time_minutes: recipe.cookTime || Number(meal.cook_time_minutes || 0) || 0,
     calories,
     nutrition: macros,
+    difficulty: recipe.difficulty,
+    description: recipe.description,
+    ingredientGroups: recipe.ingredientGroups,
+    instructionGroups: recipe.instructionGroups,
     items,
-    ingredients: (meal.ingredients || []).map(normalizeIngredient),
-    directions: Array.isArray(meal.directions)
+    ingredients: flattenMealIngredients(recipe),
+    directions: Array.isArray(meal.directions) && meal.directions.length > 0
       ? meal.directions
-      : Array.isArray(meal.instructions)
-        ? meal.instructions.map((step) => ({ text: step }))
-        : [],
+      : flattenMealDirections(recipe),
     notes: meal.notes || '',
     user_note: meal.user_note || '',
     locked: Boolean(meal.locked),
