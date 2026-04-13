@@ -46,47 +46,23 @@ export function PublicMealGeneratorPage() {
 
     setLoading(true)
     try {
+      const dietary = [form.preferences.toLowerCase().includes('vegetarian') ? 'vegetarian' : '', form.preferences.toLowerCase().includes('vegan') ? 'vegan' : '', form.preferences.toLowerCase().includes('gluten free') ? 'gluten-free' : '', form.preferences.toLowerCase().includes('dairy free') ? 'dairy-free' : '']
+        .filter(Boolean)
+
       const payload = {
-        public_mode: true,
-        household: {
-          total_people: Number(form.servings) || 4,
-          diet_focus: form.preferences || '',
-          staples_on_hand: form.ingredientsOnHand || '',
-          cooking_comfort: form.effort === 'low' ? 'simple meals' : form.effort === 'high' ? 'love cooking' : 'cook from scratch',
-        },
-        members: [
-          {
-            label: 'Guest household',
-            role: 'adult',
-            dietary_restrictions: form.allergies ? form.allergies.split(',').map((item) => item.trim()).filter(Boolean) : [],
-            food_preferences: [form.preferences, form.kidFriendly ? 'kid-friendly' : ''].filter(Boolean),
-            health_considerations: [],
-          },
-        ],
-        slots: [
-          {
-            day: 'mon',
-            meal: 'dinner',
-            attendees: [],
-            effort_level: form.effort,
-            planning_notes: form.kidFriendly ? 'Please keep this family-friendly for kids.' : 'No kid-friendly requirement.',
-            is_leftover: false,
-            leftover_source: '',
-            suggestion: [form.preferences, form.ingredientsOnHand ? `Use ingredients on hand when possible: ${form.ingredientsOnHand}` : ''].filter(Boolean).join('. '),
-          },
-        ],
-        week_notes: 'Public first-meal generation experience. Return one strong dinner only.',
-        recent_meal_names: recentMeals.slice(-3),
+        ingredients: form.ingredientsOnHand || '',
+        servings: String(Number(form.servings) || 4),
+        dietary,
+        allergies: form.allergies || '',
+        audience: form.kidFriendly ? 'kids and adults' : 'adults',
+        timeConstraint: form.effort === 'low' ? '20' : form.effort === 'high' ? '45' : '30',
+        mood: [form.preferences, override?.suggestion].filter(Boolean).join('. '),
       }
 
-      if (override?.suggestion) {
-        payload.slots[0].suggestion = [payload.slots[0].suggestion, override.suggestion].filter(Boolean).join('. ')
-      }
-
-      const { data, error } = await supabase.functions.invoke('generate-plan', { body: payload })
+      const { data, error } = await supabase.functions.invoke('generate-public-meal', { body: payload })
       if (error) throw error
 
-      const generated = data?.plan?.meals?.[0]
+      const generated = data?.recipe
       if (!generated) throw new Error('No meal returned')
       const normalized = normalizeMealRecord(generated)
       setMeal(normalized)
