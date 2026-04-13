@@ -155,7 +155,7 @@ export function SettingsPage() {
 
   const handleSignOut = async () => {
     await signOut()
-    navigate('/login')
+    // AuthProvider.signOut() already navigates to '/'
   }
 
   const updateMember = (idx, key, value) => {

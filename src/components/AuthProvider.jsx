@@ -11,6 +11,7 @@ export function AuthProvider({ children }) {
   const [emailUnverified, setEmailUnverified] = useState(false)
   const navigate = useNavigate()
   const prevUserRef = useRef(null)
+  const intentionalSignOutRef = useRef(false)
 
   // Check if email is verified
   const isEmailVerified = user?.email_confirmed_at != null
@@ -50,10 +51,12 @@ export function AuthProvider({ children }) {
       if (!mounted) return
       
       // Handle session expiry - compare with ref, not state
-      if (!session && prevUserRef.current) {
+      // Skip the toast/redirect if this was triggered by intentional sign-out
+      if (!session && prevUserRef.current && !intentionalSignOutRef.current) {
         toast.error('Your session expired. Please log in again.')
         navigate('/', { replace: true })
       }
+      intentionalSignOutRef.current = false
       
       prevUserRef.current = session?.user ?? null
       setUser(session?.user ?? null)
@@ -72,6 +75,7 @@ export function AuthProvider({ children }) {
       loading,
       emailUnverified,
       signOut: async () => {
+        intentionalSignOutRef.current = true
         await supabase.auth.signOut({ scope: 'local' })
         if (typeof window !== 'undefined') {
           try {
