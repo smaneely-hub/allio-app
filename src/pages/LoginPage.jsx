@@ -139,6 +139,15 @@ export function LoginPage() {
           <p className="text-text-secondary mt-2 text-sm">
             Your household, simplified.
           </p>
+          <button
+            type="button"
+            onClick={() => navigate('/try')}
+            className="mt-4 text-sm font-semibold text-primary-600 hover:text-primary-700"
+          >
+            Try one dinner without signing up
+          </button>
+          <p className="text-text-secondary mt-2 text-sm">
+          </p>
         </div>
 
         {/* Card */}

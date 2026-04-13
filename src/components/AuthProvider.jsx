@@ -52,7 +52,7 @@ export function AuthProvider({ children }) {
       // Handle session expiry - compare with ref, not state
       if (!session && prevUserRef.current) {
         toast.error('Your session expired. Please log in again.')
-        navigate('/login')
+        navigate('/', { replace: true })
       }
       
       prevUserRef.current = session?.user ?? null
@@ -81,7 +81,7 @@ export function AuthProvider({ children }) {
             sessionKeys.filter((k) => k.toLowerCase().includes('supabase') || k.toLowerCase().includes('sb-')).forEach((k) => window.sessionStorage.removeItem(k))
           } catch {}
         }
-        navigate('/login', { replace: true })
+        navigate('/', { replace: true })
       },
       resendVerification: async () => {
         if (!user?.email) return
