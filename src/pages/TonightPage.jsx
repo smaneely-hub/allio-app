@@ -10,6 +10,106 @@ import { buildShoppingItemsFromMeal, upsertShoppingListForDate } from '../lib/to
 import { calculateServings, logServingsCalculation, getDemographicBucket } from '../hooks/useServings'
 import { CATEGORY_LABELS, CATEGORY_ORDER, groupItemsByCategory, parseIngredient } from '../lib/shoppingListUtils'
 
+const FALLBACK_TIME_LIMITS = {
+  low: 30,
+  medium: 45,
+  high: 90,
+}
+
+function parseJsonField(value, fallback = []) {
+  if (Array.isArray(value) || (value && typeof value === 'object')) return value
+  if (typeof value !== 'string' || !value.trim()) return fallback
+  try {
+    return JSON.parse(value)
+  } catch {
+    return fallback
+  }
+}
+
+function recipeMatchesDiet(recipe, dietaryFocus = '') {
+  if (!dietaryFocus) return true
+
+  const focus = dietaryFocus.toLowerCase()
+  const title = String(recipe.title || '').toLowerCase()
+  const flags = parseJsonField(recipe.dietary_flags_json, [])
+  const tags = parseJsonField(recipe.tags_json, [])
+  const combined = [
+    ...flags.map((value) => String(value).toLowerCase()),
+    ...tags.map((value) => String(value).toLowerCase()),
+    title,
+  ]
+
+  if (focus === 'vegetarian') {
+    return combined.some((value) => value.includes('vegetarian')) && !combined.some((value) => value.includes('chicken') || value.includes('beef') || value.includes('pork'))
+  }
+  if (focus === 'vegan') return combined.some((value) => value.includes('vegan'))
+  if (focus === 'gluten-free') return combined.some((value) => value.includes('gluten-free') || value.includes('gluten free'))
+  if (focus === 'low-carb') return combined.some((value) => value.includes('low-carb') || value.includes('low carb'))
+  if (focus === 'high-protein') return combined.some((value) => value.includes('high-protein') || value.includes('high protein'))
+  if (focus === 'keto') return combined.some((value) => value.includes('keto'))
+
+  return true
+}
+
+async function generateTonightMealFallback({
+  effort,
+  dietaryFocus,
+  selectedMemberData,
+  recentMealNames,
+  excludedRecipeId = null,
+  servings = 1,
+}) {
+  const maxTime = FALLBACK_TIME_LIMITS[effort] || FALLBACK_TIME_LIMITS.medium
+  const hasKids = selectedMemberData.some((member) => ['child', 'toddler'].includes(String(member.role || '').toLowerCase()))
+  const recentNames = new Set((recentMealNames || []).map((name) => String(name || '').toLowerCase()))
+
+  const { data: recipes, error } = await supabase
+    .from('recipes')
+    .select('id, title, slug, description, cuisine, meal_type, prep_time_minutes, cook_time_minutes, servings, ingredients_json, instructions_json, tags_json, dietary_flags_json, kid_friendly_score, weeknight_score, difficulty, active')
+    .eq('meal_type', 'dinner')
+    .eq('active', true)
+    .lte('cook_time_minutes', maxTime)
+    .order('weeknight_score', { ascending: false })
+    .limit(60)
+
+  if (error) throw error
+
+  const validRecipes = (recipes || [])
+    .filter((recipe) => recipe.id !== excludedRecipeId)
+    .filter((recipe) => recipe.title && !recentNames.has(String(recipe.title).toLowerCase()))
+    .filter((recipe) => recipeMatchesDiet(recipe, dietaryFocus))
+    .filter((recipe) => parseJsonField(recipe.ingredients_json, []).length > 0)
+    .filter((recipe) => parseJsonField(recipe.instructions_json, []).length > 0)
+    .sort((left, right) => {
+      const leftScore = Number(left.weeknight_score || 0) + (hasKids ? Number(left.kid_friendly_score || 0) : 0)
+      const rightScore = Number(right.weeknight_score || 0) + (hasKids ? Number(right.kid_friendly_score || 0) : 0)
+      return rightScore - leftScore
+    })
+
+  const recipe = validRecipes[0]
+  if (!recipe) {
+    throw new Error('No suitable fallback recipe found')
+  }
+
+  return normalizeMealRecord({
+    day: 'mon',
+    meal: 'dinner',
+    recipe_id: recipe.id,
+    name: recipe.title,
+    title: recipe.title,
+    description: recipe.description || '',
+    servings: Math.max(Number(servings) || 1, Number(recipe.servings) || 1),
+    ingredients: parseJsonField(recipe.ingredients_json, []),
+    instructions: parseJsonField(recipe.instructions_json, []),
+    tags: parseJsonField(recipe.tags_json, []),
+    prep_time_minutes: recipe.prep_time_minutes || 0,
+    cook_time_minutes: recipe.cook_time_minutes || 0,
+    difficulty: recipe.difficulty || 'medium',
+    why_this_meal: 'Picked from your recipe library while planner generation is temporarily unavailable.',
+    notes: dietaryFocus ? `Diet focus: ${dietaryFocus}` : '',
+  })
+}
+
 async function getHousehold(userId) {
   if (!userId) return null
 
@@ -649,18 +749,21 @@ export function TonightPage() {
 
       console.log('[TonightPage] planner function response:', { functionName: 'generate-plan', data, error })
 
-      if (error) {
-        console.error('[TonightPage] generate-plan error:', error)
-        throw new Error(error.message || 'Generation failed')
+      let normalized = null
+      if (error || !data?.plan?.meals?.length) {
+        console.error('[TonightPage] generate-plan error:', error || data)
+        normalized = await generateTonightMealFallback({
+          effort,
+          dietaryFocus: finalDietFocus,
+          selectedMemberData,
+          recentMealNames: [...recentMealNames.slice(0, 5), ...preferenceSignals.strongAvoidSignals],
+          servings: calculatedServings,
+        })
+        toast('Planner fallback used recipe library instead.', { icon: 'ℹ️' })
+      } else {
+        console.log('[TonightPage] received meal:', data.plan.meals[0])
+        normalized = normalizeMealRecord(data.plan.meals[0])
       }
-
-      if (!data?.plan?.meals?.length) {
-        console.error('[TonightPage] no meals in response:', data)
-        throw new Error('We couldn\'t find or generate a meal matching your family\'s restrictions. Try simplifying filters or try again.')
-      }
-
-      console.log('[TonightPage] received meal:', data.plan.meals[0])
-      const normalized = normalizeMealRecord(data.plan.meals[0])
       setMeal(normalized)
       setFeedback('')
       setRefinementChanges([])  // Clear refinement state on new generation
@@ -811,15 +914,21 @@ export function TonightPage() {
 
       const { data, error } = await invokePlannerFunction(swapPayload)
 
-      if (error) {
-        throw new Error(error.message || 'Swap failed')
+      let normalized = null
+      if (error || !data?.plan?.meals?.length) {
+        console.error('[TonightPage] swap generate-plan error:', error || data)
+        normalized = await generateTonightMealFallback({
+          effort,
+          dietaryFocus: finalDietFocus,
+          selectedMemberData,
+          recentMealNames: [...recentMealNames.slice(0, 5), ...preferenceSignals.strongAvoidSignals, meal.name],
+          excludedRecipeId: meal.recipe_id || null,
+          servings: calculatedServings,
+        })
+        toast('Swap fallback used recipe library instead.', { icon: 'ℹ️' })
+      } else {
+        normalized = normalizeMealRecord(data.plan.meals[0])
       }
-
-      if (!data?.plan?.meals?.length) {
-        throw new Error('We couldn\'t find or generate a swap matching your family\'s restrictions. Try adjusting filters.')
-      }
-
-      const normalized = normalizeMealRecord(data.plan.meals[0])
       setMeal(normalized)
       setFeedback('')
       setCooked(false)
