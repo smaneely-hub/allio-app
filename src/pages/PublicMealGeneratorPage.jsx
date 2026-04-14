@@ -13,7 +13,7 @@ export function PublicMealGeneratorPage() {
     servings: 4,
     allergies: '',
     preferences: '',
-    kidFriendly: true,
+    kidFriendly: false,
     effort: 'medium',
   })
   const [loading, setLoading] = useState(false)

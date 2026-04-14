@@ -196,11 +196,12 @@ STRUCTURE:
 
 TIPS:
 - Never state the obvious ("don't burn the garlic," "don't overcrowd the pan").
-- Good tips teach something: "Velveting the chicken in a cornstarch slurry before cooking keeps it silky and tender, a technique borrowed from Chinese restaurant kitchens."
+- Good tips teach something: "Blooming the tomato paste in the pan for 30 seconds before adding liquid deepens the sauce and removes any raw metallic edge."
 - Include make-ahead, storage, and reheating instructions.
 - Include one "if you have time" upgrade: a quick pickle, a toasted nut garnish, a compound butter.
 - A tip must describe something the recipe ACTUALLY does or that the cook can ACTUALLY apply to THIS recipe.
 - Never insert a tip about a technique (like velveting, brining, marinating) unless the recipe's own instructions include that technique.
+- Never suggest velveting for ground meat. If the protein is ground beef, turkey, pork, or chicken, use browning, seasoning, or moisture-management tips instead.
 - Every tip must be specific to THIS recipe, not generic cooking advice copy-pasted from elsewhere.
 
 DESCRIPTIONS:
