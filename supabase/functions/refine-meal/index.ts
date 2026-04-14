@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+import { buildCorsHeaders, handleCorsPreflight, rejectDisallowedOrigin, requireAuth } from '../_shared/security.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || ''
@@ -7,11 +8,6 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '
 const LLM_API_KEY = Deno.env.get('LLM_API_KEY') || ''
 const LLM_MODEL = Deno.env.get('LLM_MODEL') || 'meta-llama/llama-3.1-70b-instruct'
 const LLM_ENDPOINT = Deno.env.get('LLM_ENDPOINT') || 'https://openrouter.ai/api/v1/chat/completions'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
 
 // Parse ingredients from various formats
 function parseIngredients(ingredients: any): Array<{item: string; quantity: number; unit: string; category: string; notes?: string}> {
@@ -405,28 +401,21 @@ Respond with ONLY valid JSON, no other text.`
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return handleCorsPreflight(req)
   }
 
+  const blockedOrigin = rejectDisallowedOrigin(req)
+  if (blockedOrigin) {
+    return blockedOrigin
+  }
+
+  const origin = req.headers.get('origin')
+  const corsHeaders = { ...buildCorsHeaders(origin), 'Content-Type': 'application/json' }
+
   try {
-    const authorization = req.headers.get('Authorization')
-    if (!authorization) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authorization } },
-    })
-
-    const { data: { user }, error: authError } = await authClient.auth.getUser()
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    const auth = await requireAuth(req, SUPABASE_URL, SUPABASE_ANON_KEY)
+    if (auth.response) {
+      return auth.response
     }
 
     const { recipe, feedback } = await req.json()

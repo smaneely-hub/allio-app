@@ -1,17 +1,15 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
 
+import { buildCorsHeaders, handleCorsPreflight, rejectDisallowedOrigin } from '../_shared/security.ts'
+
 const LLM_API_KEY = Deno.env.get('LLM_API_KEY') || ''
 const LLM_ENDPOINT = Deno.env.get('LLM_ENDPOINT') || 'https://openrouter.ai/api/v1/chat/completions'
 const LLM_MODEL = Deno.env.get('LLM_PUBLIC_MODEL') || Deno.env.get('LLM_MODEL') || 'google/gemini-2.5-flash'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-forwarded-for',
-}
-
 const ipRateLimit = new Map<string, number[]>()
 const HOUR_MS = 60 * 60 * 1000
 const MAX_REQUESTS_PER_HOUR = 5
+const MAX_PUBLIC_FIELD_LENGTH = 200
 
 function cleanupAndCheckRateLimit(ip: string) {
   const now = Date.now()
@@ -37,6 +35,48 @@ function asString(value: unknown, fallback = '') {
 function asNumber(value: unknown, fallback = 0) {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function assertPublicFieldLength(name: string, value: unknown) {
+  if (typeof value === 'string' && value.length > MAX_PUBLIC_FIELD_LENGTH) {
+    return `${name} exceeds ${MAX_PUBLIC_FIELD_LENGTH} characters`
+  }
+
+  if (Array.isArray(value)) {
+    const joined = value.join(', ')
+    if (joined.length > MAX_PUBLIC_FIELD_LENGTH) {
+      return `${name} exceeds ${MAX_PUBLIC_FIELD_LENGTH} characters`
+    }
+
+    for (const entry of value) {
+      if (typeof entry !== 'string') {
+        return `${name} must contain only strings`
+      }
+      if (entry.length > MAX_PUBLIC_FIELD_LENGTH) {
+        return `${name} exceeds ${MAX_PUBLIC_FIELD_LENGTH} characters`
+      }
+    }
+  }
+
+  return null
+}
+
+function validatePublicPayload(payload: any) {
+  const checks = [
+    ['ingredients', payload?.ingredients],
+    ['dietary', payload?.dietary],
+    ['allergies', payload?.allergies],
+    ['audience', payload?.audience],
+    ['mood', payload?.mood],
+    ['timeConstraint', payload?.timeConstraint],
+  ] as const
+
+  for (const [name, value] of checks) {
+    const error = assertPublicFieldLength(name, value)
+    if (error) return error
+  }
+
+  return null
 }
 
 function normalizeIngredientGroup(group: any) {
@@ -339,13 +379,28 @@ async function generateRecipe(payload: any) {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return handleCorsPreflight(req, {
+      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-forwarded-for',
+    })
+  }
+
+  const blockedOrigin = rejectDisallowedOrigin(req)
+  if (blockedOrigin) {
+    return blockedOrigin
+  }
+
+  const origin = req.headers.get('origin')
+  const corsHeaders = {
+    ...buildCorsHeaders(origin, {
+      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-forwarded-for',
+    }),
+    'Content-Type': 'application/json',
   }
 
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: corsHeaders,
     })
   }
 
@@ -354,7 +409,7 @@ serve(async (req) => {
   if (!cleanupAndCheckRateLimit(ip)) {
     return new Response(JSON.stringify({ error: 'Too many requests. Please wait a bit and try again.' }), {
       status: 429,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: corsHeaders,
     })
   }
 
@@ -365,16 +420,24 @@ serve(async (req) => {
         error: 'Public meal generator is not configured yet. Missing LLM API key.',
       }), {
         status: 503,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: corsHeaders,
       })
     }
 
     const payload = await req.json()
+    const validationError = validatePublicPayload(payload)
+    if (validationError) {
+      return new Response(JSON.stringify({ ok: false, error: validationError }), {
+        status: 400,
+        headers: corsHeaders,
+      })
+    }
+
     const recipe = await generateRecipe(payload)
 
     return new Response(JSON.stringify({ ok: true, recipe }), {
       status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: corsHeaders,
     })
   } catch (error) {
     console.error('[generate-public-meal] error', error?.message || error)
@@ -383,7 +446,7 @@ serve(async (req) => {
       error: 'Sorry, I could not generate a polished recipe right now. Please try again in a moment.',
     }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: corsHeaders,
     })
   }
 })

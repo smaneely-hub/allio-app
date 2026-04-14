@@ -1,6 +1,8 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+import { buildCorsHeaders, handleCorsPreflight, rejectDisallowedOrigin, requireAuth } from '../_shared/security.ts'
+
 /*
 DIAGNOSTIC FINDINGS
 - This edge function exists and already handles CORS preflight via OPTIONS plus Access-Control-Allow-Headers including authorization and apikey.
@@ -46,10 +48,6 @@ function calculateServings(members: any[]): number {
   }
   
   return Math.max(1, Math.round(total))
-}
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 // HYBRID MODE: Try recipe catalog first, then fall back to LLM
@@ -778,7 +776,7 @@ async function callLlm(messages: Array<{ role: string; content: string }>) {
 }
 
 // Save an LLM-generated recipe to the database for future reuse
-async function saveGeneratedRecipe(supabaseClient: any, meal: any, members: any[], dietApplied: string): Promise<string | null> {
+async function saveGeneratedRecipe(supabaseClient: any, meal: any, members: any[], dietApplied: string, userId: string | null): Promise<string | null> {
   try {
     // Validate required fields
     const title = meal.name || meal.title
@@ -835,6 +833,7 @@ async function saveGeneratedRecipe(supabaseClient: any, meal: any, members: any[
       kid_friendly_score: kidFriendlyScore,
       weeknight_score: weeknightScore,
       source_type: 'ai_generated',
+      user_id: userId,
     }
 
     // Insert the recipe
@@ -858,50 +857,28 @@ async function saveGeneratedRecipe(supabaseClient: any, meal: any, members: any[
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return handleCorsPreflight(req)
   }
 
+  const blockedOrigin = rejectDisallowedOrigin(req)
+  if (blockedOrigin) {
+    return blockedOrigin
+  }
+
+  const origin = req.headers.get('origin')
+  const corsHeaders = { ...buildCorsHeaders(origin), 'Content-Type': 'application/json' }
+
   try {
-    const authorization = req.headers.get('authorization') || req.headers.get('Authorization')
-    console.log('[generate-plan] authorization header present:', Boolean(authorization))
-
-    const payload = await req.json()
-    const publicMode = payload?.public_mode === true
-    let user = null
-
-    if (!publicMode) {
-      if (!authorization) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-
-      const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        global: {
-          headers: {
-            Authorization: authorization,
-          },
-        },
-      })
-
-      const {
-        data: { user: authUser },
-        error: authError,
-      } = await authClient.auth.getUser()
-
-      if (authError || !authUser) {
-        console.error('[generate-plan] auth.getUser failed:', authError?.message || 'no user')
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-
-      user = authUser
+    const auth = await requireAuth(req, SUPABASE_URL, SUPABASE_ANON_KEY)
+    if (auth.response) {
+      return auth.response
     }
+
+    console.log('[generate-plan] authorization header present:', Boolean(auth.authorization))
+
+    const user = auth.user
+    const payload = await req.json()
     if (!payload?.household || !Array.isArray(payload?.members) || !Array.isArray(payload?.slots)) {
       return new Response(JSON.stringify({ error: 'Payload must include household, members, and slots' }), {
         status: 400,
@@ -946,12 +923,6 @@ serve(async (req) => {
             attendees: fallbackAttendees
           }]
       console.log('[generate-plan] Swap mode: narrowed to single slot', swapDay, swapMeal, swapSuggestion || '(no suggestion)')
-    }
-
-    if (publicMode) {
-      payload.slots = payload.slots.slice(0, 1)
-      payload.members = Array.isArray(payload.members) ? payload.members.slice(0, 6) : []
-      payload.recent_meal_names = Array.isArray(payload.recent_meal_names) ? payload.recent_meal_names.slice(0, 3) : []
     }
 
     // HYBRID MODE: Try catalog first for each slot
@@ -1133,10 +1104,10 @@ serve(async (req) => {
         }
         
         // Save LLM-generated recipes to database for future reuse
-        if (!publicMode && llmTransformed.meals?.length > 0) {
-          const dietFromSlot = remainingSlots[0]?.suggestion || dietApplied || ''
+        if (llmTransformed.meals?.length > 0) {
+          const dietFromSlot = remainingSlots[0]?.suggestion || ''
           for (const meal of llmTransformed.meals) {
-            await saveGeneratedRecipe(supabaseClient, meal, payload.members, dietFromSlot)
+            await saveGeneratedRecipe(supabaseClient, meal, payload.members, dietFromSlot, user?.id ?? null)
           }
         }
         
@@ -1217,10 +1188,11 @@ serve(async (req) => {
     console.log('[generate-plan] Transformed plan:', JSON.stringify(transformedPlan).slice(0, 200))
 
     // Save LLM-generated recipes to database for future reuse
-    if (!publicMode && transformedPlan.meals?.length > 0) {
+    if (transformedPlan.meals?.length > 0) {
       const dietFromPayload = payload.household?.diet_focus || ''
+      const supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
       for (const meal of transformedPlan.meals) {
-        await saveGeneratedRecipe(supabaseClient, meal, payload.members, dietFromPayload)
+        await saveGeneratedRecipe(supabaseClient, meal, payload.members, dietFromPayload, user?.id ?? null)
       }
     }
 

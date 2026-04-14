@@ -1,6 +1,8 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+import { buildCorsHeaders, handleCorsPreflight, rejectDisallowedOrigin, requireAuth } from '../_shared/security.ts'
+
 /*
 DIAGNOSTIC FINDINGS
 - This edge function exists and already handles CORS preflight via OPTIONS plus Access-Control-Allow-Headers including authorization and apikey.
@@ -14,12 +16,6 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '
 const LLM_API_KEY = Deno.env.get('LLM_API_KEY') || ''
 const LLM_MODEL = Deno.env.get('LLM_MODEL') || 'meta-llama/llama-3.1-70b-instruct'
 const LLM_ENDPOINT = Deno.env.get('LLM_ENDPOINT') || 'https://openrouter.ai/api/v1/chat/completions'
-
-// CORS headers
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
 
 // HYBRID MODE: Try recipe catalog first, then fall back to LLM
 const HYBRID_MODE = true
@@ -657,41 +653,25 @@ async function callLlm(messages: Array<{ role: string; content: string }>) {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return handleCorsPreflight(req)
   }
 
+  const blockedOrigin = rejectDisallowedOrigin(req)
+  if (blockedOrigin) {
+    return blockedOrigin
+  }
+
+  const origin = req.headers.get('origin')
+  const corsHeaders = { ...buildCorsHeaders(origin), 'Content-Type': 'application/json' }
+
   try {
-    const authorization = req.headers.get('Authorization')
-
-    if (!authorization) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    const auth = await requireAuth(req, SUPABASE_URL, SUPABASE_ANON_KEY)
+    if (auth.response) {
+      return auth.response
     }
 
-    const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: {
-        headers: {
-          Authorization: authorization,
-        },
-      },
-    })
-
-    const {
-      data: { user },
-      error: authError,
-    } = await authClient.auth.getUser()
-
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
+    const user = auth.user
     const payload = await req.json()
     if (!payload?.household || !Array.isArray(payload?.members) || !Array.isArray(payload?.slots)) {
       return new Response(JSON.stringify({ error: 'Payload must include household, members, and slots' }), {
