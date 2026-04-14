@@ -293,21 +293,6 @@ export function TonightPage() {
     return reasons.slice(0, 4)
   }, [meal, selectedMembers.length, staplesOnHand])
 
-  const cookingProgress = useMemo(() => {
-    const totalSteps = Math.max((meal?.instructions || []).length, 1)
-    const checkedIngredients = Object.values(ingredientChecks).filter(Boolean).length
-    const prepTotal = Object.values(shoppingPrepItems).flat().length
-    const currentStepNumber = Math.min(currentStepIndex + 1, totalSteps)
-
-    return {
-      totalSteps,
-      currentStepNumber,
-      percent: Math.round((currentStepNumber / totalSteps) * 100),
-      checkedIngredients,
-      prepTotal,
-    }
-  }, [meal, ingredientChecks, shoppingPrepItems, currentStepIndex])
-
   const shoppingPrepItems = useMemo(() => {
     const parsed = (meal?.ingredients || [])
       .map((ingredient, index) => {
@@ -324,6 +309,21 @@ export function TonightPage() {
 
     return groupItemsByCategory(parsed)
   }, [meal])
+
+  const cookingProgress = useMemo(() => {
+    const totalSteps = Math.max((meal?.instructions || []).length, 1)
+    const checkedIngredients = Object.values(ingredientChecks).filter(Boolean).length
+    const prepTotal = Object.values(shoppingPrepItems).flat().length
+    const currentStepNumber = Math.min(currentStepIndex + 1, totalSteps)
+
+    return {
+      totalSteps,
+      currentStepNumber,
+      percent: Math.round((currentStepNumber / totalSteps) * 100),
+      checkedIngredients,
+      prepTotal,
+    }
+  }, [meal, ingredientChecks, shoppingPrepItems, currentStepIndex])
 
   // Load last saved meal on mount and build recent history
   useEffect(() => {
