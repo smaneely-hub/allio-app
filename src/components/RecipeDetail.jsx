@@ -1,5 +1,27 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { normalizeRecipe } from '../lib/recipeSchema'
+import { createClient } from '@supabase/supabase-js'
+
+// Pexels image fetcher
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://rvgtmletsbycrbeycwus.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+
+async function fetchRecipeImage(dishName) {
+  if (!supabase) return { imageUrl: null, photographer: null, pexelsLink: null };
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(
+      `${supabaseUrl}/functions/v1/fetch-recipe-image`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ query: dishName }),
+      }
+    );
+    return await res.json();
+  } catch { return { imageUrl: null, photographer: null, pexelsLink: null }; }
+}
 
 function Chevron({ expanded }) {
   return (
@@ -33,6 +55,20 @@ function CollapsibleSection({ title, expanded, onToggle, children, defaultOpen =
 }
 
 export function RecipeDetail({ meal, onClose }) {
+  const [imageUrl, setImageUrl] = useState(null);
+  const [photographer, setPhotographer] = useState(null);
+
+  useEffect(() => {
+    if (recipe.title) {
+      fetchRecipeImage(recipe.title).then((result) => {
+        if (result.imageUrl) {
+          setImageUrl(result.imageUrl);
+          setPhotographer(result.photographer);
+        }
+      });
+    }
+  }, [recipe.title]);
+
   const recipe = useMemo(() => normalizeRecipe({
     ...meal,
     title: meal?.title || meal?.name,
@@ -82,6 +118,12 @@ export function RecipeDetail({ meal, onClose }) {
 
       <div className="mx-auto max-w-3xl px-4 pb-16 pt-6">
         <header className="rounded-[32px] bg-white px-5 py-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+          {imageUrl ? (
+            <div className="mb-4">
+              <img src={imageUrl} alt={recipe.title} className="w-full h-48 object-cover rounded-t-2xl" loading="lazy" />
+              {photographer && <p className="text-xs text-gray-400 px-1 pt-1">Photo by {photographer} on Pexels</p>}
+            </div>
+          ) : null}
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-text-muted">Allio Recipe</div>
           <h1 className="mt-3 font-display text-4xl leading-tight text-text-primary sm:text-5xl">{recipe.title}</h1>
           {recipe.description ? <p className="mt-4 max-w-2xl text-[15px] leading-7 text-text-secondary">{recipe.description}</p> : null}
