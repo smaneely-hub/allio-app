@@ -8,14 +8,18 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 async function fetchRecipeImage(dishName) {
-  if (!supabase) return { imageUrl: null, photographer: null, pexelsLink: null };
+  if (!supabase || !supabaseAnonKey) return { imageUrl: null, photographer: null, pexelsLink: null };
   try {
     const { data: { session } } = await supabase.auth.getSession();
     const res = await fetch(
       `${supabaseUrl}/functions/v1/fetch-recipe-image`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token || supabaseAnonKey}`,
+          apikey: supabaseAnonKey,
+        },
         body: JSON.stringify({ query: dishName }),
       }
     );
@@ -55,20 +59,6 @@ function CollapsibleSection({ title, expanded, onToggle, children, defaultOpen =
 }
 
 export function RecipeDetail({ meal, onClose }) {
-  const [imageUrl, setImageUrl] = useState(null);
-  const [photographer, setPhotographer] = useState(null);
-
-  useEffect(() => {
-    if (recipe.title) {
-      fetchRecipeImage(recipe.title).then((result) => {
-        if (result.imageUrl) {
-          setImageUrl(result.imageUrl);
-          setPhotographer(result.photographer);
-        }
-      });
-    }
-  }, [recipe.title]);
-
   const recipe = useMemo(() => normalizeRecipe({
     ...meal,
     title: meal?.title || meal?.name,
@@ -85,6 +75,20 @@ export function RecipeDetail({ meal, onClose }) {
     sourceNote: meal?.sourceNote,
     imagePrompt: meal?.imagePrompt,
   }), [meal])
+
+  const [imageUrl, setImageUrl] = useState(null);
+  const [photographer, setPhotographer] = useState(null);
+
+  useEffect(() => {
+    if (recipe.title) {
+      fetchRecipeImage(recipe.title).then((result) => {
+        if (result.imageUrl) {
+          setImageUrl(result.imageUrl);
+          setPhotographer(result.photographer);
+        }
+      });
+    }
+  }, [recipe.title]);
 
   const [sections, setSections] = useState({
     ingredients: true,
@@ -120,8 +124,8 @@ export function RecipeDetail({ meal, onClose }) {
         <header className="rounded-[32px] bg-white px-5 py-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
           {imageUrl ? (
             <div className="mb-4">
-              <img src={imageUrl} alt={recipe.title} className="w-full h-48 object-cover rounded-t-2xl" loading="lazy" />
-              {photographer && <p className="text-xs text-gray-400 px-1 pt-1">Photo by {photographer} on Pexels</p>}
+              <img src={imageUrl} alt={recipe.title} className="h-48 w-full rounded-t-2xl object-cover" loading="lazy" />
+              {photographer && <p className="px-1 pt-1 text-xs text-gray-400">Photo by {photographer} on Pexels</p>}
             </div>
           ) : null}
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-text-muted">Allio Recipe</div>
