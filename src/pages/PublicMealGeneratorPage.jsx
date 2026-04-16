@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -6,6 +6,27 @@ import { normalizeMealRecord } from '../lib/mealSchema'
 import { normalizeRecipe } from '../lib/recipeSchema'
 
 const quickPrefs = ['High protein', 'Comfort food', 'Low carb', 'Vegetarian', 'Fast cleanup']
+
+async function fetchRecipeImage(dishName) {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-recipe-image`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ query: dishName }),
+      }
+    )
+    return await res.json()
+  } catch {
+    return { imageUrl: null, photographer: null, pexelsLink: null }
+  }
+}
 
 export function PublicMealGeneratorPage() {
   const [form, setForm] = useState({
@@ -18,6 +39,8 @@ export function PublicMealGeneratorPage() {
   })
   const [loading, setLoading] = useState(false)
   const [meal, setMeal] = useState(null)
+  const [imageUrl, setImageUrl] = useState(null)
+  const [photographer, setPhotographer] = useState(null)
   const [recentMeals, setRecentMeals] = useState([])
   const [dailyAttempts, setDailyAttempts] = useState(0)
 
@@ -75,6 +98,17 @@ export function PublicMealGeneratorPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (meal?.title) {
+      fetchRecipeImage(meal.title).then((result) => {
+        if (result.imageUrl) {
+          setImageUrl(result.imageUrl)
+          setPhotographer(result.photographer)
+        }
+      })
+    }
+  }, [meal?.title])
 
   const regenerateWithReason = (reason) => generateMeal({ suggestion: reason })
 
@@ -175,6 +209,23 @@ export function PublicMealGeneratorPage() {
           <div className="rounded-3xl border border-divider bg-white p-6 shadow-sm">
             {meal ? (
               <div className="space-y-5">
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt={meal.title || meal.name}
+                    className="h-40 w-full rounded-t-xl object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="flex h-40 w-full items-center justify-center rounded-t-xl bg-gray-100">
+                    <span className="text-sm text-gray-400">Loading photo...</span>
+                  </div>
+                )}
+                {photographer && (
+                  <p className="px-4 pt-1 text-xs text-gray-400">
+                    Photo by {photographer} on Pexels
+                  </p>
+                )}
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-wide text-primary-700">Tonight’s pick</div>
                   <h2 className="mt-2 font-display text-2xl text-text-primary">{meal.name}</h2>
