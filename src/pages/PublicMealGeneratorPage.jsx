@@ -9,6 +9,14 @@ const quickPrefs = ['High protein', 'Comfort food', 'Low carb', 'Vegetarian', 'F
 
 const DEFAULT_MEAL_IMAGE = { url: null, photographer: null, photographerUrl: null }
 
+function getTrySessionId() {
+  const existing = sessionStorage.getItem('try_session_id')
+  if (existing) return existing
+  const next = crypto.randomUUID()
+  sessionStorage.setItem('try_session_id', next)
+  return next
+}
+
 async function fetchRecipeImage(dishName) {
   const query = dishName || 'food'
   try {
@@ -50,6 +58,8 @@ export function PublicMealGeneratorPage() {
   const [mealImage, setMealImage] = useState(DEFAULT_MEAL_IMAGE)
   const [recentMeals, setRecentMeals] = useState([])
   const [dailyAttempts, setDailyAttempts] = useState(0)
+  const [sessionId] = useState(() => getTrySessionId())
+  const [feedbackState, setFeedbackState] = useState({ selected: null, locked: false, message: '' })
 
   const canGenerate = useMemo(() => dailyAttempts < 6, [dailyAttempts])
   const recipe = useMemo(() => (meal ? normalizeRecipe({
@@ -75,6 +85,8 @@ export function PublicMealGeneratorPage() {
     }
 
     setLoading(true)
+    setMealImage(DEFAULT_MEAL_IMAGE)
+    setFeedbackState({ selected: null, locked: false, message: '' })
     try {
       const dietary = [form.preferences.toLowerCase().includes('vegetarian') ? 'vegetarian' : '', form.preferences.toLowerCase().includes('vegan') ? 'vegan' : '', form.preferences.toLowerCase().includes('gluten free') ? 'gluten-free' : '', form.preferences.toLowerCase().includes('dairy free') ? 'dairy-free' : '']
         .filter(Boolean)
@@ -87,6 +99,7 @@ export function PublicMealGeneratorPage() {
         audience: form.kidFriendly ? 'kids and adults' : 'adults',
         timeConstraint: form.effort === 'low' ? '20' : form.effort === 'high' ? '45' : '30',
         mood: [form.preferences, override?.suggestion].filter(Boolean).join('. '),
+        session_id: sessionId,
       }
 
       const { data, error } = await supabase.functions.invoke('generate-public-meal', { body: payload })
@@ -95,7 +108,6 @@ export function PublicMealGeneratorPage() {
       const generated = data?.recipe
       if (!generated) throw new Error('No meal returned')
       const normalized = normalizeMealRecord({ ...generated, source: 'public_try' })
-      setMealImage(DEFAULT_MEAL_IMAGE)
       setMeal(normalized)
       setRecentMeals((current) => [...current.slice(-2), normalized.name])
       setDailyAttempts((current) => current + 1)
@@ -120,6 +132,30 @@ export function PublicMealGeneratorPage() {
   }, [meal?.title, meal?.name])
 
   const regenerateWithReason = (reason) => generateMeal({ suggestion: reason })
+
+  const submitFeedback = async (feedback) => {
+    if (!meal?.id || feedbackState.locked) return
+    setFeedbackState((current) => ({ ...current, selected: feedback, locked: true, message: feedback === 'up' ? 'Thanks! We’ll make more like this.' : '' }))
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/try-feedback`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ meal_id: meal.id, session_id: sessionId, feedback }),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      if (feedback === 'down') {
+        await generateMeal()
+      }
+    } catch (err) {
+      console.error('[PublicMealGeneratorPage] feedback failed', err)
+      toast.error('Could not save feedback right now.')
+      setFeedbackState({ selected: null, locked: false, message: '' })
+    }
+  }
 
   return (
     <div className="min-h-screen bg-bg-primary px-4 py-10">
@@ -237,6 +273,26 @@ export function PublicMealGeneratorPage() {
                   <p className="mt-2 text-sm text-text-secondary">{recipe?.description || meal.reason}</p>
                   {meal.why_this_meal ? <p className="mt-3 rounded-2xl bg-primary-50 p-3 text-sm text-primary-800">{meal.why_this_meal}</p> : null}
                   <div className="mt-3 text-sm text-text-secondary">{recipe?.yield || `${meal.servings} servings`} • {meal.prep_time_minutes} min prep • {meal.cook_time_minutes} min cook</div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => submitFeedback('up')}
+                    disabled={feedbackState.locked || loading}
+                    className={`rounded-full border px-4 py-2 text-sm font-semibold ${feedbackState.selected === 'up' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-divider bg-white text-text-primary'}`}
+                  >
+                    👍
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => submitFeedback('down')}
+                    disabled={feedbackState.locked || loading}
+                    className={`rounded-full border px-4 py-2 text-sm font-semibold ${feedbackState.selected === 'down' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-divider bg-white text-text-primary'}`}
+                  >
+                    👎
+                  </button>
+                  {feedbackState.message ? <span className="text-sm font-medium text-text-secondary">{feedbackState.message}</span> : null}
                 </div>
 
                 <div>
