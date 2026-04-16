@@ -7,7 +7,10 @@ import { normalizeRecipe } from '../lib/recipeSchema'
 
 const quickPrefs = ['High protein', 'Comfort food', 'Low carb', 'Vegetarian', 'Fast cleanup']
 
+const DEFAULT_MEAL_IMAGE = { url: null, photographer: null, photographerUrl: null }
+
 async function fetchRecipeImage(dishName) {
+  const query = dishName || 'food'
   try {
     const { data: { session } } = await supabase.auth.getSession()
     const res = await fetch(
@@ -19,12 +22,17 @@ async function fetchRecipeImage(dishName) {
           Authorization: `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ query: dishName }),
+        body: JSON.stringify({ query }),
       }
     )
-    return await res.json()
+    const data = await res.json()
+    return {
+      url: typeof data?.imageUrl === 'string' && data.imageUrl.trim() ? data.imageUrl.trim() : null,
+      photographer: typeof data?.photographer === 'string' && data.photographer.trim() ? data.photographer.trim() : null,
+      photographerUrl: typeof data?.pexelsLink === 'string' && data.pexelsLink.trim() ? data.pexelsLink.trim() : null,
+    }
   } catch {
-    return { imageUrl: null, photographer: null, pexelsLink: null }
+    return DEFAULT_MEAL_IMAGE
   }
 }
 
@@ -39,8 +47,7 @@ export function PublicMealGeneratorPage() {
   })
   const [loading, setLoading] = useState(false)
   const [meal, setMeal] = useState(null)
-  const [imageUrl, setImageUrl] = useState(null)
-  const [photographer, setPhotographer] = useState(null)
+  const [mealImage, setMealImage] = useState(DEFAULT_MEAL_IMAGE)
   const [recentMeals, setRecentMeals] = useState([])
   const [dailyAttempts, setDailyAttempts] = useState(0)
 
@@ -87,7 +94,8 @@ export function PublicMealGeneratorPage() {
 
       const generated = data?.recipe
       if (!generated) throw new Error('No meal returned')
-      const normalized = normalizeMealRecord(generated)
+      const normalized = normalizeMealRecord({ ...generated, source: 'public_try' })
+      setMealImage(DEFAULT_MEAL_IMAGE)
       setMeal(normalized)
       setRecentMeals((current) => [...current.slice(-2), normalized.name])
       setDailyAttempts((current) => current + 1)
@@ -100,15 +108,16 @@ export function PublicMealGeneratorPage() {
   }
 
   useEffect(() => {
-    if (meal?.title) {
-      fetchRecipeImage(meal.title).then((result) => {
-        if (result.imageUrl) {
-          setImageUrl(result.imageUrl)
-          setPhotographer(result.photographer)
-        }
-      })
+    if (!meal) {
+      setMealImage(DEFAULT_MEAL_IMAGE)
+      return
     }
-  }, [meal?.title])
+
+    const query = meal.title || meal.name || 'food'
+    fetchRecipeImage(query).then((result) => {
+      setMealImage(result)
+    })
+  }, [meal?.title, meal?.name])
 
   const regenerateWithReason = (reason) => generateMeal({ suggestion: reason })
 
@@ -209,21 +218,17 @@ export function PublicMealGeneratorPage() {
           <div className="rounded-3xl border border-divider bg-white p-6 shadow-sm">
             {meal ? (
               <div className="space-y-5">
-                {imageUrl ? (
+                {mealImage.url && (
                   <img
-                    src={imageUrl}
-                    alt={meal.title || meal.name}
+                    src={mealImage.url}
+                    alt={meal.title || meal.name || 'Meal photo'}
                     className="h-40 w-full rounded-t-xl object-cover"
                     loading="lazy"
                   />
-                ) : (
-                  <div className="flex h-40 w-full items-center justify-center rounded-t-xl bg-gray-100">
-                    <span className="text-sm text-gray-400">Loading photo...</span>
-                  </div>
                 )}
-                {photographer && (
+                {mealImage.url && mealImage.photographer && (
                   <p className="px-4 pt-1 text-xs text-gray-400">
-                    Photo by {photographer} on Pexels
+                    Photo by <a href={mealImage.photographerUrl || 'https://www.pexels.com'} target="_blank" rel="noopener noreferrer" className="underline">{mealImage.photographer}</a> on <a href={mealImage.photographerUrl || 'https://www.pexels.com'} target="_blank" rel="noopener noreferrer" className="underline">Pexels</a>
                   </p>
                 )}
                 <div>
