@@ -1,14 +1,13 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-import { buildCorsHeaders, rejectDisallowedOrigin } from '../_shared/security.ts'
-
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || Deno.env.get('VITE_SUPABASE_URL') || ''
 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
+      status: 200,
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'PATCH, OPTIONS',
@@ -17,11 +16,10 @@ serve(async (req) => {
     })
   }
 
-  const blockedOrigin = rejectDisallowedOrigin(req)
-  if (blockedOrigin) return blockedOrigin
-
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'PATCH, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Content-Type': 'application/json',
   }
 
