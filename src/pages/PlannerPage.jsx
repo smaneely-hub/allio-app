@@ -86,7 +86,6 @@ export function PlannerPage() {
   const planMeals = useMemo(() => (mealPlan?.draft_plan?.meals || mealPlan?.plan?.meals || []).map((meal) => normalizeMealRecord(meal)), [mealPlan])
 
   const activeSlots = Object.values(slotState).filter((slot) => slot.active && slot.attendees?.length > 0)
-  const primarySlot = activeSlots[0] || null
   const loading = householdLoading || scheduleLoading || (schedule && slots.length > 0 && Object.keys(slotState).length === 0)
   const groupedShopping = useMemo(() => groupByCategory(shoppingItems), [shoppingItems])
 
@@ -125,17 +124,69 @@ export function PlannerPage() {
     setViewMode('day')
   }
 
-  const handleGenerateDay = async (day) => {
+  const handleGenerateDay = (day) => {
     setSelectedDate(day.date)
-    toast('Day generation will target only this day in the next backend phase. For now, use Generate My Plan after editing this day.')
+    toast('Day-specific generation requires saving only that day\'s slots. Use "Generate My Plan" after configuring slots for the full week.')
   }
 
   const handleCopyPreviousDay = (day) => {
-    toast(`Copy previous day for ${day.dayName} is queued for Phase 2.`)
+    const currentIndex = days.findIndex((label) => label.slice(0, 3).toLowerCase() === day.key)
+    if (currentIndex <= 0) {
+      toast('There is no previous day to copy from yet.')
+      return
+    }
+
+    const previousKey = days[currentIndex - 1].slice(0, 3).toLowerCase()
+    const copiedEntries = Object.entries(slotState)
+      .filter(([key, slot]) => key.startsWith(`${previousKey}-`) && slot.active)
+      .map(([key, slot]) => {
+        const [, mealType] = key.split(/-(.+)/)
+        return [`${day.key}-${mealType}`, {
+          ...slot,
+          day_of_week: day.key,
+          meal_type: mealType,
+          active: true,
+          attendees: Array.isArray(slot.attendees) ? [...slot.attendees] : [],
+        }]
+      })
+
+    if (copiedEntries.length === 0) {
+      toast(`No active slots found on the previous day to copy into ${day.dayName}.`)
+      return
+    }
+
+    setSlotState((current) => {
+      const next = { ...current }
+      copiedEntries.forEach(([key, value]) => {
+        next[key] = value
+      })
+      return next
+    })
+    setSelectedDate(day.date)
+    toast.success(`Copied ${copiedEntries.length} slot${copiedEntries.length === 1 ? '' : 's'} from the previous day.`)
   }
 
   const handleCreateBlankDay = (day) => {
     setSelectedDate(day.date)
+    setSlotState((current) => {
+      const next = { ...current }
+      ;['breakfast', 'lunch', 'dinner', 'snack'].forEach((mealType) => {
+        const key = `${day.key}-${mealType}`
+        if (!next[key]) {
+          next[key] = {
+            day_of_week: day.key,
+            meal_type: mealType,
+            active: false,
+            attendees: [],
+            is_leftover: false,
+            leftover_source: '',
+            effort_level: 'medium',
+            planning_notes: '',
+          }
+        }
+      })
+      return next
+    })
     toast(`Blank day workspace opened for ${day.dayName}. Add or edit meal slots below.`)
   }
 
@@ -239,8 +290,7 @@ export function PlannerPage() {
 
     setSaving(true)
     try {
-      const singleSlot = primarySlot ? [primarySlot] : []
-      const savedSchedule = await saveSchedule({ householdId: household.id, shoppingDay, weekNotes, slots: singleSlot, validMemberIds: memberOptions.map((member) => member.id) })
+      const savedSchedule = await saveSchedule({ householdId: household.id, shoppingDay, weekNotes, slots: activeSlots, validMemberIds: memberOptions.map((member) => member.id) })
       await loadSchedule()
       const savedPlan = await generateMealPlan()
       await trackUsage('plan_generate', { schedule_id: savedSchedule?.id || schedule?.id || null })
