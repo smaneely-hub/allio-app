@@ -1,16 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { normalizeMealRecord } from '../lib/mealSchema'
-import { normalizeRecipe } from '../lib/recipeSchema'
 import { SwipeDeck } from '../components/SwipeDeck'
+import { CookingMode } from '../components/CookingMode'
 
 const quickPrefs = ['High protein', 'Comfort food', 'Low carb', 'Vegetarian', 'Fast cleanup']
 
 const DEFAULT_IMAGE = { url: null, photographer: null, photographerUrl: null }
-
-// mode: 'idle' | 'loading' | 'deck' | 'selected'
 
 function getTrySessionId() {
   const existing = sessionStorage.getItem('try_session_id')
@@ -56,28 +53,13 @@ export function PublicMealGeneratorPage() {
     kidFriendly: false,
     effort: 'medium',
   })
-  const [mode, setMode] = useState('idle') // 'idle' | 'loading' | 'deck' | 'selected'
+  const [mode, setMode] = useState('idle') // 'idle' | 'loading' | 'deck' | 'cooking'
   const [deck, setDeck] = useState([]) // [{ meal, image }]
   const [batchLoading, setBatchLoading] = useState(false)
   const [dailyAttempts, setDailyAttempts] = useState(0)
   const [sessionId] = useState(() => getTrySessionId())
   const [selectedMeal, setSelectedMeal] = useState(null)
   const [selectedImage, setSelectedImage] = useState(DEFAULT_IMAGE)
-  const [feedbackState, setFeedbackState] = useState({ selected: null, locked: false, message: '' })
-
-  const selectedRecipe = useMemo(() => selectedMeal ? normalizeRecipe({
-    ...selectedMeal,
-    title: selectedMeal.title || selectedMeal.name,
-    prepTime: selectedMeal.prep_time_minutes,
-    cookTime: selectedMeal.cook_time_minutes,
-    totalTime: selectedMeal.total_time_minutes,
-    ingredientGroups: selectedMeal.ingredientGroups,
-    instructionGroups: selectedMeal.instructionGroups,
-    substitutions: selectedMeal.substitutions,
-    nutrition: selectedMeal.nutrition,
-    tags: selectedMeal.recipeTags,
-    sourceNote: selectedMeal.sourceNote,
-  }) : null, [selectedMeal])
 
   const updateField = (key, value) => setForm((f) => ({ ...f, [key]: value }))
 
@@ -121,7 +103,6 @@ export function PublicMealGeneratorPage() {
 
     setMode('loading')
     setDeck([])
-    setFeedbackState({ selected: null, locked: false, message: '' })
 
     let succeeded = 0
     for (let i = 0; i < toGenerate; i++) {
@@ -160,8 +141,7 @@ export function PublicMealGeneratorPage() {
     setSelectedMeal(meal)
     setSelectedImage(deckItem?.image || DEFAULT_IMAGE)
     setDeck((prev) => prev.filter((d) => (d.meal.id || d.meal.name) !== (meal.id || meal.name)))
-    setFeedbackState({ selected: null, locked: false, message: '' })
-    setMode('selected')
+    setMode('cooking')
   }
 
   const handleReject = () => {
@@ -185,32 +165,6 @@ export function PublicMealGeneratorPage() {
       duration: 4000,
       icon: '✏️',
     })
-  }
-
-  const submitFeedback = async (feedback) => {
-    if (!selectedMeal?.id || feedbackState.locked) return
-    setFeedbackState((s) => ({
-      ...s,
-      selected: feedback,
-      locked: true,
-      message: feedback === 'up' ? "Thanks! We'll make more like this." : '',
-    }))
-    try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/try-feedback`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({ meal_id: selectedMeal.id, session_id: sessionId, feedback }),
-      })
-      if (!res.ok) throw new Error(await res.text())
-    } catch (err) {
-      console.error('[PublicMealGeneratorPage] feedback failed', err)
-      toast.error('Could not save feedback right now.')
-      setFeedbackState({ selected: null, locked: false, message: '' })
-    }
   }
 
   const canGenerate = dailyAttempts < 6
@@ -345,139 +299,15 @@ export function PublicMealGeneratorPage() {
               />
             )}
 
-            {mode === 'selected' && selectedMeal && (
-              <div className="space-y-5">
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setMode(deck.length > 0 ? 'deck' : 'idle')}
-                    className="rounded-full border border-divider bg-white px-3 py-1.5 text-xs font-semibold text-text-secondary transition hover:bg-warm-50"
-                  >
-                    ← Back to ideas
-                  </button>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-primary-700">Tonight's pick</div>
-                </div>
-
-                {selectedImage.url && (
-                  <img
-                    src={selectedImage.url}
-                    alt={selectedMeal.name}
-                    className="h-40 w-full rounded-xl object-cover"
-                    loading="lazy"
-                  />
-                )}
-                {selectedImage.url && selectedImage.photographer && (
-                  <p className="text-xs text-gray-400">
-                    Photo by{' '}
-                    <a href={selectedImage.photographerUrl || 'https://www.pexels.com'} target="_blank" rel="noopener noreferrer" className="underline">
-                      {selectedImage.photographer}
-                    </a>{' '}
-                    on{' '}
-                    <a href="https://www.pexels.com" target="_blank" rel="noopener noreferrer" className="underline">
-                      Pexels
-                    </a>
-                  </p>
-                )}
-
-                <div>
-                  <h2 className="font-display text-2xl text-text-primary">{selectedMeal.name}</h2>
-                  <p className="mt-2 text-sm text-text-secondary">{selectedRecipe?.description || selectedMeal.reason}</p>
-                  {selectedMeal.why_this_meal && (
-                    <p className="mt-3 rounded-2xl bg-primary-50 p-3 text-sm text-primary-800">{selectedMeal.why_this_meal}</p>
-                  )}
-                  <div className="mt-3 text-sm text-text-secondary">
-                    {selectedRecipe?.yield || `${selectedMeal.servings} servings`}
-                    {selectedMeal.prep_time_minutes ? ` • ${selectedMeal.prep_time_minutes} min prep` : ''}
-                    {selectedMeal.cook_time_minutes ? ` • ${selectedMeal.cook_time_minutes} min cook` : ''}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => submitFeedback('up')}
-                    disabled={feedbackState.locked}
-                    className={`rounded-full border px-4 py-2 text-sm font-semibold ${feedbackState.selected === 'up' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-divider bg-white text-text-primary'}`}
-                  >
-                    👍
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => submitFeedback('down')}
-                    disabled={feedbackState.locked}
-                    className={`rounded-full border px-4 py-2 text-sm font-semibold ${feedbackState.selected === 'down' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-divider bg-white text-text-primary'}`}
-                  >
-                    👎
-                  </button>
-                  {feedbackState.message && (
-                    <span className="text-sm font-medium text-text-secondary">{feedbackState.message}</span>
-                  )}
-                </div>
-
-                <div>
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Ingredients</div>
-                  <div className="space-y-4 text-sm text-text-primary">
-                    {(selectedRecipe?.ingredientGroups || []).map((group, groupIndex) => (
-                      <div key={`${group.label || 'ingredients'}-${groupIndex}`}>
-                        {group.label && (
-                          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">{group.label}</div>
-                        )}
-                        <ul className="space-y-2">
-                          {group.ingredients.map((ingredient, index) => (
-                            <li key={`${ingredient.item}-${index}`} className="rounded-xl bg-warm-50 px-3 py-2">
-                              {[ingredient.amount, ingredient.unit, ingredient.item].filter(Boolean).join(' ')}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Instructions</div>
-                  <div className="space-y-4 text-sm text-text-primary">
-                    {(selectedRecipe?.instructionGroups || []).map((group, groupIndex) => (
-                      <div key={`${group.label || 'steps'}-${groupIndex}`}>
-                        {group.label && (
-                          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">{group.label}</div>
-                        )}
-                        <ol className="space-y-3">
-                          {group.steps.map((step, index) => (
-                            <li key={`${index}-${step.text}`} className="flex gap-3">
-                              <span className="font-semibold text-primary-500">{index + 1}.</span>
-                              <div>
-                                <span>{step.text}</span>
-                                {step.tip && <div className="mt-1 text-xs text-text-muted">Tip: {step.tip}</div>}
-                              </div>
-                            </li>
-                          ))}
-                        </ol>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-primary-100 bg-primary-50 p-4">
-                  <div className="text-sm font-semibold text-text-primary">Want weekly planning and shopping too?</div>
-                  <p className="mt-1 text-sm text-text-secondary">
-                    Create a profile and Allio can turn this into a full household plan.
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-3">
-                    <Link to="/login" className="rounded-full bg-primary-500 px-4 py-2 text-sm font-semibold text-white">
-                      Create free account
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={generateBatch}
-                      disabled={!canGenerate}
-                      className="rounded-full border border-divider bg-white px-4 py-2 text-sm font-semibold text-text-primary disabled:opacity-50"
-                    >
-                      Try more meals
-                    </button>
-                  </div>
-                </div>
-              </div>
+            {mode === 'cooking' && selectedMeal && (
+              <CookingMode
+                meal={selectedMeal}
+                image={selectedImage}
+                onExit={() => {
+                  setSelectedMeal(null)
+                  setMode(deck.length > 0 ? 'deck' : 'idle')
+                }}
+              />
             )}
 
             {mode === 'idle' && (

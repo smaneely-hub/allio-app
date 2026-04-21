@@ -56,7 +56,7 @@ export function SwipeCard({ meal, image, onAccept, onReject }) {
       style={{
         transform: `translateX(${displayX}px) rotate(${rotation}deg)`,
         transition: drag.dragging ? 'none' : 'transform 0.35s cubic-bezier(0.6, -0.05, 0.75, 1)',
-        touchAction: 'pan-y',
+        touchAction: 'none',
         cursor: exiting ? 'default' : drag.dragging ? 'grabbing' : 'grab',
         willChange: 'transform',
         zIndex: 10,
