@@ -72,7 +72,7 @@ export function SwipeCard({ meal, image, onAccept, onReject }) {
         className="pointer-events-none absolute left-5 top-24 z-20 rotate-[-22deg] rounded-xl border-4 border-primary-500 px-3 py-1 text-xl font-black uppercase text-primary-600"
         style={{ opacity: acceptOpacity }}
       >
-        Keep!
+        Cook this!
       </div>
       <div
         className="pointer-events-none absolute right-5 top-24 z-20 rotate-[22deg] rounded-xl border-4 border-red-400 px-3 py-1 text-xl font-black uppercase text-red-500"

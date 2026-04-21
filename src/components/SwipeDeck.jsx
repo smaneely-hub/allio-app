@@ -79,13 +79,13 @@ export function SwipeDeck({ items, batchLoading, onAccept, onReject, onEdit }) {
           type="button"
           onClick={() => topItem && onAccept(topItem.meal)}
           className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-primary-300 bg-white text-xl shadow-sm transition hover:border-primary-500 hover:bg-primary-50 active:scale-95"
-          aria-label="Select this meal"
+          aria-label="Cook this meal"
         >
           ✓
         </button>
       </div>
 
-      <p className="text-center text-xs text-text-muted">Swipe right to keep · Swipe left to skip · Tap ✓ or ✕</p>
+      <p className="text-center text-xs text-text-muted">Swipe right to cook · Swipe left to skip · Tap ✓ or ✕</p>
     </div>
   )
 }

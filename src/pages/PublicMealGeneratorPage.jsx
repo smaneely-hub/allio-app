@@ -302,7 +302,6 @@ export function PublicMealGeneratorPage() {
             {mode === 'cooking' && selectedMeal && (
               <CookingMode
                 meal={selectedMeal}
-                image={selectedImage}
                 onExit={() => {
                   setSelectedMeal(null)
                   setMode(deck.length > 0 ? 'deck' : 'idle')
