@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { normalizeRecipe } from '../lib/recipeSchema'
-import { InstructionText } from './TimerChip'
+import { InstructionText, TimerTrayOverlay } from './TimerChip'
 
 // Screen wake lock — prevents device from sleeping while cooking.
 // Fails silently on iOS < 16.4 or if permission is denied.
@@ -111,7 +111,7 @@ export function CookingMode({ meal, onExit }) {
         </div>
 
         {/* Page content */}
-        <div className="py-4 space-y-5">
+        <div className="space-y-5 py-4" style={{ paddingBottom: '96px' }}>
           {/* Ingredients accordion */}
           <div className="rounded-2xl border border-divider overflow-hidden">
             <button
@@ -215,6 +215,7 @@ export function CookingMode({ meal, onExit }) {
         </div>
       </div>
 
+      <TimerTrayOverlay />
     </div>
   )
 }

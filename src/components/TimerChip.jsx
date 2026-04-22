@@ -3,6 +3,13 @@ import { formatDuration, parseTimers } from '../utils/parseTimers'
 
 const TimerContext = createContext(null)
 
+function requestNotificationPermissionIfNeeded() {
+  if (typeof Notification === 'undefined') return
+  if (Notification.permission === 'default') {
+    Notification.requestPermission().catch(() => {})
+  }
+}
+
 function playCompletion(audioRef) {
   const audio = audioRef.current
   if (audio) {
@@ -24,7 +31,7 @@ function playCompletion(audioRef) {
     osc.start(ctx.currentTime)
     osc.stop(ctx.currentTime + 0.2)
   } catch {
-    // Follow-up: background-tab notifications are out of scope for this change.
+    // Notification delivery is best-effort.
   }
 }
 
@@ -49,6 +56,17 @@ export function TimerProvider({ children }) {
         if (remaining === 0 && !timer.completedAt) {
           playCompletion(audioRef)
           if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300])
+          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            try {
+              new Notification('Timer done', {
+                body: timer.label,
+                tag: timer.id,
+                requireInteraction: true,
+              })
+            } catch {
+              // Notification delivery is best-effort.
+            }
+          }
           return { ...timer, completedAt: now }
         }
         return timer
@@ -58,7 +76,8 @@ export function TimerProvider({ children }) {
     return () => clearInterval(id)
   }, [])
 
-  const startTimer = useCallback((seconds, key) => {
+  const startTimer = useCallback((seconds, key, label) => {
+    requestNotificationPermissionIfNeeded()
     setTimers((current) => {
       const existing = current.find((timer) => timer.key === key)
       if (existing) {
@@ -66,6 +85,7 @@ export function TimerProvider({ children }) {
           timer.key === key
             ? {
                 ...timer,
+                label,
                 seconds,
                 startedAt: Date.now(),
                 pausedAt: null,
@@ -77,6 +97,7 @@ export function TimerProvider({ children }) {
       return [...current, {
         id: `${key}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         key,
+        label,
         seconds,
         startedAt: Date.now(),
         pausedAt: null,
@@ -109,7 +130,8 @@ export function TimerProvider({ children }) {
     setTimers((current) => current.filter((timer) => timer.key !== key))
   }, [])
 
-  const value = useMemo(() => ({ timers, startTimer, pauseTimer, resumeTimer, dismissTimer }), [timers, startTimer, pauseTimer, resumeTimer, dismissTimer])
+  const activeTimers = useMemo(() => timers.filter((timer) => !timer.completedAt), [timers])
+  const value = useMemo(() => ({ timers, activeTimers, startTimer, pauseTimer, resumeTimer, dismissTimer }), [timers, activeTimers, startTimer, pauseTimer, resumeTimer, dismissTimer])
 
   return (
     <TimerContext.Provider value={value}>
@@ -131,7 +153,7 @@ export function TimerChip({ seconds, label, timerKey }) {
 
   if (!timer) {
     return (
-      <button type="button" className="timer-chip" onClick={() => startTimer(seconds, timerKey)}>
+      <button type="button" className="timer-chip" onClick={() => startTimer(seconds, timerKey, label)}>
         ⏱ {label}
       </button>
     )
@@ -185,5 +207,30 @@ export function InstructionText({ text, contextKey = 'instruction' }) {
         return <span key={`${segment.value}-${index}`}>{segment.value}</span>
       })}
     </>
+  )
+}
+
+export function TimerTrayOverlay() {
+  const { activeTimers, dismissTimer } = useTimers()
+
+  if (activeTimers.length === 0) return null
+
+  return (
+    <div className="timer-tray-overlay" role="status" aria-live="polite">
+      {activeTimers.map((timer) => (
+        <div key={timer.id} className="timer-tray-overlay__item">
+          <span className="truncate text-xs font-semibold text-text-primary">{timer.label}</span>
+          <span className="tabular-nums text-sm font-bold text-text-primary">{formatDuration(getRemaining(timer))}</span>
+          <button
+            type="button"
+            className="timer-tray-overlay__dismiss"
+            onClick={() => dismissTimer(timer.key)}
+            aria-label={`Dismiss ${timer.label}`}
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+    </div>
   )
 }
