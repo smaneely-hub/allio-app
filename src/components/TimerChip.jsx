@@ -28,17 +28,24 @@ function playCompletion(audioRef) {
   }
 }
 
+function getRemaining(timer) {
+  if (timer.completedAt) return 0
+  const endTime = timer.startedAt + timer.seconds * 1000
+  const reference = timer.pausedAt ?? Date.now()
+  return Math.max(0, Math.ceil((endTime - reference) / 1000))
+}
+
 export function TimerProvider({ children }) {
   const [timers, setTimers] = useState([])
+  const [, forceTick] = useState(0)
   const audioRef = useRef(null)
 
   useEffect(() => {
     const id = setInterval(() => {
       const now = Date.now()
       setTimers((current) => current.map((timer) => {
-        if (timer.dismissed) return timer
-        if (timer.pausedAt) return timer
-        const remaining = Math.max(0, timer.seconds - Math.floor((now - timer.startedAt) / 1000))
+        if (timer.completedAt || timer.pausedAt) return timer
+        const remaining = Math.max(0, Math.ceil(((timer.startedAt + timer.seconds * 1000) - now) / 1000))
         if (remaining === 0 && !timer.completedAt) {
           playCompletion(audioRef)
           if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300])
@@ -46,37 +53,49 @@ export function TimerProvider({ children }) {
         }
         return timer
       }))
+      forceTick((value) => value + 1)
     }, 250)
     return () => clearInterval(id)
   }, [])
 
-  const startTimer = useCallback((seconds, label) => {
+  const startTimer = useCallback((seconds, key) => {
     setTimers((current) => {
-      const existing = current.find((timer) => timer.label === label && !timer.completedAt && !timer.dismissed)
-      if (existing) return current
+      const existing = current.find((timer) => timer.key === key)
+      if (existing) {
+        return current.map((timer) => (
+          timer.key === key
+            ? {
+                ...timer,
+                seconds,
+                startedAt: Date.now(),
+                pausedAt: null,
+                completedAt: null,
+              }
+            : timer
+        ))
+      }
       return [...current, {
-        id: `${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        label,
+        id: `${key}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        key,
         seconds,
         startedAt: Date.now(),
         pausedAt: null,
         completedAt: null,
-        dismissed: false,
       }]
     })
   }, [])
 
-  const pauseTimer = useCallback((id) => {
+  const pauseTimer = useCallback((key) => {
     setTimers((current) => current.map((timer) => (
-      timer.id === id && !timer.pausedAt && !timer.completedAt
+      timer.key === key && !timer.pausedAt && !timer.completedAt
         ? { ...timer, pausedAt: Date.now() }
         : timer
     )))
   }, [])
 
-  const resumeTimer = useCallback((id) => {
+  const resumeTimer = useCallback((key) => {
     setTimers((current) => current.map((timer) => {
-      if (timer.id !== id || !timer.pausedAt || timer.completedAt) return timer
+      if (timer.key !== key || !timer.pausedAt || timer.completedAt) return timer
       const pausedFor = Date.now() - timer.pausedAt
       return {
         ...timer,
@@ -86,8 +105,8 @@ export function TimerProvider({ children }) {
     }))
   }, [])
 
-  const dismissTimer = useCallback((id) => {
-    setTimers((current) => current.filter((timer) => timer.id !== id))
+  const dismissTimer = useCallback((key) => {
+    setTimers((current) => current.filter((timer) => timer.key !== key))
   }, [])
 
   const value = useMemo(() => ({ timers, startTimer, pauseTimer, resumeTimer, dismissTimer }), [timers, startTimer, pauseTimer, resumeTimer, dismissTimer])
@@ -96,7 +115,6 @@ export function TimerProvider({ children }) {
     <TimerContext.Provider value={value}>
       {children}
       <audio ref={audioRef} preload="auto" />
-      <TimerTray />
     </TimerContext.Provider>
   )
 }
@@ -107,71 +125,65 @@ export function useTimers() {
   return context
 }
 
-function getRemaining(timer) {
-  if (timer.completedAt) return 0
-  if (timer.pausedAt) {
-    return Math.max(0, timer.seconds - Math.floor((timer.pausedAt - timer.startedAt) / 1000))
+export function TimerChip({ seconds, label, timerKey }) {
+  const { timers, startTimer, pauseTimer, resumeTimer, dismissTimer } = useTimers()
+  const timer = timers.find((entry) => entry.key === timerKey)
+
+  if (!timer) {
+    return (
+      <button type="button" className="timer-chip" onClick={() => startTimer(seconds, timerKey)}>
+        ⏱ {label}
+      </button>
+    )
   }
-  return Math.max(0, timer.seconds - Math.floor((Date.now() - timer.startedAt) / 1000))
-}
 
-export function TimerChip({ seconds, label }) {
-  const { timers, startTimer } = useTimers()
-  const activeTimer = timers.find((timer) => timer.label === label && !timer.completedAt)
+  const done = Boolean(timer.completedAt)
+  const paused = Boolean(timer.pausedAt)
+  const remaining = getRemaining(timer)
 
-  if (activeTimer) {
-    return <span className="timer-chip timer-chip--active">⏱ {formatDuration(getRemaining(activeTimer))}</span>
+  if (done) {
+    return (
+      <button type="button" className="timer-chip timer-chip--done" onClick={() => dismissTimer(timerKey)}>
+        ✓ Done
+      </button>
+    )
   }
 
   return (
-    <button type="button" className="timer-chip" onClick={() => startTimer(seconds, label)}>
-      ⏱ {label}
-    </button>
+    <span className={`timer-chip timer-chip--active ${paused ? 'timer-chip--paused' : ''}`}>
+      <button
+        type="button"
+        className="timer-chip__main"
+        onClick={() => (paused ? resumeTimer(timerKey) : pauseTimer(timerKey))}
+      >
+        ⏱ <span className="tabular-nums">{formatDuration(remaining)}</span>
+      </button>
+      <button
+        type="button"
+        className="timer-chip__dismiss"
+        onClick={() => dismissTimer(timerKey)}
+        aria-label="Reset timer"
+      >
+        ✕
+      </button>
+    </span>
   )
 }
 
-export function InstructionText({ text }) {
+export function InstructionText({ text, contextKey = 'instruction' }) {
   const segments = parseTimers(text)
+  let timerIndex = 0
+
   return (
     <>
       {segments.map((segment, index) => {
         if (segment.type === 'timer') {
-          return <TimerChip key={`${segment.label}-${index}`} seconds={segment.seconds} label={segment.label} />
+          const currentKey = `${contextKey}-${timerIndex}`
+          timerIndex += 1
+          return <TimerChip key={`${segment.label}-${index}`} seconds={segment.seconds} label={segment.label} timerKey={currentKey} />
         }
         return <span key={`${segment.value}-${index}`}>{segment.value}</span>
       })}
     </>
-  )
-}
-
-function TimerTray() {
-  const { timers, pauseTimer, resumeTimer, dismissTimer } = useTimers()
-  const visibleTimers = timers.filter((timer) => !timer.dismissed)
-
-  if (visibleTimers.length === 0) return null
-
-  return (
-    <div className="timer-tray">
-      {visibleTimers.map((timer) => {
-        const remaining = getRemaining(timer)
-        const done = remaining === 0
-        return (
-          <div key={timer.id} className={`timer-tray__item ${done ? 'timer-tray__item--done' : ''}`}>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-text-primary">{timer.label}</div>
-              <div className="text-xs text-text-secondary tabular-nums">{done ? 'Done' : formatDuration(remaining)}</div>
-            </div>
-            {!done && (
-              timer.pausedAt ? (
-                <button type="button" className="btn-ghost px-3 py-1 text-xs" onClick={() => resumeTimer(timer.id)}>Resume</button>
-              ) : (
-                <button type="button" className="btn-ghost px-3 py-1 text-xs" onClick={() => pauseTimer(timer.id)}>Pause</button>
-              )
-            )}
-            <button type="button" className="btn-ghost px-3 py-1 text-xs" onClick={() => dismissTimer(timer.id)}>Dismiss</button>
-          </div>
-        )
-      })}
-    </div>
   )
 }

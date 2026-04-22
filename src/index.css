@@ -123,6 +123,7 @@ h1, h2, h3, h4 {
   align-items: center;
   gap: 0.25rem;
   margin: 0 0.18rem;
+  min-width: 5.75rem;
   padding: 0.1rem 0.55rem;
   border-radius: 9999px;
   border: 1px solid var(--color-primary-200);
@@ -133,44 +134,50 @@ h1, h2, h3, h4 {
   font-weight: 600;
   line-height: 1.6;
   vertical-align: baseline;
+  white-space: nowrap;
 }
 
 .timer-chip--active {
+  border-color: var(--color-accent-teal);
+  background: #ecfeff;
+  color: #0f766e;
+}
+
+.timer-chip--paused {
+  border-color: var(--color-warm-400);
+  background: var(--color-warm-100);
+  color: var(--color-warm-700);
+}
+
+.timer-chip--done {
   border-color: var(--color-primary-400);
-  background: white;
+  background: #f0fdf4;
+  color: var(--color-primary-700);
+  animation: timerChipPulse 1s ease-in-out infinite;
 }
 
-.timer-tray {
-  position: fixed;
-  left: 50%;
-  bottom: 1rem;
-  z-index: 60;
-  display: flex;
-  width: min(32rem, calc(100vw - 1.5rem));
-  flex-direction: column;
-  gap: 0.5rem;
-  transform: translateX(-50%);
+.timer-chip__main,
+.timer-chip__dismiss {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  line-height: inherit;
 }
 
-.timer-tray__item {
-  display: flex;
+.timer-chip__main {
+  display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
-  border: 1px solid var(--color-warm-200);
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
-  padding: 0.75rem 0.9rem;
-  backdrop-filter: blur(10px);
+  gap: 0.25rem;
 }
 
-.timer-tray__item--done {
-  border-color: #fca5a5;
-  background: #fef2f2;
-  animation: timerPulse 1s ease-in-out infinite;
+.timer-chip__dismiss {
+  margin-left: 0.15rem;
+  opacity: 0.8;
 }
 
-@keyframes timerPulse {
-  0%, 100% { box-shadow: 0 18px 40px rgba(239, 68, 68, 0.12); }
-  50% { box-shadow: 0 18px 48px rgba(239, 68, 68, 0.28); }
+@keyframes timerChipPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
 }

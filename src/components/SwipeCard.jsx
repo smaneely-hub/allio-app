@@ -264,7 +264,7 @@ export function SwipeCard({ meal, image, onAccept, onReject }) {
                             <li key={`${groupIndex}-${index}-${step.text}`} className="flex gap-4 rounded-2xl bg-white">
                               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-warm-100 text-sm font-semibold text-text-primary">{stepCounter}</div>
                               <div className="min-w-0 flex-1 pb-1">
-                                <p className="text-[15px] leading-7 text-text-primary"><InstructionText text={step.text} /></p>
+                                <p className="break-words text-[15px] leading-7 text-text-primary [overflow-wrap:anywhere]"><InstructionText text={step.text} contextKey={`swipe-${meal.id || meal.name}-${groupIndex}-${index}`} /></p>
                                 {step.tip ? (
                                   <div className="mt-2 rounded-2xl bg-[#f4efe6] px-4 py-3 text-sm leading-6 text-text-secondary">
                                     <div className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Tip</div>

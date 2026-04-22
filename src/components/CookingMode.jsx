@@ -1,5 +1,6 @@
-import { useEffect, useState, useMemo, useRef } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { normalizeRecipe } from '../lib/recipeSchema'
+import { InstructionText } from './TimerChip'
 
 // Screen wake lock — prevents device from sleeping while cooking.
 // Fails silently on iOS < 16.4 or if permission is denied.
@@ -22,45 +23,6 @@ function useWakeLock() {
   }, [])
 }
 
-// Detect the first meaningful timer in a step's text. Returns minutes or null.
-function detectTimerMinutes(text) {
-  // Hours
-  let m = text.match(/(\d+)\s*h(?:our|r)s?/i)
-  if (m) return Number(m[1]) * 60
-  // Range "12–15 minutes" — use lower bound
-  m = text.match(/(\d+)\s*(?:to|[-–])\s*\d+\s*min/i)
-  if (m) return Number(m[1])
-  // Plain minutes
-  m = text.match(/(\d+)\s*min(?:utes?)?/i)
-  if (m) {
-    const val = Number(m[1])
-    if (val >= 1 && val <= 120) return val
-  }
-  return null
-}
-
-// Web Audio API beep — no external assets needed, fails silently
-function playBeep() {
-  try {
-    const ctx = new AudioContext()
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-    osc.type = 'sine'
-    osc.frequency.value = 880
-    gain.gain.setValueAtTime(0.4, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.8)
-    osc.start(ctx.currentTime)
-    osc.stop(ctx.currentTime + 1.8)
-  } catch { /* intentionally empty - fails silently */ }
-}
-
-function formatTime(seconds) {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-}
 
 export function CookingMode({ meal, onExit }) {
   useWakeLock()
@@ -92,27 +54,6 @@ export function CookingMode({ meal, onExit }) {
   const [checkedSteps, setCheckedSteps] = useState(new Set())
   const [checkedIngredients, setCheckedIngredients] = useState({})
   const [showIngredients, setShowIngredients] = useState(false)
-  const [timers, setTimers] = useState([])
-  const alarmFiredRef = useRef(new Set())
-
-  // Countdown tick — only active while at least one timer is running
-  const hasActiveTimers = timers.some(t => !t.done)
-  useEffect(() => {
-    if (!hasActiveTimers) return
-    const id = setInterval(() => {
-      setTimers(prev => prev.map(t => {
-        if (t.done) return t
-        const next = t.remaining - 1
-        if (next <= 0 && !alarmFiredRef.current.has(t.id)) {
-          alarmFiredRef.current.add(t.id)
-          setTimeout(playBeep, 0)
-          return { ...t, remaining: 0, done: true }
-        }
-        return { ...t, remaining: Math.max(0, next) }
-      }))
-    }, 1000)
-    return () => clearInterval(id)
-  }, [hasActiveTimers])
 
   const toggleStep = (i) => setCheckedSteps(prev => {
     const next = new Set(prev)
@@ -123,22 +64,6 @@ export function CookingMode({ meal, onExit }) {
   const toggleIngredient = (key) =>
     setCheckedIngredients(prev => ({ ...prev, [key]: !prev[key] }))
 
-  const timerIdRef = useRef(0)
-  const startTimer = (stepIndex, minutes) => {
-    const id = `${stepIndex}-${++timerIdRef.current}`
-    setTimers(prev => [...prev, {
-      id,
-      label: `Step ${stepIndex + 1} · ${minutes} min`,
-      total: minutes * 60,
-      remaining: minutes * 60,
-      done: false,
-    }])
-  }
-
-  const dismissTimer = (id) => {
-    alarmFiredRef.current.delete(id)
-    setTimers(prev => prev.filter(t => t.id !== id))
-  }
 
   if (allSteps.length === 0) {
     return (
@@ -158,7 +83,7 @@ export function CookingMode({ meal, onExit }) {
   return (
     <div className="flex flex-col">
       {/* Scrollable area with sticky header inside */}
-      <div className="overflow-y-auto" style={{ minHeight: 420, maxHeight: '68vh' }}>
+      <div className="w-full max-w-full overflow-x-hidden overflow-y-auto" style={{ minHeight: 420, maxHeight: '68vh', boxSizing: 'border-box' }}>
         {/* Sticky header */}
         <div className="sticky top-0 z-10 bg-white pb-3 border-b border-divider">
           <div className="flex items-center justify-between mb-2">
@@ -216,7 +141,7 @@ export function CookingMode({ meal, onExit }) {
                               className={`flex w-full items-start gap-3 rounded-xl px-2 py-1.5 text-left transition ${checked ? 'opacity-40' : 'hover:bg-warm-50'}`}
                             >
                               <span className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 transition ${checked ? 'border-primary-500 bg-primary-500' : 'border-divider'}`} />
-                              <span className={`text-sm ${checked ? 'line-through text-text-muted' : 'text-text-primary'}`}>
+                              <span className={`break-words text-sm [overflow-wrap:anywhere] ${checked ? 'line-through text-text-muted' : 'text-text-primary'}`}>
                                 <strong>{[ing.amount, ing.unit].filter(Boolean).join(' ')}</strong>
                                 {(ing.amount || ing.unit) && ' '}
                                 {ing.item}
@@ -239,7 +164,6 @@ export function CookingMode({ meal, onExit }) {
             <div className="space-y-2">
               {allSteps.map((step, i) => {
                 const checked = checkedSteps.has(i)
-                const timerMins = detectTimerMinutes(step.text)
                 const showGroupLabel = step.groupLabel &&
                   (i === 0 || allSteps[i - 1].groupLabel !== step.groupLabel)
                 return (
@@ -249,7 +173,7 @@ export function CookingMode({ meal, onExit }) {
                         {step.groupLabel}
                       </div>
                     )}
-                    <div className={`rounded-xl border transition-colors ${checked ? 'border-primary-100 bg-primary-50' : 'border-divider bg-white'}`}>
+                    <div className={`w-full max-w-full overflow-x-hidden rounded-xl border transition-colors ${checked ? 'border-primary-100 bg-primary-50' : 'border-divider bg-white'}`} style={{ boxSizing: 'border-box' }}>
                       <button
                         type="button"
                         onClick={() => toggleStep(i)}
@@ -263,8 +187,8 @@ export function CookingMode({ meal, onExit }) {
                           {checked ? '✓' : i + 1}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm leading-6 ${checked ? 'line-through text-text-muted' : 'text-text-primary'}`}>
-                            {step.text}
+                          <p className={`break-words text-sm leading-6 [overflow-wrap:anywhere] ${checked ? 'line-through text-text-muted' : 'text-text-primary'}`}>
+                            <InstructionText text={step.text} contextKey={`cook-${meal.id || meal.name}-${i}`} />
                           </p>
                           {step.tip && !checked && (
                             <div className="mt-2 rounded-lg bg-primary-50 px-3 py-2">
@@ -274,17 +198,6 @@ export function CookingMode({ meal, onExit }) {
                           )}
                         </div>
                       </button>
-                      {timerMins && !checked && (
-                        <div className="px-4 pb-3">
-                          <button
-                            type="button"
-                            onClick={() => startTimer(i, timerMins)}
-                            className="inline-flex items-center gap-1.5 rounded-full bg-warm-100 px-3 py-1.5 text-xs font-semibold text-text-secondary transition hover:bg-warm-200 active:scale-95"
-                          >
-                            ⏱ Start {timerMins} min timer
-                          </button>
-                        </div>
-                      )}
                     </div>
                   </div>
                 )
@@ -302,35 +215,6 @@ export function CookingMode({ meal, onExit }) {
         </div>
       </div>
 
-      {/* Timer tray — always visible outside scroll when timers exist */}
-      {timers.length > 0 && (
-        <div className="mt-3 rounded-2xl border border-divider overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-2 bg-warm-50 border-b border-divider">
-            <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">⏱ Timers</span>
-          </div>
-          <div className="divide-y divide-divider">
-            {timers.map(timer => (
-              <div
-                key={timer.id}
-                className={`flex items-center gap-3 px-4 py-2.5 ${timer.done ? 'bg-primary-50' : 'bg-white'}`}
-              >
-                <span className="flex-1 text-xs text-text-secondary truncate">{timer.label}</span>
-                <span className={`font-mono text-sm font-bold tabular-nums ${timer.done ? 'text-primary-600 animate-pulse' : 'text-text-primary'}`}>
-                  {timer.done ? 'Done!' : formatTime(timer.remaining)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => dismissTimer(timer.id)}
-                  className="ml-1 text-xs text-text-muted hover:text-text-secondary transition leading-none"
-                  aria-label="Dismiss timer"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
