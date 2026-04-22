@@ -81,11 +81,8 @@ export function CookingMode({ meal, onExit }) {
   const totalCount = allSteps.length
 
   return (
-    <div className="flex flex-col">
-      {/* Scrollable area with sticky header inside */}
-      <div className="w-full max-w-full overflow-x-hidden overflow-y-auto" style={{ minHeight: 420, maxHeight: '68vh', boxSizing: 'border-box' }}>
-        {/* Sticky header */}
-        <div className="sticky top-0 z-10 bg-white pb-3 border-b border-divider">
+    <div className="flex w-full max-w-full flex-col overflow-x-hidden" style={{ boxSizing: 'border-box' }}>
+      <div className="sticky top-0 z-10 bg-white pb-3 border-b border-divider">
           <div className="flex items-center justify-between mb-2">
             <button
               type="button"
@@ -110,8 +107,7 @@ export function CookingMode({ meal, onExit }) {
           </div>
         </div>
 
-        {/* Page content */}
-        <div className="space-y-5 py-4" style={{ paddingBottom: '96px' }}>
+      <div className="space-y-5 py-4" style={{ paddingBottom: '96px', boxSizing: 'border-box' }}>
           {/* Ingredients accordion */}
           <div className="rounded-2xl border border-divider overflow-hidden">
             <button
@@ -212,7 +208,6 @@ export function CookingMode({ meal, onExit }) {
               <a href="/login" className="font-semibold underline">Create a free account →</a>
             </p>
           </div>
-        </div>
       </div>
 
       <TimerTrayOverlay />
