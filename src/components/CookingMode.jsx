@@ -3,20 +3,45 @@ import { normalizeRecipe } from '../lib/recipeSchema'
 import { InstructionText, TimerTrayOverlay } from './TimerChip'
 
 // Screen wake lock — prevents device from sleeping while cooking.
-// Fails silently on iOS < 16.4 or if permission is denied.
+// Fails silently on unsupported browsers or if permission is denied.
 function useWakeLock() {
   useEffect(() => {
+    if (!('wakeLock' in navigator)) return undefined
+
+    let released = false
     let wakeLock = null
-    const acquire = async () => {
-      if (!('wakeLock' in navigator)) return
-      try { wakeLock = await navigator.wakeLock.request('screen') } catch { /* intentionally empty - fails silently */ }
+
+    const attachReleaseListener = (sentinel) => {
+      sentinel.addEventListener('release', () => {
+        wakeLock = null
+        if (!released && document.visibilityState === 'visible') {
+          void acquire()
+        }
+      })
     }
+
+    async function acquire() {
+      if (released || document.visibilityState !== 'visible') return
+      try {
+        const sentinel = await navigator.wakeLock.request('screen')
+        wakeLock = sentinel
+        attachReleaseListener(sentinel)
+      } catch {
+        // Unsupported, denied, or temporarily unavailable.
+      }
+    }
+
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') acquire()
+      if (document.visibilityState === 'visible') {
+        void acquire()
+      }
     }
-    acquire()
+
+    void acquire()
     document.addEventListener('visibilitychange', onVisibilityChange)
+
     return () => {
+      released = true
       document.removeEventListener('visibilitychange', onVisibilityChange)
       wakeLock?.release().catch(() => {})
     }
