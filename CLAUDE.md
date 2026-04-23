@@ -30,6 +30,29 @@ For tasks that affect runtime behavior:
 - use repo scripts when available
 - do not claim success unless validation passes
 
+## Deployment
+
+Allio deploys to Vercel via GitHub integration. 
+Production branch is master (not `main`).
+
+Rules:
+- NEVER run vercel deploy, vercel --prod, or any 
+ Vercel CLI command.
+- Pushing to master IS the deploy. git push origin master 
+ triggers the Vercel build automatically.
+- After pushing, wait ~90 seconds, then verify the deploy 
+ by fetching https://allio.life and checking the bundle 
+ hash in the HTML (look for /assets/index-XXXXXXXX.js).
+- "Done" means the new bundle hash is live in production, 
+ not that the commit was pushed.
+- If the bundle hash has not changed after 3 minutes, 
+ check the Vercel dashboard for a failed build. Do NOT 
+ try to fix this with CLI commands.
+
+Env vars live in the Vercel dashboard, not .env.local. 
+.env.local is for local development only and is not 
+accessible to Vercel builds.
+
 ## Guardrails
 - Treat login/auth, generate-plan, swap meal, OpenRouter request path, and edge functions as protected infrastructure
 - If a task touches protected infrastructure, verify carefully before and after changes
