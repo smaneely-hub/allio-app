@@ -13,6 +13,41 @@ function getWeekStartDate() {
   return monday.toISOString().slice(0, 10)
 }
 
+const DAY_INDEX = {
+  mon: 0,
+  tue: 1,
+  wed: 2,
+  thu: 3,
+  fri: 4,
+  sat: 5,
+  sun: 6,
+}
+
+const MEAL_INDEX = {
+  breakfast: 0,
+  lunch: 1,
+  dinner: 2,
+  snack: 3,
+}
+
+function normalizeDayKey(value) {
+  return typeof value === 'string' ? value.trim().slice(0, 3).toLowerCase() : ''
+}
+
+function normalizeMealKey(value) {
+  return typeof value === 'string' ? value.trim().toLowerCase().replace(/\s+/g, '_') : ''
+}
+
+function computeSortOrder(day, meal) {
+  const dayIndex = DAY_INDEX[normalizeDayKey(day)] ?? 99
+  const mealIndex = MEAL_INDEX[normalizeMealKey(meal)] ?? 9
+  return (dayIndex * 10) + mealIndex
+}
+
+function sortSlotsChronologically(slots = []) {
+  return [...slots].sort((a, b) => computeSortOrder(a?.day, a?.meal) - computeSortOrder(b?.day, b?.meal))
+}
+
 export function useSchedule() {
   const { user } = useAuth()
   const [schedule, setSchedule] = useState(null)
@@ -54,13 +89,18 @@ export function useSchedule() {
           .from('schedule_slots')
           .select('*')
           .eq('schedule_id', scheduleData.id)
-          .order('day', { ascending: true })
+          .order('sort_order', { ascending: true })
 
         if (slotsError) {
           console.error('[useSchedule] ERROR loading slots:', slotsError)
           throw slotsError
         }
-        setSlots(slotData ?? [])
+
+        const normalizedSlots = Array.isArray(slotData) && slotData.some((slot) => slot?.sort_order == null)
+          ? sortSlotsChronologically(slotData)
+          : (slotData ?? [])
+
+        setSlots(normalizedSlots)
       } else {
         setSlots([])
       }
@@ -138,8 +178,11 @@ export function useSchedule() {
           if (meal === undefined) meal = slot.meal
           
           // Fallback defaults to prevent validation failure
-          if (!day) { console.warn('[useSchedule] Day missing, using Monday'); day = 'Monday' }
-          if (!meal) { console.warn('[useSchedule] Meal missing, using Dinner'); meal = 'Dinner' }
+          if (!day) { console.warn('[useSchedule] Day missing, using Monday'); day = 'mon' }
+          if (!meal) { console.warn('[useSchedule] Meal missing, using Dinner'); meal = 'dinner' }
+
+          day = normalizeDayKey(day) || 'mon'
+          meal = normalizeMealKey(meal) || 'dinner'
           
           // FIXED: Filter attendees to only include valid current member IDs
           // Only filter if we have valid member IDs; otherwise keep existing for backward compatibility
@@ -164,6 +207,7 @@ export function useSchedule() {
             leftover_source: slot.leftover_source || '',
             effort_level: slot.effort_level || 'medium',
             planning_notes: slot.planning_notes || '',
+            sort_order: computeSortOrder(day, meal),
           }
           
           return slotPayload

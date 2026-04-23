@@ -181,8 +181,9 @@ export function useMealPlan(scheduleId) {
     [mealPlan, user],
   )
 
-  const generateMealPlan = useCallback(async () => {
-    if (!user || !scheduleId) throw new Error('Schedule is required before generating a meal plan.')
+  const generateMealPlan = useCallback(async (overrideScheduleId = null) => {
+    const activeScheduleId = overrideScheduleId ?? scheduleId
+    if (!user || !activeScheduleId) throw new Error('Schedule is required before generating a meal plan.')
 
     setGenerating(true)
     setError(null)
@@ -207,14 +208,14 @@ export function useMealPlan(scheduleId) {
         .from('schedule_slots')
         .select('*')
         .eq('user_id', user.id)
-        .eq('schedule_id', scheduleId)
+        .eq('schedule_id', activeScheduleId)
       if (slotsError) throw slotsError
 
       // Also fetch the schedule to get week_notes
       const { data: schedule } = await supabase
         .from('weekly_schedules')
         .select('week_notes')
-        .eq('id', scheduleId)
+        .eq('id', activeScheduleId)
         .maybeSingle()
       
 
@@ -307,7 +308,7 @@ export function useMealPlan(scheduleId) {
       console.log('[useMealPlan] save started')
       console.log('[useMealPlan] about to save returned plan', {
         mealCount: mergedPlan?.meals?.length || 0,
-        scheduleId,
+        scheduleId: activeScheduleId,
       })
       const { data: savedPlan, error: saveError } = await supabase
         .from('meal_plans')
@@ -315,7 +316,7 @@ export function useMealPlan(scheduleId) {
           ...(mealPlan?.id ? { id: mealPlan.id } : {}),
           user_id: user.id,
           household_id: household.id,
-          schedule_id: scheduleId,
+          schedule_id: activeScheduleId,
           week_of: new Date().toISOString().split('T')[0],
           status: mealPlan?.status || 'draft',
           plan: mergedPlan,

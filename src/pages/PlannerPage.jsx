@@ -291,9 +291,12 @@ export function PlannerPage() {
     setSaving(true)
     try {
       const savedSchedule = await saveSchedule({ householdId: household.id, shoppingDay, weekNotes, slots: activeSlots, validMemberIds: memberOptions.map((member) => member.id) })
+      if (!savedSchedule?.id) {
+        throw new Error('Schedule save did not return an id.')
+      }
       await loadSchedule()
-      const savedPlan = await generateMealPlan()
-      await trackUsage('plan_generate', { schedule_id: savedSchedule?.id || schedule?.id || null })
+      const savedPlan = await generateMealPlan(savedSchedule.id)
+      await trackUsage('plan_generate', { schedule_id: savedSchedule.id })
 
       const generatedMeals = savedPlan?.draft_plan?.meals || savedPlan?.plan?.meals || []
       const items = aggregateShoppingList({ meals: generatedMeals }, household?.staples_on_hand || '')
