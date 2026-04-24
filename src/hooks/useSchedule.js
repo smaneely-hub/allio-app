@@ -140,6 +140,7 @@ export function useSchedule() {
           household_id: householdId,
           week_start_date: getWeekStartDate(),
           shopping_day: shoppingDay,
+          week_notes: weekNotes || '',
           status: 'draft',
         }
 
