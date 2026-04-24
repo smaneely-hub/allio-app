@@ -1,12 +1,31 @@
 import { supabase } from './supabase'
 
 const FUNCTION_CANDIDATES = ['generate-plan']
+const DEFAULT_FUNCTION_TIMEOUT_MS = 15000
+
+function createFunctionTimeoutError(timeoutMs) {
+  return {
+    message: `Planner request timed out after ${Math.round(timeoutMs / 1000)}s`,
+    code: 'FUNCTION_TIMEOUT',
+  }
+}
+
+async function invokeWithTimeout(name, payload, options = {}) {
+  const timeoutMs = options.timeoutMs || DEFAULT_FUNCTION_TIMEOUT_MS
+
+  return Promise.race([
+    supabase.functions.invoke(name, { body: payload, ...options }),
+    new Promise((resolve) => {
+      setTimeout(() => resolve({ data: null, error: createFunctionTimeoutError(timeoutMs) }), timeoutMs)
+    }),
+  ])
+}
 
 async function invokePlannerFunctionOnce(payload, options = {}) {
   let lastError = null
 
   for (const name of FUNCTION_CANDIDATES) {
-    const { data, error } = await supabase.functions.invoke(name, { body: payload, ...options })
+    const { data, error } = await invokeWithTimeout(name, payload, options)
     if (!error) {
       return { data, error: null, functionName: name }
     }

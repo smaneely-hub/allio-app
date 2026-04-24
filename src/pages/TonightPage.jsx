@@ -737,17 +737,17 @@ export function TonightPage() {
 
       if (!session) {
         console.error('[TonightPage] No active session, cannot invoke generate-plan')
-        return
+        throw new Error('No active session')
       }
 
-      const { data, error } = await supabase.functions.invoke('generate-plan', {
-        body: payload,
+      const { data, error, functionName } = await invokePlannerFunction(payload, {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
+        timeoutMs: 15000,
       })
 
-      console.log('[TonightPage] planner function response:', { functionName: 'generate-plan', data, error })
+      console.log('[TonightPage] planner function response:', { functionName, data, error })
 
       let normalized = null
       if (error || !data?.plan?.meals?.length) {
