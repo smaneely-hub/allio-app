@@ -3,10 +3,10 @@ import { useAuth } from '../hooks/useAuth'
 import { Logo } from './Logo'
 
 const links = [
-  { to: '/', label: 'Tonight', icon: '🍲' },
+  { to: '/tonight', label: 'Tonight', icon: '🍲' },
+  { to: '/plan', label: 'Plan', icon: '📅' },
   { to: '/shop', label: 'Shop', icon: '🛒' },
   { to: '/settings', label: 'Family', icon: '👨‍👩‍👧' },
-  { to: '/dashboard', label: 'More', icon: '⋯' },
 ]
 
 export function NavBar() {

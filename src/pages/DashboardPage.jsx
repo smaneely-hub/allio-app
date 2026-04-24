@@ -109,10 +109,17 @@ export function DashboardPage() {
         <h2 className="font-display text-lg text-text-primary mb-3">Quick Actions</h2>
         <div className="space-y-2">
           <Link 
-            to="/" 
+            to="/tonight" 
             className="flex items-center justify-between p-3 rounded-xl bg-bg-primary hover:bg-primary-50 transition-colors min-h-[48px]"
           >
             <span className="text-sm text-text-primary">Tonight's Meal</span>
+            <span className="text-text-muted">→</span>
+          </Link>
+          <Link 
+            to="/plan" 
+            className="flex items-center justify-between p-3 rounded-xl bg-bg-primary hover:bg-primary-50 transition-colors min-h-[48px]"
+          >
+            <span className="text-sm text-text-primary">Weekly Meal Plan</span>
             <span className="text-text-muted">→</span>
           </Link>
           <Link 
