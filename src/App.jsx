@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { BrowserRouter, Route, Routes, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { EmailVerificationBanner } from './components/EmailVerificationBanner'
@@ -126,6 +126,11 @@ export default function App() {
                     </ProtectedRoute>
                   }
                 />
+                <Route path="/family" element={<Navigate to="/settings" replace />} />
+                <Route path="/profile" element={<Navigate to="/settings" replace />} />
+                <Route path="/cook" element={<Navigate to="/tonight" replace />} />
+                <Route path="/cooking" element={<Navigate to="/tonight" replace />} />
+                <Route path="/meals" element={<Navigate to="/recipes" replace />} />
                 <Route path="/pricing" element={<PricingPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/terms" element={<TermsPage />} />

@@ -157,7 +157,7 @@ export function ShopPage() {
           headline="No shopping list yet"
           body="Generate a meal on Tonight's Meal to create your shopping list."
           ctaLabel="Generate meal"
-          ctaLink="/"
+          ctaLink="/tonight"
         />
       </div>
     )

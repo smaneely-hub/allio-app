@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { FilterBar } from '../components/FilterBar'
+import { RecipeDetail } from '../components/RecipeDetail'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { filterRecipesByTags, getAvailableTags } from '../lib/recipeFilters'
 import { normalizeRecipe } from '../lib/recipeSchema'
@@ -11,6 +12,7 @@ export function RecipesPage() {
   const [recipes, setRecipes] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedTags, setSelectedTags] = useState([])
+  const [selectedRecipe, setSelectedRecipe] = useState(null)
 
   useEffect(() => {
     async function loadRecipes() {
@@ -36,6 +38,10 @@ export function RecipesPage() {
       ? current.filter((entry) => entry !== tag)
       : [...current, tag]
     )
+  }
+
+  if (selectedRecipe) {
+    return <RecipeDetail meal={selectedRecipe} onClose={() => setSelectedRecipe(null)} />
   }
 
   return (
@@ -74,7 +80,12 @@ export function RecipesPage() {
             const tags = [recipe.tags.cuisine, recipe.tags.mealType, ...recipe.tags.dietary, ...(recipe.tags.cookingMethod || [])].filter(Boolean)
 
             return (
-              <div key={recipe.id} className="card p-4 shadow-sm transition-shadow duration-200 hover:shadow-md">
+              <button
+                key={recipe.id}
+                type="button"
+                onClick={() => setSelectedRecipe(recipe)}
+                className="card w-full p-4 text-left shadow-sm transition-shadow duration-200 hover:shadow-md"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h2 className="font-display text-xl text-text-primary">{recipe.title}</h2>
@@ -103,7 +114,7 @@ export function RecipesPage() {
                     </span>
                   ))}
                 </div>
-              </div>
+              </button>
             )
           })}
 
