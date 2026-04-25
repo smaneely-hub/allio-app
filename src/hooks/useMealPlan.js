@@ -303,7 +303,16 @@ export function useMealPlan(scheduleId) {
         ],
       }
 
-      
+      console.log('[PLAN_DEBUG] parsed generate-plan response:', JSON.stringify({
+        topLevelKeys: Object.keys(generated?.plan || {}),
+        hasDraftPlan: !!generated?.draft_plan,
+        hasPlan: !!generated?.plan,
+        mealsLength: (generated?.draft_plan?.meals || generated?.plan?.meals || []).length,
+        firstMeal: (generated?.draft_plan?.meals || generated?.plan?.meals || [])[0] || null,
+        allMealSlotNames: (generated?.draft_plan?.meals || generated?.plan?.meals || [])
+          .map(m => ({ day: m?.day, meal: m?.meal })),
+      }, null, 2))
+
       console.log('[useMealPlan] response parse started')
       console.log('[useMealPlan] save started')
       console.log('[useMealPlan] about to save returned plan', {
