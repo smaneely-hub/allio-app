@@ -16,6 +16,8 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '
 const LLM_API_KEY = Deno.env.get('LLM_API_KEY') || ''
 const LLM_MODEL = Deno.env.get('LLM_MODEL') || 'google/gemini-2.5-flash'
 const LLM_ENDPOINT = Deno.env.get('LLM_ENDPOINT') || 'https://openrouter.ai/api/v1/chat/completions'
+const LLM_TIMEOUT_MS = Number(Deno.env.get('LLM_TIMEOUT_MS') || '12000')
+const REQUEST_TIMEOUT_MS = Number(Deno.env.get('REQUEST_TIMEOUT_MS') || '20000')
 
 // ─────────────────────────────────────────────
 // SERVING EQUIVALENTS HELPERS (Phase 2)
@@ -531,30 +533,49 @@ function transformLlmOutput(llmOutput: unknown, scheduledSlots: Array<{ day: str
 }
 
 async function callLlm(messages: Array<{ role: string; content: string }>) {
-  const response = await fetch(LLM_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${LLM_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: LLM_MODEL,
-      max_tokens: 5000,
-      temperature: 0.55,
-      response_format: { type: 'json_object' },
-      messages,
-    }),
-  })
-
-  const json = await response.json()
-  if (!response.ok) {
-    throw new Error(json.error?.message || 'LLM request failed')
+  if (!LLM_API_KEY) {
+    throw new Error('LLM_API_KEY is not configured')
   }
 
-  return json
+  const abortController = new AbortController()
+  const timeoutId = setTimeout(() => abortController.abort('llm_timeout'), LLM_TIMEOUT_MS)
+
+  try {
+    const response = await fetch(LLM_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${LLM_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: LLM_MODEL,
+        max_tokens: 5000,
+        temperature: 0.55,
+        response_format: { type: 'json_object' },
+        messages,
+      }),
+      signal: abortController.signal,
+    })
+
+    const json = await response.json()
+    if (!response.ok) {
+      throw new Error(json.error?.message || 'LLM request failed')
+    }
+
+    return json
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`LLM request timed out after ${Math.round(LLM_TIMEOUT_MS / 1000)}s`)
+    }
+    throw error
+  } finally {
+    clearTimeout(timeoutId)
+  }
 }
 
 serve(async (req) => {
+  const requestStartedAt = Date.now()
+
   if (req.method === 'OPTIONS') {
     return handleCorsPreflight(req)
   }
@@ -568,7 +589,10 @@ serve(async (req) => {
   const corsHeaders = { ...buildCorsHeaders(origin), 'Content-Type': 'application/json' }
 
   try {
-    const auth = await requireAuth(req, SUPABASE_URL, SUPABASE_ANON_KEY)
+    const auth = await Promise.race([
+      requireAuth(req, SUPABASE_URL, SUPABASE_ANON_KEY),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`Request timed out during auth after ${Math.round(REQUEST_TIMEOUT_MS / 1000)}s`)), REQUEST_TIMEOUT_MS)),
+    ])
     if (auth.response) {
       return auth.response
     }
@@ -630,6 +654,7 @@ serve(async (req) => {
     ]
 
     let llmJson = await callLlm(messages)
+    console.log('[generate-plan] first LLM call completed in ms:', Date.now() - requestStartedAt)
     console.log('[generate-plan] LLM raw response:', JSON.stringify(llmJson).slice(0, 300))
     let parsedPlan = JSON.parse(llmJson.choices[0].message.content)
     let validation = validatePlan(parsedPlan, payload.slots)
@@ -641,6 +666,7 @@ serve(async (req) => {
         { role: 'user', content: JSON.stringify(payload) },
       ]
       llmJson = await callLlm(retryMessages)
+      console.log('[generate-plan] retry LLM call 1 completed in ms:', Date.now() - requestStartedAt)
       parsedPlan = JSON.parse(llmJson.choices[0].message.content)
       validation = validatePlan(parsedPlan, payload.slots)
     }
@@ -651,6 +677,7 @@ serve(async (req) => {
         { role: 'user', content: JSON.stringify(payload) },
       ]
       llmJson = await callLlm(retryMessages)
+      console.log('[generate-plan] retry LLM call 2 completed in ms:', Date.now() - requestStartedAt)
       parsedPlan = JSON.parse(llmJson.choices[0].message.content)
       validation = validatePlan(parsedPlan, payload.slots)
     }
@@ -666,6 +693,7 @@ serve(async (req) => {
       }),
     }
     console.log('[generate-plan] Transformed plan:', JSON.stringify(transformedPlan).slice(0, 200))
+    console.log('[generate-plan] total request ms:', Date.now() - requestStartedAt)
 
     return new Response(JSON.stringify({ plan: transformedPlan }), {
       status: 200,
