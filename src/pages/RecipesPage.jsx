@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { FilterBar } from '../components/FilterBar'
 import { RecipeDetail } from '../components/RecipeDetail'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -9,10 +10,11 @@ import { supabase } from '../lib/supabase'
 /** Render a minimal browse view for recipes with tag-based filtering. */
 export function RecipesPage() {
   useDocumentTitle('Recipes | Allio')
+  const navigate = useNavigate()
+  const { recipeId } = useParams()
   const [recipes, setRecipes] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedTags, setSelectedTags] = useState([])
-  const [selectedRecipe, setSelectedRecipe] = useState(null)
 
   useEffect(() => {
     async function loadRecipes() {
@@ -40,8 +42,30 @@ export function RecipesPage() {
     )
   }
 
+  const selectedRecipe = useMemo(() => {
+    if (!recipeId) return null
+    return recipes
+      .map((recipeRow) => normalizeRecipe({
+        ...recipeRow,
+        yield: recipeRow.yield_text,
+        prepTime: recipeRow.prep_time_minutes,
+        cookTime: recipeRow.cook_time_minutes,
+        totalTime: recipeRow.total_time_minutes,
+        ingredientGroups: recipeRow.ingredient_groups_json,
+        instructionGroups: recipeRow.instruction_groups_json,
+        ingredients: recipeRow.ingredients_json,
+        instructions: recipeRow.instructions_json,
+        substitutions: recipeRow.substitutions_json,
+        tags: recipeRow.tags_v2_json,
+        dietary_flags_json: recipeRow.dietary_flags_json,
+        sourceNote: recipeRow.source_note,
+        imagePrompt: recipeRow.image_prompt,
+      }))
+      .find((recipe) => String(recipe.id) === String(recipeId) || String(recipe.slug) === String(recipeId)) || null
+  }, [recipeId, recipes])
+
   if (selectedRecipe) {
-    return <RecipeDetail meal={selectedRecipe} onClose={() => setSelectedRecipe(null)} />
+    return <RecipeDetail meal={selectedRecipe} onClose={() => navigate('/recipes')} />
   }
 
   return (
@@ -83,7 +107,7 @@ export function RecipesPage() {
               <button
                 key={recipe.id}
                 type="button"
-                onClick={() => setSelectedRecipe(recipe)}
+                onClick={() => navigate(`/recipes/${recipe.slug || recipe.id}`)}
                 className="card w-full p-4 text-left shadow-sm transition-shadow duration-200 hover:shadow-md"
               >
                 <div className="flex items-start justify-between gap-3">

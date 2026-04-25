@@ -119,6 +119,14 @@ export default function App() {
                   }
                 />
                 <Route
+                  path="/recipes/:recipeId"
+                  element={
+                    <ProtectedRoute>
+                      <RecipesPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="/settings"
                   element={
                     <ProtectedRoute>
