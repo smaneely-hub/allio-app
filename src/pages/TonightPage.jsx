@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { SwipeDeck } from '../components/SwipeDeck'
 import toast from 'react-hot-toast'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useAuth } from '../hooks/useAuth'
@@ -190,7 +191,7 @@ const MEMBER_FEEDBACK_OPTIONS = [
 async function persistTonightMealState({ userId, householdId, meal, staplesOnHand = '' }) {
   const today = new Date().toISOString().split('T')[0]
   const planPayload = {
-    meals: [{ ...meal, id: `${meal.day}-${meal.meal}` }],
+    meals: [{ ...meal, id: `${activeMeal.day}-${activeMeal.meal}` }],
   }
 
   const { data: existingPlan, error: planLoadError } = await supabase
@@ -349,6 +350,7 @@ export function TonightPage() {
   const [staplesOnHand, setStaplesOnHand] = useState('')
   const [generating, setGenerating] = useState(false)
   const [meal, setMeal] = useState(null)
+  const [mealQueue, setMealQueue] = useState([])
   const [cooked, setCooked] = useState(false)
   const [history, setHistory] = useState([])
   // Track recent meal names to avoid repeats
@@ -374,27 +376,29 @@ export function TonightPage() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [ingredientChecks, setIngredientChecks] = useState({})
 
+  const activeMeal = mealQueue[0] || meal
+
   const mealFitReasons = useMemo(() => {
-    if (!meal) return []
+    if (!activeMeal) return []
 
     const reasons = []
-    const totalTime = Number(meal.prep_time_minutes || 0) + Number(meal.cook_time_minutes || 0)
+    const totalTime = Number(activeMeal.prep_time_minutes || 0) + Number(activeMeal.cook_time_minutes || 0)
 
     if (totalTime > 0 && totalTime <= 35) reasons.push(`Ready in about ${totalTime} minutes`)
-    if ((meal.servings || 0) >= Math.max(selectedMembers.length || 0, 4)) reasons.push(`Sized for ${meal.servings} servings`)
+    if ((activeMeal.servings || 0) >= Math.max(selectedMembers.length || 0, 4)) reasons.push(`Sized for ${activeMeal.servings} servings`)
     if (selectedMembers.length > 0) reasons.push(`Adjusted for your selected household members`)
     if (staplesOnHand.trim()) reasons.push('Takes your on-hand staples into account')
-    if (Array.isArray(meal.tags) && meal.tags.length > 0) {
-      if (meal.tags.includes('weeknight')) reasons.push('Built for a smoother weeknight')
-      if (meal.tags.includes('kid-friendly')) reasons.push('A good fit for family dinner')
-      if (meal.tags.includes('under-30-min')) reasons.push('Fast enough for a busy evening')
+    if (Array.isArray(activeMeal.tags) && activeMeal.tags.length > 0) {
+      if (activeMeal.tags.includes('weeknight')) reasons.push('Built for a smoother weeknight')
+      if (activeMeal.tags.includes('kid-friendly')) reasons.push('A good fit for family dinner')
+      if (activeMeal.tags.includes('under-30-min')) reasons.push('Fast enough for a busy evening')
     }
 
     return reasons.slice(0, 4)
-  }, [meal, selectedMembers.length, staplesOnHand])
+  }, [activeMeal, selectedMembers.length, staplesOnHand])
 
   const shoppingPrepItems = useMemo(() => {
-    const parsed = (meal?.ingredients || [])
+    const parsed = (activeMeal?.ingredients || [])
       .map((ingredient, index) => {
         const parsedIngredient = parseIngredient(ingredient)
         return parsedIngredient ? {
@@ -408,7 +412,7 @@ export function TonightPage() {
       .filter(Boolean)
 
     return groupItemsByCategory(parsed)
-  }, [meal])
+  }, [activeMeal])
 
   const cookingProgress = useMemo(() => {
     const totalSteps = Math.max((meal?.instructions || []).length, 1)
@@ -541,7 +545,7 @@ export function TonightPage() {
   // Check if current meal is a favorite
   useEffect(() => {
     if (meal && savedMeals.length > 0) {
-      const isFav = savedMeals.some(s => s.recipe_name === meal.name)
+      const isFav = savedMeals.some(s => s.recipe_name === activeMeal.name)
       setIsFavorite(isFav)
     }
   }, [meal, savedMeals])
@@ -567,13 +571,13 @@ export function TonightPage() {
     
     if (isFavorite) {
       // Remove from favorites
-      const toRemove = savedMeals.find(s => s.recipe_name === meal.name)
+      const toRemove = savedMeals.find(s => s.recipe_name === activeMeal.name)
       if (toRemove) {
         await supabase.from('saved_meals').delete().eq('id', toRemove.id)
         setSavedMeals(prev => prev.filter(s => s.id !== toRemove.id))
         setIsFavorite(false)
         refreshPreferenceSignals()
-        console.log('[TonightPage] removed from favorites:', meal.name)
+        console.log('[TonightPage] removed from favorites:', activeMeal.name)
       }
     } else {
       // Add to favorites
@@ -581,8 +585,8 @@ export function TonightPage() {
         .from('saved_meals')
         .insert({
           user_id: user.id,
-          recipe_id: meal.recipe_id || null,
-          recipe_name: meal.name,
+          recipe_id: activeMeal.recipe_id || null,
+          recipe_name: activeMeal.name,
           recipe_data: meal,
         })
         .select()
@@ -592,7 +596,7 @@ export function TonightPage() {
         setSavedMeals(prev => [data, ...prev])
         setIsFavorite(true)
         refreshPreferenceSignals()
-        console.log('[TonightPage] added to favorites:', meal.name)
+        console.log('[TonightPage] added to favorites:', activeMeal.name)
       }
     }
   }
@@ -765,6 +769,7 @@ export function TonightPage() {
         normalized = normalizeMealRecord(data.plan.meals[0])
       }
       setMeal(normalized)
+      setMealQueue([{ meal: normalized, image: normalized.image ? { url: normalized.image } : { url: null, photographer: null, photographerUrl: null } }])
       setFeedback('')
       setRefinementChanges([])  // Clear refinement state on new generation
       setMealInstanceId(null)   // Clear old instance ID for new meal
@@ -827,7 +832,7 @@ export function TonightPage() {
   const swapMeal = async () => {
     if (!meal || !user) return
 
-    console.log('[TonightPage] swap started for meal:', meal.name)
+    console.log('[TonightPage] swap started for meal:', activeMeal.name)
     setGenerating(true)
 
     try {
@@ -921,8 +926,8 @@ export function TonightPage() {
           effort,
           dietaryFocus: finalDietFocus,
           selectedMemberData,
-          recentMealNames: [...recentMealNames.slice(0, 5), ...preferenceSignals.strongAvoidSignals, meal.name],
-          excludedRecipeId: meal.recipe_id || null,
+          recentMealNames: [...recentMealNames.slice(0, 5), ...preferenceSignals.strongAvoidSignals, activeMeal.name],
+          excludedRecipeId: activeMeal.recipe_id || null,
           servings: calculatedServings,
         })
         toast('Swap fallback used recipe library instead.', { icon: 'ℹ️' })
@@ -930,6 +935,7 @@ export function TonightPage() {
         normalized = normalizeMealRecord(data.plan.meals[0])
       }
       setMeal(normalized)
+      setMealQueue([{ meal: normalized, image: normalized.image ? { url: normalized.image } : { url: null, photographer: null, photographerUrl: null } }])
       setFeedback('')
       setCooked(false)
       setRefinementChanges([])  // Clear refinement state on swap
@@ -945,12 +951,12 @@ export function TonightPage() {
       console.log('[TonightPage] swapped to meal:', normalized.name)
 
       // Capture signal: user swapped away from the previous meal
-      console.log('[TonightPage] Signal: swapped away from:', meal.name)
+      console.log('[TonightPage] Signal: swapped away from:', activeMeal.name)
       try {
         await supabase.from('meal_signals').insert({
           user_id: user.id,
-          meal_name: meal.name,
-          recipe_id: meal.recipe_id,
+          meal_name: activeMeal.name,
+          recipe_id: activeMeal.recipe_id,
           signal_type: 'swapped_away',
           created_at: new Date().toISOString()
         })
@@ -1064,8 +1070,8 @@ export function TonightPage() {
         await supabase.from('meal_signals').insert([
           {
             user_id: user.id,
-            meal_name: meal.name,
-            recipe_id: meal.recipe_id,
+            meal_name: activeMeal.name,
+            recipe_id: activeMeal.recipe_id,
             signal_type: 'refined_from',
             created_at: new Date().toISOString()
           },
@@ -1114,8 +1120,8 @@ export function TonightPage() {
           .insert({
             household_id: household.id,
             user_id: user.id,
-            recipe_id: meal.recipe_id || null,
-            recipe_name: meal.name,
+            recipe_id: activeMeal.recipe_id || null,
+            recipe_name: activeMeal.name,
             selected_member_ids: selectedMembers,
             source: 'tonight',
             effort_level: effort,
@@ -1294,17 +1300,25 @@ export function TonightPage() {
           <label className="block text-sm font-medium text-text-700 mb-2">
             How much time do you have?
           </label>
-          <select
-            value={effort}
-            onChange={(e) => setEffort(e.target.value)}
-            className="input w-full"
-          >
-            {EFFORT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          <div className="flex flex-wrap gap-2">
+            {EFFORT_OPTIONS.map((opt) => {
+              const isActive = effort === opt.value
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setEffort(opt.value)}
+                  className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                    isActive
+                      ? 'bg-primary-500 text-white shadow-sm'
+                      : 'border border-divider bg-white text-text-secondary hover:border-primary-300 hover:bg-primary-50'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         <div>
@@ -1395,13 +1409,33 @@ export function TonightPage() {
         </button>
       </div>
 
-      {meal && (
+      {activeMeal && mealQueue.length > 0 && (
         <div className="mt-6 rounded-2xl border border-divider bg-white p-4 md:p-6">
+          <div className="mb-4">
+            <SwipeDeck
+              items={mealQueue}
+              batchLoading={generating}
+              onAccept={(acceptedMeal) => {
+                setMeal(acceptedMeal)
+                setMealQueue([{ meal: acceptedMeal, image: acceptedMeal.image ? { url: acceptedMeal.image } : { url: null, photographer: null, photographerUrl: null } }])
+              }}
+              onReject={() => {
+                swapMeal()
+              }}
+              onEdit={() => {
+                toast('Adjust Tonight preferences above, then generate again or refine the current activeMeal.', { icon: '✏️' })
+              }}
+            />
+          </div>
+
+          <div className="mb-4 rounded-xl bg-warm-50 p-3 text-xs text-text-secondary">
+            Swipe right to cook, swipe left to skip, or use the buttons below.
+          </div>
           <div className="mb-4 flex items-start justify-between">
             <div className="flex-1">
-              <h2 className="text-xl font-semibold text-text-primary">{meal.name}</h2>
+              <h2 className="text-xl font-semibold text-text-primary">{activeMeal.name}</h2>
               <p className="text-sm text-text-secondary">
-                {meal.prep_time_minutes} min prep · {meal.cook_time_minutes} min cook · {meal.servings} servings
+                {activeMeal.prep_time_minutes} min prep · {activeMeal.cook_time_minutes} min cook · {activeMeal.servings} servings
               </p>
             </div>
             <button
@@ -1421,30 +1455,30 @@ export function TonightPage() {
           </div>
 
           {/* Meal Image */}
-          {meal.image && (
+          {activeMeal.image && (
             <div className="mb-4 rounded-xl overflow-hidden bg-gray-100">
               <img 
-                src={meal.image} 
-                alt={meal.name}
+                src={activeMeal.image} 
+                alt={activeMeal.name}
                 className="w-full h-48 object-cover"
                 onError={(e) => { e.target.style.display = 'none' }}
               />
             </div>
           )}
 
-          {meal.description && (
-            <p className="mb-3 text-sm text-text-primary">{meal.description}</p>
+          {activeMeal.description && (
+            <p className="mb-3 text-sm text-text-primary">{activeMeal.description}</p>
           )}
 
           {/* Prominent "Why this meal" - make it stand out */}
-          {((meal.why_this_meal || meal.notes) || mealFitReasons.length > 0) && (
+          {((activeMeal.why_this_meal || activeMeal.notes) || mealFitReasons.length > 0) && (
             <div className="mb-4 rounded-xl border border-primary-100 bg-gradient-to-r from-primary-50 to-teal-50 p-4">
               <div className="flex items-start gap-2">
                 <span className="text-lg">💡</span>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-primary-800">Why this meal works</p>
-                  {(meal.why_this_meal || meal.notes) && (
-                    <p className="mt-1 text-sm text-primary-700">{meal.why_this_meal || meal.notes}</p>
+                  {(activeMeal.why_this_meal || activeMeal.notes) && (
+                    <p className="mt-1 text-sm text-primary-700">{activeMeal.why_this_meal || activeMeal.notes}</p>
                   )}
                   {mealFitReasons.length > 0 && (
                     <ul className="mt-3 space-y-1 text-sm text-primary-700">
@@ -1461,16 +1495,16 @@ export function TonightPage() {
             </div>
           )}
 
-          {Array.isArray(meal.tags) && meal.tags.length > 0 && (
+          {Array.isArray(activeMeal.tags) && activeMeal.tags.length > 0 && (
             <div className="mb-4 flex flex-wrap gap-1">
-              {meal.tags.map((tag, i) => (
+              {activeMeal.tags.map((tag, i) => (
                 <span key={i} className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">{tag}</span>
               ))}
             </div>
           )}
 
-          {meal.notes && (
-            <p className="mb-4 text-sm text-text-secondary">{meal.notes}</p>
+          {activeMeal.notes && (
+            <p className="mb-4 text-sm text-text-secondary">{activeMeal.notes}</p>
           )}
 
           <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -1520,11 +1554,11 @@ export function TonightPage() {
               <div className="mb-4 grid gap-3 md:grid-cols-3">
                 <div className="rounded-xl bg-white p-3 shadow-sm">
                   <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">Prep time</div>
-                  <div className="mt-1 text-sm font-semibold text-text-primary">{meal.prep_time_minutes || 0} min</div>
+                  <div className="mt-1 text-sm font-semibold text-text-primary">{activeMeal.prep_time_minutes || 0} min</div>
                 </div>
                 <div className="rounded-xl bg-white p-3 shadow-sm">
                   <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">Cook time</div>
-                  <div className="mt-1 text-sm font-semibold text-text-primary">{meal.cook_time_minutes || 0} min</div>
+                  <div className="mt-1 text-sm font-semibold text-text-primary">{activeMeal.cook_time_minutes || 0} min</div>
                 </div>
                 <div className="rounded-xl bg-white p-3 shadow-sm">
                   <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">Prep checklist</div>
@@ -1533,10 +1567,10 @@ export function TonightPage() {
               </div>
 
               <div className="mb-4 rounded-xl bg-white p-4 shadow-sm">
-                {(meal.instructions || []).length > 0 ? (
+                {(activeMeal.instructions || []).length > 0 ? (
                   <>
                     <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">Current step</div>
-                    <p className="mt-2 text-lg font-medium leading-7 text-text-primary">{meal.instructions[currentStepIndex] || meal.instructions[0]}</p>
+                    <p className="mt-2 text-lg font-medium leading-7 text-text-primary">{activeMeal.instructions[currentStepIndex] || activeMeal.instructions[0]}</p>
                   </>
                 ) : (
                   <p className="text-sm text-text-secondary">No instructions listed</p>
@@ -1585,8 +1619,8 @@ export function TonightPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCurrentStepIndex((prev) => Math.min(prev + 1, Math.max((meal.instructions || []).length - 1, 0)))}
-                  disabled={currentStepIndex >= Math.max((meal.instructions || []).length - 1, 0)}
+                  onClick={() => setCurrentStepIndex((prev) => Math.min(prev + 1, Math.max((activeMeal.instructions || []).length - 1, 0)))}
+                  disabled={currentStepIndex >= Math.max((activeMeal.instructions || []).length - 1, 0)}
                   className="flex-1 rounded-full bg-primary-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
                 >
                   Next step
@@ -1598,8 +1632,8 @@ export function TonightPage() {
               <div className="mb-4">
                 <h3 className="mb-2 text-sm font-semibold text-text-primary">Ingredients</h3>
                 <ul className="space-y-1 text-sm text-text-secondary">
-                  {(meal.ingredients || []).length > 0 ? (
-                    meal.ingredients.map((ing, i) => (
+                  {(activeMeal.ingredients || []).length > 0 ? (
+                    activeMeal.ingredients.map((ing, i) => (
                       <li key={i}>{typeof ing === 'string' ? ing : ''}</li>
                     ))
                   ) : (
@@ -1611,8 +1645,8 @@ export function TonightPage() {
               <div className="mb-4">
                 <h3 className="mb-2 text-sm font-semibold text-text-primary">Instructions</h3>
                 <ol className="space-y-2 text-sm text-text-secondary">
-                  {(meal.instructions || []).length > 0 ? (
-                    meal.instructions.map((step, i) => (
+                  {(activeMeal.instructions || []).length > 0 ? (
+                    activeMeal.instructions.map((step, i) => (
                       <li key={i} className="flex gap-2">
                         <span className="font-semibold text-text-primary">{i + 1}.</span>
                         <span>{typeof step === 'string' ? step : ''}</span>
@@ -1626,44 +1660,44 @@ export function TonightPage() {
             </>
           )}
 
-          {Array.isArray(meal.visual_cues) && meal.visual_cues.length > 0 && (
+          {Array.isArray(activeMeal.visual_cues) && activeMeal.visual_cues.length > 0 && (
             <div className="mb-4 rounded-xl bg-yellow-50 p-3">
               <h4 className="mb-1 text-xs font-semibold text-yellow-800">👀 Look for</h4>
               <ul className="space-y-1 text-sm text-yellow-700">
-                {meal.visual_cues.map((cue, i) => (
+                {activeMeal.visual_cues.map((cue, i) => (
                   <li key={i}>• {cue}</li>
                 ))}
               </ul>
             </div>
           )}
 
-          {Array.isArray(meal.tips) && meal.tips.length > 0 && (
+          {Array.isArray(activeMeal.tips) && activeMeal.tips.length > 0 && (
             <div className="mb-4 rounded-xl bg-blue-50 p-3">
               <h4 className="mb-1 text-xs font-semibold text-blue-800">💡 Tips</h4>
               <ul className="space-y-1 text-sm text-blue-700">
-                {meal.tips.map((tip, i) => (
+                {activeMeal.tips.map((tip, i) => (
                   <li key={i}>• {tip}</li>
                 ))}
               </ul>
             </div>
           )}
 
-          {Array.isArray(meal.common_mistakes) && meal.common_mistakes.length > 0 && (
+          {Array.isArray(activeMeal.common_mistakes) && activeMeal.common_mistakes.length > 0 && (
             <div className="mb-4 rounded-xl bg-red-50 p-3">
               <h4 className="mb-1 text-xs font-semibold text-red-800">⚠️ Avoid</h4>
               <ul className="space-y-1 text-sm text-red-700">
-                {meal.common_mistakes.map((mistake, i) => (
+                {activeMeal.common_mistakes.map((mistake, i) => (
                   <li key={i}>• {mistake}</li>
                 ))}
               </ul>
             </div>
           )}
 
-          {Array.isArray(meal.easy_swaps) && meal.easy_swaps.length > 0 && (
+          {Array.isArray(activeMeal.easy_swaps) && activeMeal.easy_swaps.length > 0 && (
             <div className="mb-4 rounded-xl bg-green-50 p-3">
               <h4 className="mb-1 text-xs font-semibold text-green-800">🔄 Easy swaps</h4>
               <ul className="space-y-1 text-sm text-green-700">
-                {meal.easy_swaps.map((swap, i) => (
+                {activeMeal.easy_swaps.map((swap, i) => (
                   <li key={i}>• {swap}</li>
                 ))}
               </ul>
@@ -1785,12 +1819,12 @@ export function TonightPage() {
               How was {meal?.name}?
             </h2>
             <p className="mb-4 text-sm text-text-secondary">
-              Rate how each person felt about tonight&apos;s meal.
+              Rate how each person felt about tonight&apos;s activeMeal.
             </p>
 
             {effectiveRatingMembers.length === 0 ? (
               <div className="mb-6 rounded-xl border border-divider p-4 text-sm text-text-secondary">
-                Add household members first, then you can track who liked tonight&apos;s meal.
+                Add household members first, then you can track who liked tonight&apos;s activeMeal.
               </div>
             ) : (
               <div className="mb-6 space-y-4">
