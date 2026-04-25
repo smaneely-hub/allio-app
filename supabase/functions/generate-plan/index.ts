@@ -16,8 +16,9 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '
 const LLM_API_KEY = Deno.env.get('LLM_API_KEY') || ''
 const LLM_MODEL = Deno.env.get('LLM_MODEL') || 'google/gemini-2.5-flash'
 const LLM_ENDPOINT = Deno.env.get('LLM_ENDPOINT') || 'https://openrouter.ai/api/v1/chat/completions'
-const LLM_TIMEOUT_MS = Number(Deno.env.get('LLM_TIMEOUT_MS') || '12000')
-const REQUEST_TIMEOUT_MS = Number(Deno.env.get('REQUEST_TIMEOUT_MS') || '20000')
+const LLM_TIMEOUT_MS = Number(Deno.env.get('LLM_TIMEOUT_MS') || '25000')
+const REQUEST_TIMEOUT_MS = Number(Deno.env.get('REQUEST_TIMEOUT_MS') || '30000')
+const MAX_VALIDATION_RETRIES = Number(Deno.env.get('MAX_VALIDATION_RETRIES') || '0')
 
 // ─────────────────────────────────────────────
 // SERVING EQUIVALENTS HELPERS (Phase 2)
@@ -549,8 +550,8 @@ async function callLlm(messages: Array<{ role: string; content: string }>) {
       },
       body: JSON.stringify({
         model: LLM_MODEL,
-        max_tokens: 5000,
-        temperature: 0.55,
+        max_tokens: 2200,
+        temperature: 0.4,
         response_format: { type: 'json_object' },
         messages,
       }),
@@ -659,31 +660,22 @@ serve(async (req) => {
     let parsedPlan = JSON.parse(llmJson.choices[0].message.content)
     let validation = validatePlan(parsedPlan, payload.slots)
 
-    if (!validation.valid) {
-      console.warn('[generate-plan] LLM validation failed, retrying once:', validation.failures)
+    let retryCount = 0
+    while (!validation.valid && retryCount < MAX_VALIDATION_RETRIES) {
+      retryCount += 1
+      console.warn(`[generate-plan] LLM validation failed, retrying (${retryCount}/${MAX_VALIDATION_RETRIES}):`, validation.failures)
       const retryMessages = [
         { role: 'system', content: buildRetryPrompt(buildSystemPrompt(payload.slots, payload.members, payload.household, payload.replace_slot?.suggestion, payload.week_notes), validation.failures) },
         { role: 'user', content: JSON.stringify(payload) },
       ]
       llmJson = await callLlm(retryMessages)
-      console.log('[generate-plan] retry LLM call 1 completed in ms:', Date.now() - requestStartedAt)
+      console.log(`[generate-plan] retry LLM call ${retryCount} completed in ms:`, Date.now() - requestStartedAt)
       parsedPlan = JSON.parse(llmJson.choices[0].message.content)
       validation = validatePlan(parsedPlan, payload.slots)
     }
 
     if (!validation.valid) {
-      const retryMessages = [
-        { role: 'system', content: buildRetryPrompt(buildSystemPrompt(payload.slots, payload.members, payload.household, payload.replace_slot?.suggestion, payload.week_notes), validation.failures) },
-        { role: 'user', content: JSON.stringify(payload) },
-      ]
-      llmJson = await callLlm(retryMessages)
-      console.log('[generate-plan] retry LLM call 2 completed in ms:', Date.now() - requestStartedAt)
-      parsedPlan = JSON.parse(llmJson.choices[0].message.content)
-      validation = validatePlan(parsedPlan, payload.slots)
-    }
-
-    if (!validation.valid) {
-      throw new Error(`Plan validation failed after retry: ${validation.failures.join(' | ')}`)
+      console.warn('[generate-plan] returning best-effort plan after validation failures:', validation.failures)
     }
 
     const transformedPlan = {
