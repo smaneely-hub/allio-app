@@ -533,7 +533,7 @@ function transformLlmOutput(llmOutput: unknown, scheduledSlots: Array<{ day: str
   }
 }
 
-async function callLlm(messages: Array<{ role: string; content: string }>) {
+async function callLlm(messages: Array<{ role: string; content: string }>, maxTokens = 4000) {
   if (!LLM_API_KEY) {
     throw new Error('LLM_API_KEY is not configured')
   }
@@ -550,7 +550,7 @@ async function callLlm(messages: Array<{ role: string; content: string }>) {
       },
       body: JSON.stringify({
         model: LLM_MODEL,
-        max_tokens: 2200,
+        max_tokens: maxTokens,
         temperature: 0.4,
         response_format: { type: 'json_object' },
         messages,
@@ -654,10 +654,28 @@ serve(async (req) => {
       { role: 'user', content: JSON.stringify(payload) },
     ]
 
-    let llmJson = await callLlm(messages)
+    // Scale max_tokens by slot count: each recipe needs ~2500 tokens for full recipe content.
+    // Minimum 4000 (handles 1-slot /tonight), cap at 16000.
+    const slotCount = Array.isArray(payload.slots) ? payload.slots.length : 1
+    const dynamicMaxTokens = Math.min(16000, Math.max(4000, slotCount * 2800))
+    console.log('[generate-plan] slotCount:', slotCount, 'maxTokens:', dynamicMaxTokens)
+
+    let llmJson = await callLlm(messages, dynamicMaxTokens)
     console.log('[generate-plan] first LLM call completed in ms:', Date.now() - requestStartedAt)
     console.log('[generate-plan] LLM raw response:', JSON.stringify(llmJson).slice(0, 300))
-    let parsedPlan = JSON.parse(llmJson.choices[0].message.content)
+
+    let rawContent = llmJson.choices?.[0]?.message?.content
+    if (!rawContent) {
+      throw new Error('LLM returned empty content')
+    }
+
+    let parsedPlan: unknown
+    try {
+      parsedPlan = JSON.parse(rawContent)
+    } catch (parseError) {
+      console.error('[generate-plan] JSON parse failed, content length:', rawContent.length, 'error:', parseError)
+      throw new Error(`LLM returned invalid JSON (content length: ${rawContent.length}, tokens may be truncated)`)
+    }
     let validation = validatePlan(parsedPlan, payload.slots)
 
     let retryCount = 0
@@ -668,9 +686,15 @@ serve(async (req) => {
         { role: 'system', content: buildRetryPrompt(buildSystemPrompt(payload.slots, payload.members, payload.household, payload.replace_slot?.suggestion, payload.week_notes), validation.failures) },
         { role: 'user', content: JSON.stringify(payload) },
       ]
-      llmJson = await callLlm(retryMessages)
+      llmJson = await callLlm(retryMessages, dynamicMaxTokens)
       console.log(`[generate-plan] retry LLM call ${retryCount} completed in ms:`, Date.now() - requestStartedAt)
-      parsedPlan = JSON.parse(llmJson.choices[0].message.content)
+      rawContent = llmJson.choices?.[0]?.message?.content || ''
+      try {
+        parsedPlan = JSON.parse(rawContent)
+      } catch (retryParseError) {
+        console.error('[generate-plan] retry JSON parse failed:', retryParseError)
+        break
+      }
       validation = validatePlan(parsedPlan, payload.slots)
     }
 
