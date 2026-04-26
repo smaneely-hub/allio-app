@@ -269,7 +269,8 @@ export function useMealPlan(scheduleId) {
         hasWeekNotes: Boolean(payload.week_notes),
         hasLockedMeals: (payload.locked_meals?.length || 0) > 0,
       })
-      let { data: generated, error: functionError } = await invokeGeneratePlan(payload)
+      // /plan needs a larger budget than the shared 15s default
+      let { data: generated, error: functionError } = await invokeGeneratePlan(payload, { timeoutMs: 45000 })
       console.log('[useMealPlan] generate-plan invoke resolved')
       console.log('[useMealPlan] generate-plan response received', {
         hasData: Boolean(generated),
