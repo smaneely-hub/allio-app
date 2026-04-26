@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { ClipRecipeModal } from '../components/ClipRecipeModal'
 import { FilterBar } from '../components/FilterBar'
 import { RecipeDetail } from '../components/RecipeDetail'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -15,22 +16,23 @@ export function RecipesPage() {
   const [recipes, setRecipes] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedTags, setSelectedTags] = useState([])
+  const [showClipModal, setShowClipModal] = useState(false)
+
+  const loadRecipes = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('recipes')
+      .select('id, title, slug, description, cuisine, meal_type, prep_time_minutes, cook_time_minutes, total_time_minutes, servings, yield_text, difficulty, ingredients_json, instructions_json, ingredient_groups_json, instruction_groups_json, nutrition_json, tips_json, substitutions_json, tags_json, tags_v2_json, source_note, source_domain, source_url, image_prompt, created_at, updated_at, active')
+      .eq('active', true)
+      .order('title', { ascending: true })
+
+    setRecipes(data || [])
+    setLoading(false)
+  }, [])
 
   useEffect(() => {
-    async function loadRecipes() {
-      setLoading(true)
-      const { data } = await supabase
-        .from('recipes')
-        .select('id, title, slug, description, cuisine, meal_type, prep_time_minutes, cook_time_minutes, total_time_minutes, servings, yield_text, difficulty, ingredients_json, instructions_json, ingredient_groups_json, instruction_groups_json, nutrition_json, tips_json, substitutions_json, tags_json, tags_v2_json, source_note, image_prompt, created_at, updated_at, active')
-        .eq('active', true)
-        .order('title', { ascending: true })
-
-      setRecipes(data || [])
-      setLoading(false)
-    }
-
     loadRecipes()
-  }, [])
+  }, [loadRecipes])
 
   const availableTags = useMemo(() => getAvailableTags(recipes), [recipes])
   const filteredRecipes = useMemo(() => filterRecipesByTags(recipes, selectedTags), [recipes, selectedTags])
@@ -70,10 +72,19 @@ export function RecipesPage() {
 
   return (
     <div className="px-3 pb-24 pt-2 md:px-0">
-      <div className="mb-4">
-        <div className="h-1 w-12 rounded-full bg-gradient-to-r from-primary-400 via-teal-400 to-purple-400 mb-2" />
-        <h1 className="font-display text-2xl text-text-primary md:text-3xl">Recipes</h1>
-        <p className="text-sm text-text-muted">Browse the recipe library and filter by the tags that fit your household.</p>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <div className="h-1 w-12 rounded-full bg-gradient-to-r from-primary-400 via-teal-400 to-purple-400 mb-2" />
+          <h1 className="font-display text-2xl text-text-primary md:text-3xl">Recipes</h1>
+          <p className="text-sm text-text-muted">Browse the recipe library and filter by the tags that fit your household.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowClipModal(true)}
+          className="btn-primary shrink-0 text-sm"
+        >
+          + Add Recipe
+        </button>
       </div>
 
       <div className="mb-4 rounded-2xl border border-divider bg-surface p-3 shadow-sm">
@@ -148,6 +159,13 @@ export function RecipesPage() {
             </div>
           )}
         </div>
+      )}
+
+      {showClipModal && (
+        <ClipRecipeModal
+          onClose={() => setShowClipModal(false)}
+          onSaved={loadRecipes}
+        />
       )}
     </div>
   )
