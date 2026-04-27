@@ -102,9 +102,8 @@ function normalizeJsonLd(ld: Record<string, unknown>, sourceUrl: string): Record
   }
 }
 
-async function extractWithLlm(html: string, sourceUrl: string): Promise<Record<string, unknown>> {
-  // Strip script/style tags and trim to ~12k chars to stay within token budget
-  const stripped = html
+async function extractWithLlmFromText(pageText: string, sourceUrl: string): Promise<Record<string, unknown>> {
+  const stripped = pageText
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<[^>]+>/g, ' ')
@@ -176,6 +175,27 @@ ${stripped}`
   }
 }
 
+async function extractWithLlm(html: string, sourceUrl: string): Promise<Record<string, unknown>> {
+  return extractWithLlmFromText(html, sourceUrl)
+}
+
+async function fetchViaJinaMirror(url: string): Promise<string | null> {
+  const mirrorUrl = `https://r.jina.ai/http://${url}`
+  const res = await fetch(mirrorUrl, {
+    headers: {
+      'Accept': 'text/plain',
+      'User-Agent': 'Mozilla/5.0',
+    },
+    signal: AbortSignal.timeout(20000),
+  })
+
+  if (!res.ok) return null
+
+  const text = await res.text()
+  if (!text || /Warning: Target URL returned error/i.test(text)) return null
+  return text
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return handleCorsPreflight(req)
 
@@ -209,7 +229,8 @@ serve(async (req) => {
 
     console.log('[clip] Fetching URL:', url)
 
-    let html: string
+    let html: string | null = null
+    let mirroredText: string | null = null
     try {
       const fetchAttempts = [
         {
@@ -283,6 +304,10 @@ serve(async (req) => {
       }
 
       if (!html) {
+        mirroredText = await fetchViaJinaMirror(url)
+      }
+
+      if (!html && !mirroredText) {
         const reason = lastStatus
           ? `Failed to fetch page (HTTP ${lastStatus}). The site may block automated requests.`
           : 'Could not fetch page content.'
@@ -297,17 +322,18 @@ serve(async (req) => {
       )
     }
 
-    // Try JSON-LD first — fastest and most accurate
-    const ld = extractJsonLdRecipe(html)
-    if (ld && ld.name && Array.isArray(ld.recipeIngredient) && ld.recipeIngredient.length > 0) {
-      console.log('[clip] Extracted via JSON-LD:', ld.name)
-      const recipe = normalizeJsonLd(ld, url)
-      return new Response(JSON.stringify({ recipe }), { status: 200, headers: corsHeaders })
+    if (html) {
+      const ld = extractJsonLdRecipe(html)
+      if (ld && ld.name && Array.isArray(ld.recipeIngredient) && ld.recipeIngredient.length > 0) {
+        console.log('[clip] Extracted via JSON-LD:', ld.name)
+        const recipe = normalizeJsonLd(ld, url)
+        return new Response(JSON.stringify({ recipe }), { status: 200, headers: corsHeaders })
+      }
     }
 
-    // Fall back to LLM extraction
-    console.log('[clip] No JSON-LD found, using LLM extraction')
-    const recipe = await extractWithLlm(html, url)
+    const extractionText = mirroredText || html || ''
+    console.log(`[clip] ${mirroredText ? 'Using mirrored text fallback' : 'No JSON-LD found, using LLM extraction'}`)
+    const recipe = await extractWithLlmFromText(extractionText, url)
     console.log('[clip] LLM extracted recipe:', recipe.title)
     return new Response(JSON.stringify({ recipe }), { status: 200, headers: corsHeaders })
   } catch (error) {
