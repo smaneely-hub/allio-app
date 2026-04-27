@@ -211,31 +211,66 @@ serve(async (req) => {
 
     let html: string
     try {
-      const pageRes = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
+      const fetchAttempts = [
+        {
+          label: 'browser',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Upgrade-Insecure-Requests': '1',
+          },
         },
-        signal: AbortSignal.timeout(12000),
-      })
+        {
+          label: 'googlebot',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+          },
+        },
+      ]
 
-      if (!pageRes.ok) {
-        return new Response(
-          JSON.stringify({ error: `Failed to fetch page (HTTP ${pageRes.status}). The site may block automated requests.` }),
-          { status: 422, headers: corsHeaders }
-        )
+      let lastStatus: number | null = null
+      let lastContentType = ''
+      let lastBodySnippet = ''
+
+      for (const attempt of fetchAttempts) {
+        console.log(`[clip] Fetch attempt (${attempt.label}) for URL:`, url)
+        const pageRes = await fetch(url, {
+          headers: attempt.headers,
+          redirect: 'follow',
+          signal: AbortSignal.timeout(12000),
+        })
+
+        lastStatus = pageRes.status
+        lastContentType = pageRes.headers.get('content-type') || ''
+
+        if (!pageRes.ok) {
+          lastBodySnippet = (await pageRes.text()).slice(0, 200)
+          console.warn(`[clip] Fetch attempt (${attempt.label}) failed with status ${pageRes.status}`)
+          continue
+        }
+
+        if (!lastContentType.includes('text/html') && !lastContentType.includes('application/xhtml')) {
+          lastBodySnippet = (await pageRes.text()).slice(0, 200)
+          console.warn(`[clip] Fetch attempt (${attempt.label}) returned non-HTML content-type: ${lastContentType}`)
+          continue
+        }
+
+        html = await pageRes.text()
+        break
       }
 
-      const contentType = pageRes.headers.get('content-type') || ''
-      if (!contentType.includes('text/html') && !contentType.includes('application/xhtml')) {
-        return new Response(
-          JSON.stringify({ error: 'URL does not point to an HTML page' }),
-          { status: 422, headers: corsHeaders }
-        )
+      if (!html) {
+        const reason = lastStatus
+          ? `Failed to fetch page (HTTP ${lastStatus}). The site may block automated requests.`
+          : 'Could not fetch page content.'
+        const details = lastBodySnippet ? ` Snippet: ${lastBodySnippet}` : ''
+        return new Response(JSON.stringify({ error: `${reason}${details}` }), { status: 422, headers: corsHeaders })
       }
-
-      html = await pageRes.text()
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       return new Response(
