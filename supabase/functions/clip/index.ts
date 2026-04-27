@@ -3,197 +3,329 @@ import { buildCorsHeaders, handleCorsPreflight, rejectDisallowedOrigin, requireA
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || ''
-const LLM_API_KEY = Deno.env.get('LLM_API_KEY') || ''
-const LLM_MODEL = Deno.env.get('LLM_MODEL') || 'google/gemini-2.5-flash'
-const LLM_ENDPOINT = Deno.env.get('LLM_ENDPOINT') || 'https://openrouter.ai/api/v1/chat/completions'
+const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY') || Deno.env.get('LLM_API_KEY') || ''
+const JINA_API_KEY = Deno.env.get('JINA_API_KEY') || ''
 
-// Parse ISO 8601 duration like PT30M, PT1H, PT1H30M → minutes
-function parseDuration(iso: string | undefined | null): number | null {
-  if (!iso) return null
-  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?/)
-  if (!match) return null
-  const hours = parseInt(match[1] || '0', 10)
-  const minutes = parseInt(match[2] || '0', 10)
-  const total = hours * 60 + minutes
-  return total > 0 ? total : null
+const DIRECT_FETCH_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
 }
 
-// Find a Recipe schema.org object in the HTML JSON-LD blocks
-function extractJsonLdRecipe(html: string): Record<string, unknown> | null {
-  const scriptRe = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
-  let match: RegExpExecArray | null
-  while ((match = scriptRe.exec(html)) !== null) {
-    try {
-      const raw: unknown = JSON.parse(match[1].trim())
-      const items: unknown[] = Array.isArray(raw)
-        ? raw
-        : (raw && typeof raw === 'object' && '@graph' in (raw as Record<string, unknown>))
-          ? ((raw as Record<string, unknown>)['@graph'] as unknown[])
-          : [raw]
-      for (const item of items) {
-        if (!item || typeof item !== 'object') continue
-        const typed = item as Record<string, unknown>
-        const t = typed['@type']
-        if (t === 'Recipe' || (Array.isArray(t) && t.includes('Recipe'))) {
-          return typed
-        }
-      }
-    } catch {
-      // malformed JSON-LD — continue
+const MANUAL_PASTE_MESSAGE = 'Could not extract recipe from this URL. Try pasting the recipe content manually.'
+const UNIT_WORDS = new Set([
+  'cup', 'cups', 'tsp', 'teaspoon', 'teaspoons', 'tbsp', 'tablespoon', 'tablespoons',
+  'oz', 'ounce', 'ounces', 'lb', 'lbs', 'pound', 'pounds', 'g', 'gram', 'grams',
+  'kg', 'ml', 'l', 'liter', 'liters', 'litre', 'litres', 'clove', 'cloves', 'pinch',
+  'pinches', 'can', 'cans', 'package', 'packages', 'slice', 'slices'
+])
+
+type RecipeIngredient = { amount: string, unit: string, item: string }
+type NormalizedRecipe = {
+  title: string,
+  description: string,
+  ingredients: RecipeIngredient[],
+  instructions: string[],
+  prep_time_minutes: number | null,
+  cook_time_minutes: number | null,
+  total_time_minutes: number | null,
+  servings: number | null,
+  image_url: string | null,
+  source_url: string,
+  source_domain: string,
+}
+
+function parseIsoDurationMinutes(iso: string | undefined | null): number | null {
+  if (!iso || typeof iso !== 'string') return null
+  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?/i)
+  if (!match) return null
+  const hours = Number.parseInt(match[1] || '0', 10)
+  const minutes = Number.parseInt(match[2] || '0', 10)
+  const total = hours * 60 + minutes
+  return Number.isFinite(total) && total > 0 ? total : null
+}
+
+function firstNumericValue(input: unknown): number | null {
+  if (typeof input === 'number' && Number.isFinite(input) && input > 0) return input
+  if (typeof input === 'string') {
+    const match = input.match(/\d+(?:\.\d+)?/)
+    if (!match) return null
+    const parsed = Number.parseFloat(match[0])
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+  }
+  if (Array.isArray(input)) {
+    for (const item of input) {
+      const parsed = firstNumericValue(item)
+      if (parsed !== null) return parsed
     }
   }
   return null
 }
 
-function normalizeJsonLd(ld: Record<string, unknown>, sourceUrl: string): Record<string, unknown> {
-  const ingredients: string[] = Array.isArray(ld.recipeIngredient)
-    ? (ld.recipeIngredient as unknown[]).map(String)
-    : []
+function firstImageUrl(input: unknown): string | null {
+  if (typeof input === 'string' && input.trim()) return input.trim()
+  if (Array.isArray(input)) {
+    for (const item of input) {
+      const parsed = firstImageUrl(item)
+      if (parsed) return parsed
+    }
+    return null
+  }
+  if (input && typeof input === 'object') {
+    const url = (input as Record<string, unknown>).url
+    return typeof url === 'string' && url.trim() ? url.trim() : null
+  }
+  return null
+}
+
+function parseIngredient(raw: string): RecipeIngredient {
+  const text = raw.trim()
+  const match = text.match(/^((?:\d+\s+\d\/\d|\d+\/\d|\d+(?:\.\d+)?))\s+(.*)$/)
+  if (!match) return { amount: '', unit: '', item: text }
+  const amount = match[1].trim()
+  const remainder = match[2].trim()
+  const parts = remainder.split(/\s+/)
+  const unitCandidate = parts[0]?.toLowerCase().replace(/[.,]$/, '') || ''
+  if (UNIT_WORDS.has(unitCandidate)) {
+    return {
+      amount,
+      unit: parts[0],
+      item: parts.slice(1).join(' ').trim(),
+    }
+  }
+  return { amount, unit: '', item: remainder }
+}
+
+function flattenInstructions(input: unknown): string[] {
+  if (typeof input === 'string') {
+    return input.split('\n').map((step) => step.trim()).filter(Boolean)
+  }
+  if (!Array.isArray(input)) return []
 
   const steps: string[] = []
-  const rawInstructions = ld.recipeInstructions
-  if (Array.isArray(rawInstructions)) {
-    for (const step of rawInstructions as unknown[]) {
-      if (typeof step === 'string') {
-        steps.push(step)
-      } else if (step && typeof step === 'object') {
-        const s = step as Record<string, unknown>
-        if (typeof s.text === 'string' && s.text.trim()) steps.push(s.text.trim())
-        else if (typeof s.name === 'string' && s.name.trim()) steps.push(s.name.trim())
-      }
+  for (const entry of input) {
+    if (typeof entry === 'string') {
+      if (entry.trim()) steps.push(entry.trim())
+      continue
     }
-  } else if (typeof rawInstructions === 'string') {
-    steps.push(...rawInstructions.split('\n').map((s) => s.trim()).filter(Boolean))
+    if (!entry || typeof entry !== 'object') continue
+    const node = entry as Record<string, unknown>
+    const type = node['@type']
+    if (type === 'HowToSection' || (Array.isArray(type) && type.includes('HowToSection'))) {
+      steps.push(...flattenInstructions(node.itemListElement))
+      continue
+    }
+    const text = typeof node.text === 'string' ? node.text.trim() : ''
+    const name = typeof node.name === 'string' ? node.name.trim() : ''
+    if (text) steps.push(text)
+    else if (name) steps.push(name)
+  }
+  return steps.filter(Boolean)
+}
+
+function listRecipeNodesFromHtml(html: string): Record<string, unknown>[] {
+  const nodes: Record<string, unknown>[] = []
+  const scriptRe = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
+  let match: RegExpExecArray | null
+
+  while ((match = scriptRe.exec(html)) !== null) {
+    try {
+      const raw: unknown = JSON.parse(match[1].trim())
+      const candidates: unknown[] = Array.isArray(raw)
+        ? raw
+        : (raw && typeof raw === 'object' && Array.isArray((raw as Record<string, unknown>)['@graph']))
+          ? ((raw as Record<string, unknown>)['@graph'] as unknown[])
+          : [raw]
+
+      for (const candidate of candidates) {
+        if (!candidate || typeof candidate !== 'object') continue
+        const node = candidate as Record<string, unknown>
+        const type = node['@type']
+        if (type === 'Recipe' || (Array.isArray(type) && type.includes('Recipe'))) {
+          nodes.push(node)
+        }
+      }
+    } catch {
+      continue
+    }
   }
 
-  let image: string | null = null
-  if (typeof ld.image === 'string') {
-    image = ld.image
-  } else if (Array.isArray(ld.image) && ld.image.length > 0) {
-    const first = ld.image[0]
-    image = typeof first === 'string' ? first : String((first as Record<string, unknown>)?.url || '')
-  } else if (ld.image && typeof ld.image === 'object') {
-    const img = ld.image as Record<string, unknown>
-    image = typeof img.url === 'string' ? img.url : null
-  }
+  return nodes
+}
 
-  const servingsRaw = ld.recipeYield
-  let servings: number | null = null
-  if (servingsRaw) {
-    const candidate = Array.isArray(servingsRaw) ? String(servingsRaw[0]) : String(servingsRaw)
-    const parsed = parseInt(candidate, 10)
-    if (!isNaN(parsed) && parsed > 0) servings = parsed
-  }
+function mapJsonLdToRecipe(node: Record<string, unknown>, sourceUrl: string): NormalizedRecipe | null {
+  const title = typeof node.name === 'string' ? node.name.trim() : ''
+  if (!title) return null
+
+  const rawIngredients = Array.isArray(node.recipeIngredient)
+    ? (node.recipeIngredient as unknown[]).map((value) => String(value).trim()).filter(Boolean)
+    : []
+  if (rawIngredients.length === 0) return null
+
+  const instructions = flattenInstructions(node.recipeInstructions)
+  if (instructions.length === 0) return null
 
   const parsedUrl = new URL(sourceUrl)
-  const domain = parsedUrl.hostname.replace(/^www\./, '')
+  const sourceDomain = parsedUrl.hostname.replace(/^www\./, '')
+  const totalTime = parseIsoDurationMinutes(node.totalTime as string | undefined)
+  const cookTime = parseIsoDurationMinutes(node.cookTime as string | undefined)
+  const prepTime = parseIsoDurationMinutes(node.prepTime as string | undefined)
 
   return {
-    title: String(ld.name || '').trim(),
-    description: String(ld.description || '').trim(),
-    ingredients,
-    steps,
-    cook_time_minutes: parseDuration(ld.cookTime as string | undefined),
-    prep_time_minutes: parseDuration(ld.prepTime as string | undefined),
-    servings,
-    image_url: image || null,
+    title,
+    description: typeof node.description === 'string' ? node.description.trim() : '',
+    ingredients: rawIngredients.map(parseIngredient),
+    instructions,
+    prep_time_minutes: prepTime,
+    cook_time_minutes: cookTime,
+    total_time_minutes: totalTime ?? ((prepTime || 0) + (cookTime || 0) || null),
+    servings: firstNumericValue(node.recipeYield),
+    image_url: firstImageUrl(node.image),
     source_url: sourceUrl,
-    source_domain: domain,
+    source_domain: sourceDomain,
   }
 }
 
-async function extractWithLlmFromText(pageText: string, sourceUrl: string): Promise<Record<string, unknown>> {
-  const stripped = pageText
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s{2,}/g, ' ')
-    .trim()
-    .slice(0, 12000)
+function mapLlmRecipeToNormalized(parsed: Record<string, unknown>, sourceUrl: string): NormalizedRecipe | null {
+  const title = typeof parsed.title === 'string' ? parsed.title.trim() : ''
+  if (!title || parsed.error === 'no_recipe') return null
 
-  const prompt = `You are a recipe extractor. Extract the recipe from this webpage text and return a JSON object.
+  const instructions = Array.isArray(parsed.instructions)
+    ? parsed.instructions.map((step) => String(step).trim()).filter(Boolean)
+    : []
+  if (instructions.length === 0) return null
 
-Return ONLY valid JSON with these fields (no extra text, no markdown):
-{
-  "title": "string — recipe name",
-  "description": "string — 1-2 sentence description of the dish",
-  "ingredients": ["string", ...],
-  "steps": ["string", ...],
-  "cook_time_minutes": number or null,
-  "prep_time_minutes": number or null,
-  "servings": number or null,
-  "image_url": null
+  const rawIngredients = Array.isArray(parsed.ingredients) ? parsed.ingredients : []
+  const ingredients = rawIngredients
+    .map((ingredient) => {
+      if (!ingredient || typeof ingredient !== 'object') return null
+      const node = ingredient as Record<string, unknown>
+      return {
+        amount: typeof node.amount === 'string' ? node.amount.trim() : '',
+        unit: typeof node.unit === 'string' ? node.unit.trim() : '',
+        item: typeof node.item === 'string' ? node.item.trim() : '',
+      }
+    })
+    .filter((ingredient): ingredient is RecipeIngredient => Boolean(ingredient && ingredient.item))
+  if (ingredients.length === 0) return null
+
+  const parsedUrl = new URL(sourceUrl)
+  const sourceDomain = parsedUrl.hostname.replace(/^www\./, '')
+  const totalTime = typeof parsed.total_time_minutes === 'number' && Number.isFinite(parsed.total_time_minutes)
+    ? parsed.total_time_minutes
+    : null
+  const servings = typeof parsed.servings === 'number' && Number.isFinite(parsed.servings)
+    ? parsed.servings
+    : null
+
+  return {
+    title,
+    description: '',
+    ingredients,
+    instructions,
+    prep_time_minutes: null,
+    cook_time_minutes: null,
+    total_time_minutes: totalTime,
+    servings,
+    image_url: null,
+    source_url: sourceUrl,
+    source_domain: sourceDomain,
+  }
 }
 
-If the page does not contain a recipe, return: {"error": "no recipe found"}
+function buildSuccessRecipe(recipe: NormalizedRecipe) {
+  return {
+    title: recipe.title,
+    description: recipe.description,
+    prep_time_minutes: recipe.prep_time_minutes,
+    cook_time_minutes: recipe.cook_time_minutes,
+    total_time_minutes: recipe.total_time_minutes,
+    servings: recipe.servings,
+    image_url: recipe.image_url,
+    source_url: recipe.source_url,
+    source_domain: recipe.source_domain,
+    ingredients: recipe.ingredients.map((ingredient) => [ingredient.amount, ingredient.unit, ingredient.item].filter(Boolean).join(' ').trim()),
+    steps: recipe.instructions,
+  }
+}
 
-PAGE TEXT:
-${stripped}`
+async function tryJsonLdFromHtml(html: string, sourceUrl: string): Promise<NormalizedRecipe | null> {
+  for (const node of listRecipeNodesFromHtml(html)) {
+    const recipe = mapJsonLdToRecipe(node, sourceUrl)
+    if (recipe) return recipe
+  }
+  return null
+}
 
-  const response = await fetch(LLM_ENDPOINT, {
+async function fetchDirectHtml(url: string): Promise<string | null> {
+  const response = await fetch(url, {
+    headers: DIRECT_FETCH_HEADERS,
+    redirect: 'follow',
+    signal: AbortSignal.timeout(15000),
+  })
+  if (!response.ok) return null
+  return await response.text()
+}
+
+async function fetchJina(url: string, asHtml: boolean): Promise<string | null> {
+  const endpoint = `https://r.jina.ai/http://${url}`
+  const headers: Record<string, string> = {
+    'Accept': asHtml ? 'text/html' : 'text/plain',
+  }
+  if (asHtml) headers['X-Return-Format'] = 'html'
+  if (JINA_API_KEY) headers['Authorization'] = `Bearer ${JINA_API_KEY}`
+
+  const response = await fetch(endpoint, {
+    headers,
+    signal: AbortSignal.timeout(20000),
+  })
+  if (!response.ok) return null
+
+  const text = await response.text()
+  if (!text.trim()) return null
+  if (/Warning: Target URL returned error/i.test(text)) return null
+  return text
+}
+
+async function extractWithLlm(markdownText: string, sourceUrl: string): Promise<NormalizedRecipe | null> {
+  if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY is not configured')
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${LLM_API_KEY}`,
+      'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: LLM_MODEL,
-      max_tokens: 2000,
-      temperature: 0.1,
+      model: 'google/gemini-2.5-flash',
       response_format: { type: 'json_object' },
-      messages: [{ role: 'user', content: prompt }],
+      messages: [
+        {
+          role: 'system',
+          content: `Extract the recipe from the user's markdown. Return ONLY valid JSON matching this exact schema, no other text:\n{\n \"title\": string,\n \"servings\": number or null,\n \"total_time_minutes\": number or null,\n \"ingredients\": [{ \"amount\": string, \"unit\": string, \"item\": string }],\n \"instructions\": [string]\n}\nIf no recipe is present in the markdown, return: {\"error\": \"no_recipe\"}`,
+        },
+        {
+          role: 'user',
+          content: markdownText,
+        },
+      ],
     }),
-    signal: AbortSignal.timeout(20000),
+    signal: AbortSignal.timeout(30000),
   })
 
   const json = await response.json()
   if (!response.ok) {
-    throw new Error(json.error?.message || `LLM request failed: ${response.status}`)
+    throw new Error(json.error?.message || `OpenRouter request failed: ${response.status}`)
   }
 
-  const content: string = json.choices?.[0]?.message?.content || '{}'
-  const parsed = JSON.parse(content)
-
-  if (parsed.error) {
-    throw new Error(parsed.error)
+  const content = json.choices?.[0]?.message?.content || '{}'
+  let parsed: Record<string, unknown>
+  try {
+    parsed = JSON.parse(content)
+  } catch {
+    throw new Error('OpenRouter returned invalid JSON')
   }
-
-  const parsedUrl = new URL(sourceUrl)
-  const domain = parsedUrl.hostname.replace(/^www\./, '')
-
-  return {
-    title: String(parsed.title || '').trim(),
-    description: String(parsed.description || '').trim(),
-    ingredients: Array.isArray(parsed.ingredients) ? parsed.ingredients.map(String) : [],
-    steps: Array.isArray(parsed.steps) ? parsed.steps.map(String) : [],
-    cook_time_minutes: typeof parsed.cook_time_minutes === 'number' ? parsed.cook_time_minutes : null,
-    prep_time_minutes: typeof parsed.prep_time_minutes === 'number' ? parsed.prep_time_minutes : null,
-    servings: typeof parsed.servings === 'number' ? parsed.servings : null,
-    image_url: typeof parsed.image_url === 'string' ? parsed.image_url : null,
-    source_url: sourceUrl,
-    source_domain: domain,
-  }
-}
-
-async function extractWithLlm(html: string, sourceUrl: string): Promise<Record<string, unknown>> {
-  return extractWithLlmFromText(html, sourceUrl)
-}
-
-async function fetchViaJinaMirror(url: string): Promise<string | null> {
-  const mirrorUrl = `https://r.jina.ai/http://${url}`
-  const res = await fetch(mirrorUrl, {
-    headers: {
-      'Accept': 'text/plain',
-      'User-Agent': 'Mozilla/5.0',
-    },
-    signal: AbortSignal.timeout(20000),
-  })
-
-  if (!res.ok) return null
-
-  const text = await res.text()
-  if (!text || /Warning: Target URL returned error/i.test(text)) return null
-  return text
+  return mapLlmRecipeToNormalized(parsed, sourceUrl)
 }
 
 serve(async (req) => {
@@ -229,113 +361,66 @@ serve(async (req) => {
 
     console.log('[clip] Fetching URL:', url)
 
-    let html: string | null = null
-    let mirroredText: string | null = null
     try {
-      const fetchAttempts = [
-        {
-          label: 'browser',
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-            'Upgrade-Insecure-Requests': '1',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-User': '?1',
-          },
-        },
-        {
-          label: 'browser-with-referer',
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Cache-Control': 'max-age=0',
-            'Referer': parsedUrl.origin + '/',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'same-origin',
-            'Upgrade-Insecure-Requests': '1',
-          },
-        },
-        {
-          label: 'googlebot',
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-          },
-        },
-      ]
-
-      let lastStatus: number | null = null
-      let lastContentType = ''
-      let lastBodySnippet = ''
-
-      for (const attempt of fetchAttempts) {
-        console.log(`[clip] Fetch attempt (${attempt.label}) for URL:`, url)
-        const pageRes = await fetch(url, {
-          headers: attempt.headers,
-          redirect: 'follow',
-          signal: AbortSignal.timeout(12000),
-        })
-
-        lastStatus = pageRes.status
-        lastContentType = pageRes.headers.get('content-type') || ''
-
-        if (!pageRes.ok) {
-          lastBodySnippet = (await pageRes.text()).slice(0, 200)
-          console.warn(`[clip] Fetch attempt (${attempt.label}) failed with status ${pageRes.status}`)
-          continue
+      try {
+        const directHtml = await fetchDirectHtml(url)
+        if (directHtml) {
+          const recipe = await tryJsonLdFromHtml(directHtml, url)
+          if (recipe) {
+            console.log('[clip] Step 1 succeeded: direct fetch JSON-LD')
+            return new Response(JSON.stringify({ recipe: buildSuccessRecipe(recipe) }), { status: 200, headers: corsHeaders })
+          }
+          console.log('[clip] Step 1 found no Recipe JSON-LD')
+        } else {
+          console.warn('[clip] Step 1 direct fetch failed or returned non-200')
         }
+      } catch (error) {
+        console.warn('[clip] Step 1 failed:', error)
+      }
 
-        if (!lastContentType.includes('text/html') && !lastContentType.includes('application/xhtml')) {
-          lastBodySnippet = (await pageRes.text()).slice(0, 200)
-          console.warn(`[clip] Fetch attempt (${attempt.label}) returned non-HTML content-type: ${lastContentType}`)
-          continue
+      try {
+        const jinaHtml = await fetchJina(url, true)
+        if (jinaHtml) {
+          const recipe = await tryJsonLdFromHtml(jinaHtml, url)
+          if (recipe) {
+            console.log('[clip] Step 2 succeeded: Jina HTML JSON-LD')
+            return new Response(JSON.stringify({ recipe: buildSuccessRecipe(recipe) }), { status: 200, headers: corsHeaders })
+          }
+          console.log('[clip] Step 2 found no Recipe JSON-LD')
+        } else {
+          console.warn('[clip] Step 2 Jina HTML fetch failed or returned non-200')
         }
-
-        html = await pageRes.text()
-        break
+      } catch (error) {
+        console.warn('[clip] Step 2 failed:', error)
       }
 
-      if (!html) {
-        mirroredText = await fetchViaJinaMirror(url)
+      try {
+        const jinaMarkdown = await fetchJina(url, false)
+        if (jinaMarkdown) {
+          const recipe = await extractWithLlm(jinaMarkdown, url)
+          if (recipe) {
+            console.log('[clip] Step 3 succeeded: Jina markdown + LLM extraction')
+            return new Response(JSON.stringify({ recipe: buildSuccessRecipe(recipe) }), { status: 200, headers: corsHeaders })
+          }
+          console.warn('[clip] Step 3 returned no recipe')
+        } else {
+          console.warn('[clip] Step 3 Jina markdown fetch failed or returned non-200')
+        }
+      } catch (error) {
+        console.warn('[clip] Step 3 failed:', error)
       }
 
-      if (!html && !mirroredText) {
-        const reason = lastStatus
-          ? `Failed to fetch page (HTTP ${lastStatus}). The site may block automated requests.`
-          : 'Could not fetch page content.'
-        const details = lastBodySnippet ? ` Snippet: ${lastBodySnippet}` : ''
-        return new Response(JSON.stringify({ error: `${reason}${details}` }), { status: 422, headers: corsHeaders })
-      }
+      return new Response(
+        JSON.stringify({ error: MANUAL_PASTE_MESSAGE }),
+        { status: 422, headers: corsHeaders }
+      )
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       return new Response(
-        JSON.stringify({ error: `Could not reach the page: ${msg}` }),
+        JSON.stringify({ error: msg || MANUAL_PASTE_MESSAGE }),
         { status: 422, headers: corsHeaders }
       )
     }
-
-    if (html) {
-      const ld = extractJsonLdRecipe(html)
-      if (ld && ld.name && Array.isArray(ld.recipeIngredient) && ld.recipeIngredient.length > 0) {
-        console.log('[clip] Extracted via JSON-LD:', ld.name)
-        const recipe = normalizeJsonLd(ld, url)
-        return new Response(JSON.stringify({ recipe }), { status: 200, headers: corsHeaders })
-      }
-    }
-
-    const extractionText = mirroredText || html || ''
-    console.log(`[clip] ${mirroredText ? 'Using mirrored text fallback' : 'No JSON-LD found, using LLM extraction'}`)
-    const recipe = await extractWithLlmFromText(extractionText, url)
-    console.log('[clip] LLM extracted recipe:', recipe.title)
-    return new Response(JSON.stringify({ recipe }), { status: 200, headers: corsHeaders })
   } catch (error) {
     console.error('[clip] Error:', error)
     return new Response(
