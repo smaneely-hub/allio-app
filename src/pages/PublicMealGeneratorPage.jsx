@@ -2,6 +2,7 @@ import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { normalizeMealRecord } from '../lib/mealSchema'
+import { recordTryFeedback } from '../lib/publicTryFeedback'
 import { SwipeDeck } from '../components/SwipeDeck'
 import { CookingMode } from '../components/CookingMode'
 
@@ -137,6 +138,7 @@ export function PublicMealGeneratorPage() {
   }
 
   const handleAccept = (meal) => {
+    recordTryFeedback({ recipeId: meal?.recipe_id || meal?.id || null, feedback: 'up' })
     const deckItem = deck.find((d) => (d.meal.id || d.meal.name) === (meal.id || meal.name))
     setSelectedMeal(meal)
     setSelectedImage(deckItem?.image || DEFAULT_IMAGE)
@@ -144,7 +146,8 @@ export function PublicMealGeneratorPage() {
     setMode('cooking')
   }
 
-  const handleReject = () => {
+  const handleReject = (meal) => {
+    recordTryFeedback({ recipeId: meal?.recipe_id || meal?.id || null, feedback: 'down' })
     setDeck((prev) => prev.slice(1))
     // Auto top-up if running low (fire-and-forget, best effort)
     if (deck.length <= 2 && dailyAttempts < 6 && !batchLoading) {

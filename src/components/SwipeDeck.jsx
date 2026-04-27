@@ -52,7 +52,7 @@ export function SwipeDeck({ items, batchLoading, onAccept, onReject, onEdit }) {
             meal={topItem.meal}
             image={topItem.image}
             onAccept={() => onAccept(topItem.meal)}
-            onReject={onReject}
+            onReject={() => onReject(topItem.meal)}
           />
         )}
       </div>
@@ -61,7 +61,7 @@ export function SwipeDeck({ items, batchLoading, onAccept, onReject, onEdit }) {
       <div className="flex items-center justify-center gap-8">
         <button
           type="button"
-          onClick={onReject}
+          onClick={() => topItem && onReject(topItem.meal)}
           className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-red-200 bg-white text-xl shadow-sm transition hover:border-red-400 hover:bg-red-50 active:scale-95"
           aria-label="Skip this meal"
         >
