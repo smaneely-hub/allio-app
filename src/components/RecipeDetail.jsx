@@ -1,15 +1,13 @@
 import { useMemo, useState, useEffect } from 'react'
 import { normalizeRecipe } from '../lib/recipeSchema'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabase'
 import { markCooked, rateRecipe, toggleFavorite } from '../hooks/useRecipeMutations'
 
 // Pexels image fetcher
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://rvgtmletsbycrbeycwus.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 async function fetchRecipeImage(dishName) {
-  if (!supabase || !supabaseAnonKey) return { imageUrl: null, photographer: null, pexelsLink: null };
   try {
     const { data: { session } } = await supabase.auth.getSession();
     const res = await fetch(
@@ -82,18 +80,20 @@ export function RecipeDetail({ meal, onClose }) {
     prepTime: meal?.prep_time_minutes,
     cookTime: meal?.cook_time_minutes,
     totalTime: meal?.total_time_minutes,
-    ingredientGroups: meal?.ingredientGroups,
-    instructionGroups: meal?.instructionGroups,
-    ingredients: meal?.ingredients,
-    instructions: meal?.instructions,
-    substitutions: meal?.substitutions,
-    nutrition: meal?.nutrition,
-    tags: meal?.recipeTags,
-    sourceNote: meal?.sourceNote,
-    imagePrompt: meal?.imagePrompt,
+    // Accept both camelCase (already-normalized) and DB snake_case column names
+    ingredientGroups: meal?.ingredientGroups ?? meal?.ingredient_groups_json,
+    instructionGroups: meal?.instructionGroups ?? meal?.instruction_groups_json,
+    ingredients: meal?.ingredients ?? meal?.ingredients_json,
+    instructions: meal?.instructions ?? meal?.instructions_json,
+    substitutions: meal?.substitutions ?? meal?.substitutions_json,
+    tips: meal?.tips ?? meal?.tips_json,
+    nutrition: meal?.nutrition ?? meal?.nutrition_json,
+    tags: meal?.recipeTags ?? meal?.tags_v2_json,
+    sourceNote: meal?.sourceNote ?? meal?.source_note,
+    imagePrompt: meal?.imagePrompt ?? meal?.image_prompt,
   }), [meal])
 
-  const [imageUrl, setImageUrl] = useState(null);
+  const [imageUrl, setImageUrl] = useState(recipe.imageUrl || null);
   const [photographer, setPhotographer] = useState(null);
   const [isFavorite, setIsFavorite] = useState(Boolean(meal?.is_favorite ?? meal?.isFavorite))
   const [rating, setRating] = useState(meal?.rating ?? null)
@@ -101,15 +101,18 @@ export function RecipeDetail({ meal, onClose }) {
   const [ratingFocus, setRatingFocus] = useState(false)
 
   useEffect(() => {
-    if (recipe.title) {
+    // Only fetch a Pexels image when the recipe has no stored image
+    if (recipe.title && !recipe.imageUrl) {
       fetchRecipeImage(recipe.title).then((result) => {
         if (result.imageUrl) {
           setImageUrl(result.imageUrl);
           setPhotographer(result.photographer);
         }
       });
+    } else {
+      setImageUrl(recipe.imageUrl || null);
     }
-  }, [recipe.title]);
+  }, [recipe.title, recipe.imageUrl]);
 
   const [sections, setSections] = useState({
     ingredients: true,

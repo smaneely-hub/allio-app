@@ -2,7 +2,7 @@ import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 
-function SaveToCatalogPrompt({ recipe, onSave, onDiscard, loading }) {
+function SaveToCatalogPrompt({ recipe, onSave, onEditFirst, loading }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
       <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
@@ -16,7 +16,7 @@ function SaveToCatalogPrompt({ recipe, onSave, onDiscard, loading }) {
             .join('\n')}
         </div>
         <div className="mt-4 flex gap-2">
-          <button type="button" onClick={onDiscard} className="btn-secondary flex-1">Discard</button>
+          <button type="button" onClick={onEditFirst} className="btn-secondary flex-1">Edit first</button>
           <button type="button" onClick={onSave} disabled={loading} className="btn-primary flex-1">{loading ? 'Saving…' : 'Save'}</button>
         </div>
       </div>
@@ -183,12 +183,7 @@ export function ClipRecipeModal({ onClose, onSaved }) {
             recipe={form}
             loading={loading}
             onSave={handleSave}
-            onDiscard={() => {
-              setShowSavePrompt(false)
-              setForm(null)
-              setStep('url')
-              setError(null)
-            }}
+            onEditFirst={() => setShowSavePrompt(false)}
           />
         ) : null}
         {/* Header */}

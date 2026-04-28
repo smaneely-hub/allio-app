@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listUserRecipes } from '../hooks/useRecipeMutations'
 import { normalizeRecipe } from '../lib/recipeSchema'
+import { ClipRecipeModal } from '../components/ClipRecipeModal'
 
 export function Catalog() {
   const navigate = useNavigate()
@@ -13,6 +14,8 @@ export function Catalog() {
   const [minRating, setMinRating] = useState('')
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [sortBy, setSortBy] = useState<'newest' | 'rating' | 'favorites'>('newest')
+  const [showClipModal, setShowClipModal] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     const handle = window.setTimeout(() => setSearch(searchInput), 200)
@@ -38,7 +41,7 @@ export function Catalog() {
     return () => {
       cancelled = true
     }
-  }, [cuisine, minRating, favoritesOnly, sortBy, search])
+  }, [cuisine, minRating, favoritesOnly, sortBy, search, refreshKey])
 
   const normalized = useMemo(() => recipes.map((recipeRow) => normalizeRecipe({
     ...recipeRow,
@@ -53,6 +56,8 @@ export function Catalog() {
     substitutions: recipeRow.substitutions_json,
     tags: recipeRow.tags_v2_json,
     dietary_flags_json: recipeRow.dietary_flags_json,
+    tips: recipeRow.tips_json,
+    nutrition: recipeRow.nutrition_json,
     sourceNote: recipeRow.source_note,
     imagePrompt: recipeRow.image_prompt,
     image_url: recipeRow.image_url,
@@ -71,6 +76,9 @@ export function Catalog() {
           <h1 className="font-display text-3xl text-text-primary">My Recipes</h1>
           <p className="text-sm text-text-muted">{normalized.length} recipes</p>
         </div>
+        <button type="button" onClick={() => setShowClipModal(true)} className="btn-primary shrink-0">
+          + Add Recipe
+        </button>
       </div>
 
       <div className="space-y-3 rounded-2xl border border-divider bg-surface p-3 shadow-sm">
@@ -135,6 +143,16 @@ export function Catalog() {
             </button>
           ))}
         </div>
+      )}
+
+      {showClipModal && (
+        <ClipRecipeModal
+          onClose={() => setShowClipModal(false)}
+          onSaved={() => {
+            setShowClipModal(false)
+            setRefreshKey((k) => k + 1)
+          }}
+        />
       )}
     </div>
   )
