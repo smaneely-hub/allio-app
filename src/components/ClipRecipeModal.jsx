@@ -2,6 +2,28 @@ import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 
+function SaveToCatalogPrompt({ recipe, onSave, onDiscard, loading }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+        <h3 className="font-display text-2xl text-text-primary">Save to your catalog?</h3>
+        <p className="mt-2 text-sm text-text-secondary">{recipe.title}</p>
+        <div className="mt-3 rounded-xl bg-warm-50 px-3 py-3 text-sm text-text-secondary">
+          {(recipe.ingredients_text || '')
+            .split('\n')
+            .filter(Boolean)
+            .slice(0, 2)
+            .join('\n')}
+        </div>
+        <div className="mt-4 flex gap-2">
+          <button type="button" onClick={onDiscard} className="btn-secondary flex-1">Discard</button>
+          <button type="button" onClick={onSave} disabled={loading} className="btn-primary flex-1">{loading ? 'Saving…' : 'Save'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack']
 
 function slugify(text) {
@@ -18,6 +40,7 @@ export function ClipRecipeModal({ onClose, onSaved }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [form, setForm] = useState(null)
+  const [showSavePrompt, setShowSavePrompt] = useState(false)
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
   const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -57,6 +80,7 @@ export function ClipRecipeModal({ onClose, onSaved }) {
       }
       setForm(nextForm)
       setStep('preview')
+      setShowSavePrompt(true)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -134,6 +158,7 @@ export function ClipRecipeModal({ onClose, onSaved }) {
     try {
       await saveRecipe(form)
       toast.success('Recipe saved to your catalog!')
+      setShowSavePrompt(false)
       onSaved?.()
       onClose()
     } catch (e) {
@@ -153,6 +178,19 @@ export function ClipRecipeModal({ onClose, onSaved }) {
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="w-full max-h-[92vh] overflow-y-auto rounded-t-3xl bg-surface sm:rounded-2xl sm:max-w-lg shadow-xl">
+        {showSavePrompt && form ? (
+          <SaveToCatalogPrompt
+            recipe={form}
+            loading={loading}
+            onSave={handleSave}
+            onDiscard={() => {
+              setShowSavePrompt(false)
+              setForm(null)
+              setStep('url')
+              setError(null)
+            }}
+          />
+        ) : null}
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-divider bg-surface px-4 py-3">
           <h2 className="font-display text-lg text-text-primary">Add Recipe</h2>
@@ -199,7 +237,7 @@ export function ClipRecipeModal({ onClose, onSaved }) {
           )}
 
           {/* Step 2: Preview & edit */}
-          {step === 'preview' && form && (
+          {step === 'preview' && form && !showSavePrompt && (
             <div className="space-y-4">
               {/* Source badge */}
               <div className="rounded-xl bg-warm-100 px-3 py-2 text-xs text-text-muted">

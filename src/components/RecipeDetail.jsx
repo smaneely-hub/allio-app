@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { normalizeRecipe } from '../lib/recipeSchema'
 import { createClient } from '@supabase/supabase-js'
+import { markCooked, rateRecipe, toggleFavorite } from '../hooks/useRecipeMutations'
 
 // Pexels image fetcher
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://rvgtmletsbycrbeycwus.supabase.co';
@@ -25,6 +26,22 @@ async function fetchRecipeImage(dishName) {
     );
     return await res.json();
   } catch { return { imageUrl: null, photographer: null, pexelsLink: null }; }
+}
+
+function HeartIcon({ filled = false }) {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 20.5l-1.45-1.32C5.4 14.36 2 11.28 2 7.5 2 4.42 4.42 2 7.5 2c1.74 0 3.41.81 4.5 2.09C13.09 2.81 14.76 2 16.5 2 19.58 2 22 4.42 22 7.5c0 3.78-3.4 6.86-8.55 11.68L12 20.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
+function StarIcon({ filled = false }) {
+  return (
+    <svg className="h-5 w-5" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 3.75l2.55 5.17 5.7.83-4.12 4.02.97 5.68L12 16.77l-5.1 2.68.97-5.68L3.75 9.75l5.7-.83L12 3.75z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+    </svg>
+  )
 }
 
 function Chevron({ expanded }) {
@@ -78,6 +95,10 @@ export function RecipeDetail({ meal, onClose }) {
 
   const [imageUrl, setImageUrl] = useState(null);
   const [photographer, setPhotographer] = useState(null);
+  const [isFavorite, setIsFavorite] = useState(Boolean(meal?.is_favorite ?? meal?.isFavorite))
+  const [rating, setRating] = useState(meal?.rating ?? null)
+  const [cookedAt, setCookedAt] = useState(meal?.cooked_at || meal?.cookedAt || '')
+  const [ratingFocus, setRatingFocus] = useState(false)
 
   useEffect(() => {
     if (recipe.title) {
@@ -128,8 +149,28 @@ export function RecipeDetail({ meal, onClose }) {
               {photographer && <p className="px-1 pt-1 text-xs text-gray-400">Photo by {photographer} on Pexels</p>}
             </div>
           ) : null}
-          <div className="text-xs font-semibold uppercase tracking-[0.24em] text-text-muted">Allio Recipe</div>
-          <h1 className="mt-3 font-display text-4xl leading-tight text-text-primary sm:text-5xl">{recipe.title}</h1>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.24em] text-text-muted">Allio Recipe</div>
+              <h1 className="mt-3 font-display text-4xl leading-tight text-text-primary sm:text-5xl">{recipe.title}</h1>
+            </div>
+            <button
+              type="button"
+              aria-label={isFavorite ? 'Remove favorite' : 'Mark favorite'}
+              onClick={async () => {
+                const next = !isFavorite
+                setIsFavorite(next)
+                try {
+                  await toggleFavorite(recipe.id, next)
+                } catch {
+                  setIsFavorite(!next)
+                }
+              }}
+              className="rounded-full border border-divider bg-white p-3 text-primary-500 shadow-sm"
+            >
+              <HeartIcon filled={isFavorite} />
+            </button>
+          </div>
           {recipe.description ? <p className="mt-4 max-w-2xl text-[15px] leading-7 text-text-secondary">{recipe.description}</p> : null}
 
           <div className="mt-5 flex flex-wrap items-center gap-2 text-sm text-text-secondary">
@@ -139,6 +180,39 @@ export function RecipeDetail({ meal, onClose }) {
             {recipe.yield ? <span className="rounded-full bg-warm-50 px-3 py-1.5">{recipe.yield}</span> : null}
             <span className="rounded-full border border-primary-100 bg-primary-50 px-3 py-1.5 font-semibold text-primary-700">{recipe.difficulty}</span>
           </div>
+
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={async () => {
+                await markCooked(recipe.id)
+                setCookedAt(new Date().toISOString())
+                setRatingFocus(true)
+              }}
+              className="rounded-full border border-divider bg-white px-4 py-2 text-sm font-medium text-text-primary"
+            >
+              {cookedAt ? 'Cooked again' : 'I cooked this'}
+            </button>
+          </div>
+
+          {(cookedAt || ratingFocus) ? (
+            <div className="mt-4 flex items-center gap-2">
+              {[1, 2, 3, 4, 5].map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={async () => {
+                    setRating(value)
+                    await rateRecipe(recipe.id, value)
+                  }}
+                  className="text-amber-500"
+                  aria-label={`Rate ${value} stars`}
+                >
+                  <StarIcon filled={(rating || 0) >= value} />
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           {tagPills.length > 0 ? (
             <div className="mt-4 flex flex-wrap gap-2">

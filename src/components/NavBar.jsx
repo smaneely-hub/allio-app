@@ -5,6 +5,7 @@ import { Logo } from './Logo'
 const links = [
   { to: '/tonight', label: 'Tonight', icon: '🍲' },
   { to: '/plan', label: 'Plan', icon: '📅' },
+  { to: '/catalog', label: 'Catalog', icon: '📚' },
   { to: '/shop', label: 'Shop', icon: '🛒' },
   { to: '/settings', label: 'Family', icon: '👨‍👩‍👧' },
 ]

@@ -101,6 +101,7 @@ export function normalizeRecipe(recipe = {}) {
     title: asString(recipe.title ?? recipe.name, 'Generated recipe'),
     slug: asString(recipe.slug, ''),
     description: asString(recipe.description, ''),
+    cuisine: asString(recipe.cuisine, ''),
     yield: asString(recipe.yield, recipe.servings ? `${recipe.servings} servings` : ''),
     prepTime,
     cookTime,
@@ -135,6 +136,11 @@ export function normalizeRecipe(recipe = {}) {
     imagePrompt: typeof recipe.imagePrompt === 'string' ? recipe.imagePrompt : undefined,
     createdAt: asString(recipe.createdAt ?? recipe.created_at, ''),
     updatedAt: asString(recipe.updatedAt ?? recipe.updated_at, ''),
+    imageUrl: asString(recipe.imageUrl ?? recipe.image_url, ''),
+    isFavorite: Boolean(recipe.isFavorite ?? recipe.is_favorite),
+    rating: recipe.rating == null ? null : asNumber(recipe.rating, 0),
+    cookedAt: asString(recipe.cookedAt ?? recipe.cooked_at, ''),
+    category: asArray(recipe.category).filter((value) => typeof value === 'string'),
   }
 }
 

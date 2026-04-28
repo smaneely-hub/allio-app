@@ -16,6 +16,7 @@ import { PlanPage } from './pages/PlanPage'
 import { PlannerPage } from './pages/PlannerPage'
 import { TonightPage } from './pages/TonightPage'
 import { RecipesPage } from './pages/RecipesPage'
+import { Catalog } from './pages/Catalog'
 
 import { ShopPage } from './pages/ShopPage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -115,6 +116,14 @@ export default function App() {
                   element={
                     <ProtectedRoute>
                       <RecipesPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/catalog"
+                  element={
+                    <ProtectedRoute>
+                      <Catalog />
                     </ProtectedRoute>
                   }
                 />
