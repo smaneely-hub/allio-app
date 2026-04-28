@@ -42,7 +42,7 @@ export function ClipRecipeModal({ onClose, onSaved }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Import failed')
       const r = data.recipe || {}
-      setForm({
+      const nextForm = {
         title: r.title || '',
         description: r.description || '',
         meal_type: 'dinner',
@@ -54,13 +54,72 @@ export function ClipRecipeModal({ onClose, onSaved }) {
         source_domain: r.source_domain || '',
         ingredients_text: (r.ingredients || []).join('\n'),
         steps_text: (r.steps || []).join('\n'),
-      })
+      }
+      setForm(nextForm)
       setStep('preview')
     } catch (e) {
       setError(e.message)
     } finally {
       setLoading(false)
     }
+  }
+
+  function buildRecipeRow(formState, userId) {
+    const title = formState.title?.trim()
+    const ingredients = formState.ingredients_text.split('\n').map((s) => s.trim()).filter(Boolean)
+    const steps = formState.steps_text.split('\n').map((s) => s.trim()).filter(Boolean)
+    const slug = `${slugify(title) || 'recipe'}-${Date.now()}`
+
+    const prepMin = parseInt(formState.prep_time_minutes, 10) || null
+    const cookMin = parseInt(formState.cook_time_minutes, 10) || null
+    const servings = parseInt(formState.servings, 10) || null
+
+    return {
+      user_id: userId,
+      title,
+      slug,
+      description: formState.description || null,
+      meal_type: formState.meal_type || 'dinner',
+      prep_time_minutes: prepMin,
+      cook_time_minutes: cookMin,
+      total_time_minutes: prepMin && cookMin ? prepMin + cookMin : cookMin || null,
+      servings,
+      ingredients_json: JSON.stringify(ingredients),
+      instructions_json: JSON.stringify(steps),
+      ingredient_groups_json: JSON.stringify([
+        { label: null, ingredients: ingredients.map((i) => ({ item: i })) },
+      ]),
+      instruction_groups_json: JSON.stringify([
+        { label: null, steps: steps.map((s) => ({ text: s })) },
+      ]),
+      source_type: 'clipped',
+      source_name: formState.source_domain || null,
+      source_url: formState.source_url || null,
+      source_domain: formState.source_domain || null,
+      image_url: formState.image_url || null,
+      active: true,
+      difficulty: 'medium',
+    }
+  }
+
+  async function saveRecipe(formState) {
+    console.log('[CLIP_SAVE] handler fired')
+    const title = formState?.title?.trim()
+    if (!title) {
+      throw new Error('Title is required')
+    }
+
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
+    console.log('[CLIP_SAVE] user:', user)
+    if (!user) throw new Error('Not authenticated')
+
+    const row = buildRecipeRow(formState, user.id)
+    console.log('[CLIP_SAVE] payload:', row)
+
+    const { data, error } = await supabase.from('recipes').insert(row)
+    console.log('[CLIP_SAVE] insert response:', { data, error })
+    if (error) throw new Error(error.message)
   }
 
   async function handleSave() {
@@ -73,47 +132,7 @@ export function ClipRecipeModal({ onClose, onSaved }) {
     setLoading(true)
     setError(null)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.user) throw new Error('Not authenticated')
-
-      const ingredients = form.ingredients_text.split('\n').map((s) => s.trim()).filter(Boolean)
-      const steps = form.steps_text.split('\n').map((s) => s.trim()).filter(Boolean)
-      const slug = `${slugify(title) || 'recipe'}-${Date.now()}`
-
-      const prepMin = parseInt(form.prep_time_minutes, 10) || null
-      const cookMin = parseInt(form.cook_time_minutes, 10) || null
-      const servings = parseInt(form.servings, 10) || null
-
-      const row = {
-        user_id: session.user.id,
-        title,
-        slug,
-        description: form.description || null,
-        meal_type: form.meal_type || 'dinner',
-        prep_time_minutes: prepMin,
-        cook_time_minutes: cookMin,
-        total_time_minutes: prepMin && cookMin ? prepMin + cookMin : cookMin || null,
-        servings,
-        ingredients_json: JSON.stringify(ingredients),
-        instructions_json: JSON.stringify(steps),
-        ingredient_groups_json: JSON.stringify([
-          { label: null, ingredients: ingredients.map((i) => ({ item: i })) },
-        ]),
-        instruction_groups_json: JSON.stringify([
-          { label: null, steps: steps.map((s) => ({ text: s })) },
-        ]),
-        source_type: 'clipped',
-        source_name: form.source_domain || null,
-        source_url: form.source_url || null,
-        source_domain: form.source_domain || null,
-        image_url: form.image_url || null,
-        active: true,
-        difficulty: 'medium',
-      }
-
-      const { error: insertError } = await supabase.from('recipes').insert(row)
-      if (insertError) throw new Error(insertError.message)
-
+      await saveRecipe(form)
       toast.success('Recipe saved to your catalog!')
       onSaved?.()
       onClose()
