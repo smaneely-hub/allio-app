@@ -216,11 +216,14 @@ export function normalizeMeal(meal = {}, weekStart = getStartOfWeek()) {
   }
 }
 
-export function buildPlannerWeek({ weekStart = getStartOfWeek(), meals = [], dayNotes = {} } = {}) {
-  const normalizedMeals = meals.map((meal) => normalizeMeal(meal, weekStart))
+export function buildPlannerWeek({ weekStart = new Date(), meals = [], dayNotes = {} } = {}) {
+  const windowStart = new Date(weekStart)
+  windowStart.setHours(0, 0, 0, 0)
+  const normalizedMeals = meals.map((meal) => normalizeMeal(meal, windowStart))
 
-  return DAY_ORDER.map((dayName) => {
-    const date = getDateForDayName(weekStart, dayName)
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = addDays(windowStart, index)
+    const dayName = normalizeDayName(date.toLocaleDateString('en-US', { weekday: 'long' }))
     const short = DAY_SHORT[dayName]
     const mealsForDay = normalizedMeals.filter((meal) => meal.day === short)
     const mealGroups = MEAL_SLOTS.map((slot) => {
@@ -244,10 +247,12 @@ export function buildPlannerWeek({ weekStart = getStartOfWeek(), meals = [], day
       { carbs: 0, fat: 0, protein: 0 },
     )
 
+    const displayDayName = date.toLocaleDateString('en-US', { weekday: 'long' })
+
     return {
       key: short,
-      dayName,
-      shortLabel: dayName.slice(0, 3),
+      dayName: displayDayName,
+      shortLabel: displayDayName.slice(0, 3),
       date,
       dateLabel: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       notes: dayNotes?.[short] || dayNotes?.[dayName] || '',
