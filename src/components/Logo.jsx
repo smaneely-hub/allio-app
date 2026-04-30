@@ -28,7 +28,7 @@ export function Logo({ className = '', size = 'md' }) {
   return (
     <Link to="/" className={`inline-flex items-center gap-2 ${className}`}>
       <img
-        src="/allio-logo-full.jpg"
+        src="/allio-icon-mark.jpg"
         alt="Allio"
         className={`${sizeClasses[size]} w-auto shrink-0 rounded-2xl`}
         onError={() => setImageError(true)}
