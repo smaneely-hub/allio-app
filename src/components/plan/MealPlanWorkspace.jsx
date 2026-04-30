@@ -40,7 +40,7 @@ function EmptyDayState({ onAddMeal }) {
   return (
     <div className="rounded-xl bg-surface-card p-4 shadow-card">
       <div className="text-sm text-ink-secondary">No meals planned</div>
-      <button type="button" onClick={onAddMeal} className="mt-2 text-sm font-medium text-accent-blue">
+      <button type="button" onClick={onAddMeal} className="btn-secondary mt-3 text-sm">
         Add meal
       </button>
     </div>
@@ -74,7 +74,7 @@ function DaySection({ day, defaultOpen = false, onOpenMeal, onOpenDayActions, on
               <div className="flex items-center justify-between px-1 pt-1">
                 <div className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">{group.label}</div>
                 {group.meals.length === 0 ? (
-                  <button type="button" onClick={() => onOpenAddMeal(day, group.slot)} className="text-xs font-medium text-accent-blue">+ Add</button>
+                  <button type="button" onClick={() => onOpenAddMeal(day, group.slot)} className="text-xs font-medium text-accent-blue">Add meal</button>
                 ) : null}
               </div>
               {group.meals.length > 0 ? group.meals.map((meal) => (
@@ -99,7 +99,7 @@ function DayViewContent({ selectedDay, onOpenMeal, onOpenMealActions, onOpenAddM
         <div key={group.slot} className="rounded-2xl bg-surface-card p-4 shadow-card">
           <div className="mb-3 flex items-center justify-between">
             <div className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">{group.label}</div>
-            {group.meals.length === 0 ? <button type="button" onClick={() => onOpenAddMeal(selectedDay, group.slot)} className="text-xs font-medium text-accent-blue">+ Add</button> : null}
+            {group.meals.length === 0 ? <button type="button" onClick={() => onOpenAddMeal(selectedDay, group.slot)} className="text-xs font-medium text-accent-blue">Add meal</button> : null}
           </div>
           {group.meals.length > 0 ? (
             <div className="space-y-2">

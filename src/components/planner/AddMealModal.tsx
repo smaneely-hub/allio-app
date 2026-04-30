@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { CatalogPickerModal } from './CatalogPickerModal'
 
-type MealSource = 'generated' | 'catalog' | 'eat_out' | 'takeout' | 'delivery'
+type MealSource = 'generated' | 'catalog' | 'eat_out' | 'takeout' | 'delivery' | 'import'
 
 type Props = {
   open: boolean
@@ -40,6 +40,9 @@ function ShoppingBagIcon(props: any) {
 function TruckIcon(props: any) {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}><path d="M10 17h4V5H2v12h3" /><path d="M14 8h4l4 4v5h-3" /><circle cx="7.5" cy="17.5" r="2.5" /><circle cx="17.5" cy="17.5" r="2.5" /></svg>
 }
+function ImportIcon(props: any) {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></svg>
+}
 function ChevronRightIcon(props: any) {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}><path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
 }
@@ -50,23 +53,26 @@ const sourceMeta = {
   eat_out: { label: 'Eat Out', sublabel: 'Dining at a restaurant', icon: UtensilsIcon },
   takeout: { label: 'Takeout', sublabel: 'Picking up from a place', icon: ShoppingBagIcon },
   delivery: { label: 'Delivery', sublabel: 'Getting it delivered', icon: TruckIcon },
+  import: { label: 'Import', sublabel: 'Bring in a recipe or link', icon: ImportIcon },
 } as const
 
 export function AddMealModal({ open, onClose, dayKey, mealSlot, existingMealId, canGenerate = true, onGenerate, onSaveMeal }: Props) {
   const [showCatalog, setShowCatalog] = useState(false)
 
   const subtitle = useMemo(() => `${dayKey.toUpperCase()} · ${mealSlot}`, [dayKey, mealSlot])
+  const strategyHint = canGenerate ? 'Choose a meal strategy for this slot.' : 'Who is eating is not set for this slot yet. You can still choose catalog, import, eat out, takeout, or delivery.'
 
   if (!open) return null
 
-  const rows: MealSource[] = ['generated', 'catalog', 'eat_out', 'takeout', 'delivery']
+  const rows: MealSource[] = ['generated', 'catalog', 'import', 'eat_out', 'takeout', 'delivery']
 
   return (
     <>
       <div className="fixed inset-0 z-[60] bg-black/40" onClick={onClose}>
         <div className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-surface-card p-4 shadow-2xl sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
-          <div className="text-lg font-semibold text-ink-primary">Add a meal</div>
+          <div className="text-lg font-semibold text-ink-primary">Add meal</div>
           <div className="mt-1 text-sm text-ink-secondary">{subtitle}</div>
+          <div className="mt-2 rounded-xl bg-surface-muted px-3 py-2 text-sm text-ink-secondary">{strategyHint}</div>
           <div className="mt-4 overflow-hidden rounded-xl bg-surface-card shadow-card">
             {rows.map((source, index) => {
               const meta = sourceMeta[source]
@@ -84,6 +90,9 @@ export function AddMealModal({ open, onClose, dayKey, mealSlot, existingMealId, 
                       onClose()
                     } else if (source === 'catalog') {
                       setShowCatalog(true)
+                    } else if (source === 'import') {
+                      await onSaveMeal({ existingMealId, meal_source: 'catalog', source_recipe_id: null, place_name: null, source_note: 'import_requested', title: 'Import', mealSlot, dayKey })
+                      onClose()
                     } else {
                       await onSaveMeal({ existingMealId, meal_source: source, source_recipe_id: null, place_name: null, source_note: null, title: sourceMeta[source].label, mealSlot, dayKey })
                       onClose()
