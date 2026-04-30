@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { buildPlannerWeek, formatWeekLabel, getStartOfWeek } from '../../lib/planner'
+import { addDays, buildPlannerWeek, formatWeekLabel } from '../../lib/planner'
 import { MealCard } from './MealCard'
 
 function ChevronLeftIcon(props) {
@@ -128,8 +128,12 @@ export function MealPlanWorkspace({
   onOpenMealActions,
   onOpenAddMeal,
 }) {
-  const weekStart = useMemo(() => getStartOfWeek(selectedDate), [selectedDate])
-  const plannerWeek = useMemo(() => buildPlannerWeek({ weekStart, meals }), [meals, weekStart])
+  const windowStart = useMemo(() => {
+    const next = new Date(selectedDate)
+    next.setHours(0, 0, 0, 0)
+    return next
+  }, [selectedDate])
+  const plannerWeek = useMemo(() => buildPlannerWeek({ weekStart: windowStart, meals }), [meals, windowStart])
   const selectedDay = useMemo(() => {
     const iso = selectedDate.toISOString().slice(0, 10)
     return plannerWeek.find((day) => day.date.toISOString().slice(0, 10) === iso) || plannerWeek[0]
@@ -144,7 +148,7 @@ export function MealPlanWorkspace({
             <button type="button" onClick={onPrev} className="flex h-10 w-10 items-center justify-center text-ink-primary" aria-label="Previous range">
               <ChevronLeftIcon className="h-5 w-5" />
             </button>
-            <div className="text-center text-sm font-medium text-ink-primary">{formatWeekLabel(weekStart)}</div>
+            <div className="text-center text-sm font-medium text-ink-primary">{formatWeekLabel(windowStart)}</div>
             <button type="button" onClick={onNext} className="flex h-10 w-10 items-center justify-center text-ink-primary" aria-label="Next range">
               <ChevronRightIcon className="h-5 w-5" />
             </button>
