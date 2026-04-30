@@ -1,8 +1,25 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listUserRecipes } from '../hooks/useRecipeMutations'
 import { normalizeRecipe } from '../lib/recipeSchema'
 import { ClipRecipeModal } from '../components/ClipRecipeModal'
+
+function SearchIcon(props: any) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function XIcon(props: any) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
+      <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
 
 export function Catalog() {
   const navigate = useNavigate()
@@ -16,6 +33,8 @@ export function Catalog() {
   const [sortBy, setSortBy] = useState<'newest' | 'rating' | 'favorites'>('newest')
   const [showClipModal, setShowClipModal] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [searchExpanded, setSearchExpanded] = useState(false)
+  const searchRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     const handle = window.setTimeout(() => setSearch(searchInput), 200)
@@ -69,12 +88,43 @@ export function Catalog() {
 
   const cuisines = useMemo(() => Array.from(new Set(normalized.map((recipe) => recipe.cuisine).filter(Boolean))).sort(), [normalized])
 
+  useEffect(() => {
+    if (searchExpanded) {
+      window.requestAnimationFrame(() => searchRef.current?.focus())
+    }
+  }, [searchExpanded])
+
   return (
     <div className="px-3 pb-24 pt-0 md:px-0">
-      <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-3xl text-text-primary">My Recipes</h1>
-          <p className="text-sm text-text-muted">{normalized.length} recipes</p>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <h1 className="font-display text-3xl text-text-primary">My Recipes</h1>
+              <p className="text-sm text-text-muted">{normalized.length} recipes</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSearchExpanded((open) => !open)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-divider bg-white text-text-primary shadow-sm"
+              aria-label={searchExpanded ? 'Close search' : 'Open search'}
+            >
+              {searchExpanded ? <XIcon className="h-5 w-5" /> : <SearchIcon className="h-5 w-5" />}
+            </button>
+          </div>
+
+          {searchExpanded ? (
+            <div className="mt-3">
+              <input
+                ref={searchRef}
+                type="search"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search recipes..."
+                className="input w-full"
+              />
+            </div>
+          ) : null}
         </div>
         <button type="button" onClick={() => setShowClipModal(true)} className="btn-primary shrink-0">
           + Add Recipe
@@ -82,13 +132,6 @@ export function Catalog() {
       </div>
 
       <div className="space-y-3 rounded-2xl border border-divider bg-surface p-3 shadow-sm">
-        <input
-          type="search"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Search recipes..."
-          className="input w-full"
-        />
 
         <div className="grid gap-2 sm:grid-cols-4">
           <select className="input w-full" value={cuisine} onChange={(e) => setCuisine(e.target.value)}>

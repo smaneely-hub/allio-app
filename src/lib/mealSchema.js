@@ -3,9 +3,11 @@ import { flattenRecipeIngredients, flattenRecipeInstructions, normalizeRecipe } 
 export function normalizeMealRecord(meal = {}, fallback = {}) {
   const safeDay = typeof (meal.day ?? fallback.day) === 'string' ? String(meal.day ?? fallback.day).trim().toLowerCase() : 'mon'
   const safeMeal = typeof (meal.meal ?? fallback.meal) === 'string' ? String(meal.meal ?? fallback.meal).trim().toLowerCase() : 'dinner'
+  const mealSource = typeof meal.meal_source === 'string' && meal.meal_source.trim() ? meal.meal_source.trim() : 'generated'
+  const sourceLabel = mealSource === 'eat_out' ? 'Eating out' : mealSource === 'takeout' ? 'Takeout' : mealSource === 'delivery' ? 'Delivery' : 'Generated meal'
   const safeName = typeof (meal.name ?? meal.title ?? fallback.name) === 'string' && String(meal.name ?? meal.title ?? fallback.name).trim()
     ? String(meal.name ?? meal.title ?? fallback.name).trim()
-    : 'Generated meal'
+    : (typeof meal.place_name === 'string' && meal.place_name.trim() ? meal.place_name.trim() : sourceLabel)
 
   const imageUrl = typeof meal.image === 'string' && meal.image.trim() ? meal.image.trim() : null
   const recipe = normalizeRecipe({
@@ -18,10 +20,15 @@ export function normalizeMealRecord(meal = {}, fallback = {}) {
     id: typeof meal.id === 'string' && meal.id ? meal.id : `${safeDay}-${safeMeal}`,
     day: safeDay || 'mon',
     meal: safeMeal || 'dinner',
+    meal_source: mealSource,
+    source_recipe_id: typeof meal.source_recipe_id === 'string' && meal.source_recipe_id ? meal.source_recipe_id : null,
+    place_name: typeof meal.place_name === 'string' && meal.place_name.trim() ? meal.place_name.trim() : null,
+    source_note: typeof meal.source_note === 'string' && meal.source_note.trim() ? meal.source_note.trim() : null,
     name: safeName,
-    title: recipe.title,
+    title: recipe.title || safeName,
     slug: recipe.slug,
     image: imageUrl,
+    image_url: meal.image_url || imageUrl || null,
     description: recipe.description,
     reason: typeof meal.reason === 'string' ? meal.reason : '',
     why_this_meal: typeof meal.why_this_meal === 'string' ? meal.why_this_meal : '',

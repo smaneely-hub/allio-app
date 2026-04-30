@@ -11,48 +11,38 @@ function withMealDefaults(plan, fallbackSlots = []) {
   return normalizeMealPlan(plan, fallbackSlots)
 }
 
+function applySourceDefaults(meal = {}) {
+  const normalized = normalizeMealRecord(meal)
+  return {
+    ...normalized,
+    meal_source: normalized.meal_source || 'generated',
+    source_recipe_id: normalized.source_recipe_id ?? null,
+    place_name: normalized.place_name ?? null,
+    source_note: normalized.source_note ?? null,
+  }
+}
+
 async function invokeGeneratePlan(payload) {
   const {
     data: { session },
     error: sessionError,
   } = await supabase.auth.getSession()
 
-  if (sessionError) {
-    throw sessionError
-  }
-
-  console.log('[useMealPlan] generate-plan session present:', Boolean(session))
+  if (sessionError) throw sessionError
 
   let activeSession = session
-
   if (!activeSession?.access_token) {
     const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
-    if (refreshError) {
-      throw refreshError
-    }
+    if (refreshError) throw refreshError
     activeSession = refreshData.session
   }
-
-  if (!activeSession?.access_token) {
-    console.error('[useMealPlan] No active session while calling generate-plan')
-    throw new Error('No active session — user must log in')
-  }
-
-  const tokenExpired = activeSession.expires_at ? Date.now() >= activeSession.expires_at * 1000 : false
-  console.log('[useMealPlan] generate-plan token ready:', { hasToken: Boolean(activeSession.access_token), tokenExpired })
-  console.log('[useMealPlan] generate-plan request headers prepared:', { hasAuthorization: true, hasApiKey: Boolean(import.meta.env.VITE_SUPABASE_ANON_KEY) })
+  if (!activeSession?.access_token) throw new Error('No active session — user must log in')
 
   let result = await invokePlannerFunction(payload).then(({ data, error, functionName }) => {
-      console.log('[useMealPlan] planner function used:', functionName)
-      return { data, error }
-  }).then(({ data, error }) => {
-    return error
-      ? { data: null, error: { message: error?.message || 'Function invoke failed', context: error?.context || error, status: error?.status || 500 } }
-      : { data, error: null }
-  }).catch((error) => {
-    if (error?.name === 'AbortError') {
-      return { data: null, error: { message: 'generate-plan timed out after 45 seconds', context: null, status: 408 } }
-    }
+    console.log('[useMealPlan] planner function used:', functionName)
+    return { data, error }
+  }).then(({ data, error }) => error ? { data: null, error: { message: error?.message || 'Function invoke failed', context: error?.context || error, status: error?.status || 500 } } : { data, error: null }).catch((error) => {
+    if (error?.name === 'AbortError') return { data: null, error: { message: 'generate-plan timed out after 45 seconds', context: null, status: 408 } }
     throw error
   })
 
@@ -62,14 +52,8 @@ async function invokeGeneratePlan(payload) {
       result = await invokePlannerFunction(payload).then(({ data, error, functionName }) => {
         console.log('[useMealPlan] planner retry function used:', functionName)
         return { data, error }
-      }).then(({ data, error }) => {
-        return error
-          ? { data: null, error: { message: error?.message || 'Function invoke failed', context: error?.context || error, status: error?.status || 500 } }
-          : { data, error: null }
-      }).catch((error) => {
-        if (error?.name === 'AbortError') {
-          return { data: null, error: { message: 'generate-plan timed out after 45 seconds', context: null, status: 408 } }
-        }
+      }).then(({ data, error }) => error ? { data: null, error: { message: error?.message || 'Function invoke failed', context: error?.context || error, status: error?.status || 500 } } : { data, error: null }).catch((error) => {
+        if (error?.name === 'AbortError') return { data: null, error: { message: 'generate-plan timed out after 45 seconds', context: null, status: 408 } }
         throw error
       })
     }
@@ -104,14 +88,7 @@ export function useMealPlan(scheduleId) {
     setError(null)
 
     try {
-      const { data, error: loadError } = await supabase
-        .from('meal_plans')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('schedule_id', scheduleId)
-        .limit(1)
-        .maybeSingle()
-
+      const { data, error: loadError } = await supabase.from('meal_plans').select('*').eq('user_id', user.id).eq('schedule_id', scheduleId).limit(1).maybeSingle()
       if (loadError) throw loadError
       const fallbackSlots = Array.isArray(data?.draft_plan?.meals) ? data.draft_plan.meals : Array.isArray(data?.plan?.meals) ? data.plan.meals : []
       setMealPlan(data ? { ...data, draft_plan: withMealDefaults(data.draft_plan || data.plan || {}, fallbackSlots), plan: withMealDefaults(data.plan || data.draft_plan || {}, fallbackSlots) } : null)
@@ -123,63 +100,75 @@ export function useMealPlan(scheduleId) {
     }
   }, [scheduleId, user])
 
-  useEffect(() => {
-    loadMealPlan()
-  }, [loadMealPlan])
+  useEffect(() => { loadMealPlan() }, [loadMealPlan])
 
-  const persistPlan = useCallback(
-    async (nextPlan, nextStatus) => {
-      if (!mealPlan?.id) throw new Error('No meal plan available to persist.')
+  const persistPlan = useCallback(async (nextPlan, nextStatus) => {
+    if (!mealPlan?.id) throw new Error('No meal plan available to persist.')
 
-      const payload = {
-        ...mealPlan,
-        status: nextStatus ?? mealPlan.status,
-        draft_plan: nextPlan,
-        plan: nextPlan,
-        updated_at: new Date().toISOString(),
+    const normalizedNextPlan = {
+      ...nextPlan,
+      meals: (nextPlan?.meals || []).map(applySourceDefaults),
+    }
+
+    const payload = {
+      ...mealPlan,
+      status: nextStatus ?? mealPlan.status,
+      draft_plan: normalizedNextPlan,
+      plan: normalizedNextPlan,
+      updated_at: new Date().toISOString(),
+    }
+
+    if ((nextStatus ?? mealPlan.status) === 'active') {
+      const today = new Date().toISOString().split('T')[0]
+      const { data: household } = await supabase.from('households').select('id, staples_on_hand').eq('user_id', user.id).limit(1).single()
+      const items = aggregateShoppingList(normalizedNextPlan, household?.staples_on_hand || '')
+      try {
+        await upsertShoppingListForDate({ userId: user.id, householdId: household?.id || null, weekOf: today, items })
+      } catch (listError) {
+        console.error('[useMealPlan] Shopping list error:', listError)
       }
+    }
 
-      if ((nextStatus ?? mealPlan.status) === 'active') {
-        const today = new Date().toISOString().split('T')[0]
-        const { data: household } = await supabase
-          .from('households')
-          .select('id, staples_on_hand')
-          .eq('user_id', user.id)
-          .limit(1)
-          .single()
+    const { data, error: saveError } = await supabase.from('meal_plans').update({ status: payload.status, draft_plan: payload.draft_plan, plan: payload.plan, updated_at: payload.updated_at }).eq('id', mealPlan.id).select('*').single()
+    if (saveError) throw saveError
+    setMealPlan({ ...data, draft_plan: withMealDefaults(data.draft_plan || data.plan || {}), plan: withMealDefaults(data.plan || data.draft_plan || {}) })
+    return data
+  }, [mealPlan, user])
 
-        const items = aggregateShoppingList(nextPlan, household?.staples_on_hand || '')
+  const saveCustomMealSource = useCallback(async ({ existingMealId = null, meal_source, source_recipe_id = null, place_name = null, source_note = null, dayKey, mealSlot, recipe = null, title = null }) => {
+    if (!mealPlan?.draft_plan) throw new Error('No meal plan available to update.')
 
-        try {
-          await upsertShoppingListForDate({
-            userId: user.id,
-            householdId: household?.id || null,
-            weekOf: today,
-            items,
-          })
-        } catch (listError) {
-          console.error('[useMealPlan] Shopping list error:', listError)
-        }
-      }
+    const sourceLabel = title || (meal_source === 'eat_out' ? 'Eat Out' : meal_source === 'takeout' ? 'Takeout' : meal_source === 'delivery' ? 'Delivery' : recipe?.title || 'Meal')
+    const baseMeal = {
+      id: existingMealId || `${dayKey}-${mealSlot}-${Date.now()}`,
+      day: dayKey,
+      meal: mealSlot,
+      name: meal_source === 'catalog' ? (recipe?.title || 'Saved recipe') : (place_name || sourceLabel),
+      title: meal_source === 'catalog' ? (recipe?.title || 'Saved recipe') : (place_name || sourceLabel),
+      image_url: recipe?.image_url || null,
+      cuisine: recipe?.cuisine || null,
+      servings: 1,
+      ingredients: [],
+      instructions: [],
+      ingredientGroups: [],
+      instructionGroups: [],
+      nutrition: {},
+      prep_time_minutes: 0,
+      cook_time_minutes: 0,
+      total_time_minutes: 0,
+      meal_source,
+      source_recipe_id: meal_source === 'catalog' ? source_recipe_id : null,
+      place_name: ['eat_out', 'takeout', 'delivery'].includes(meal_source) ? place_name : null,
+      source_note: ['eat_out', 'takeout', 'delivery'].includes(meal_source) ? source_note : null,
+    }
 
-      const { data, error: saveError } = await supabase
-        .from('meal_plans')
-        .update({
-          status: payload.status,
-          draft_plan: payload.draft_plan,
-          plan: payload.plan,
-          updated_at: payload.updated_at,
-        })
-        .eq('id', mealPlan.id)
-        .select('*')
-        .single()
+    const currentMeals = mealPlan.draft_plan.meals || []
+    const nextMeals = existingMealId
+      ? currentMeals.map((meal) => meal.id === existingMealId ? applySourceDefaults({ ...meal, ...baseMeal }) : applySourceDefaults(meal))
+      : [...currentMeals.filter((meal) => !(meal.day === dayKey && meal.meal === mealSlot && !meal.id)), applySourceDefaults(baseMeal)]
 
-      if (saveError) throw saveError
-      setMealPlan({ ...data, draft_plan: withMealDefaults(data.draft_plan || data.plan || {}), plan: withMealDefaults(data.plan || data.draft_plan || {}) })
-      return data
-    },
-    [mealPlan, user],
-  )
+    return persistPlan({ ...mealPlan.draft_plan, meals: nextMeals })
+  }, [mealPlan, persistPlan])
 
   const generateMealPlan = useCallback(async (overrideScheduleId = null) => {
     const activeScheduleId = overrideScheduleId ?? scheduleId
@@ -189,43 +178,19 @@ export function useMealPlan(scheduleId) {
     setError(null)
 
     try {
-      const { data: household, error: householdError } = await supabase
-        .from('households')
-        .select('*')
-        .eq('user_id', user.id)
-        .limit(1)
-        .single()
+      const { data: household, error: householdError } = await supabase.from('households').select('*').eq('user_id', user.id).limit(1).single()
       if (householdError) throw householdError
-
-      const { data: members, error: membersError } = await supabase
-        .from('household_members')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('household_id', household.id)
+      const { data: members, error: membersError } = await supabase.from('household_members').select('*').eq('user_id', user.id).eq('household_id', household.id)
       if (membersError) throw membersError
-
-      const { data: slots, error: slotsError } = await supabase
-        .from('schedule_slots')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('schedule_id', activeScheduleId)
+      const { data: slots, error: slotsError } = await supabase.from('schedule_slots').select('*').eq('user_id', user.id).eq('schedule_id', activeScheduleId)
       if (slotsError) throw slotsError
-
-      // Also fetch the schedule to get week_notes
-      const { data: schedule } = await supabase
-        .from('weekly_schedules')
-        .select('week_notes')
-        .eq('id', activeScheduleId)
-        .maybeSingle()
-      
+      const { data: schedule } = await supabase.from('weekly_schedules').select('week_notes').eq('id', activeScheduleId).maybeSingle()
 
       const lockedMeals = mealPlan?.draft_plan?.meals?.filter((meal) => meal.locked) || []
-      
-      // Only keep locked meals that match current scheduled slots
       const slotKey = (s) => `${String(s?.day || '').trim()}-${String(s?.meal || '').trim()}`
       const currentSlotKeys = new Set(slots.map(slotKey))
       const validLockedMeals = lockedMeals.filter((m) => currentSlotKeys.has(`${m.day}-${m.meal}`))
-      
+
       const payload = {
         household: {
           total_people: household.total_people,
@@ -246,40 +211,21 @@ export function useMealPlan(scheduleId) {
           food_preferences: member.food_preferences || [],
           health_considerations: member.health_considerations || [],
         })),
-        slots: slots
-          .map((slot) => ({
-            day: typeof slot?.day === 'string' ? slot.day.trim().slice(0, 3).toLowerCase() : '',
-            meal: typeof slot?.meal === 'string' ? slot.meal.trim().toLowerCase().replace(/\s+/g, '_') : '',
-            attendees: Array.isArray(slot?.attendees) ? slot.attendees : [],
-            effort_level: slot?.effort_level,
-            planning_notes: slot?.planning_notes,
-            is_leftover: slot?.is_leftover,
-            leftover_source: slot?.leftover_source,
-          }))
-          .filter((slot) => slot.day && slot.meal),
+        slots: slots.map((slot) => ({
+          day: typeof slot?.day === 'string' ? slot.day.trim().slice(0, 3).toLowerCase() : '',
+          meal: typeof slot?.meal === 'string' ? slot.meal.trim().toLowerCase().replace(/\s+/g, '_') : '',
+          attendees: Array.isArray(slot?.attendees) ? slot.attendees : [],
+          effort_level: slot?.effort_level,
+          planning_notes: slot?.planning_notes,
+          is_leftover: slot?.is_leftover,
+          leftover_source: slot?.leftover_source,
+        })).filter((slot) => slot.day && slot.meal),
         week_notes: schedule?.week_notes || '',
         locked_meals: validLockedMeals,
       }
 
-
-      
-      console.log('[useMealPlan] generate-plan invoke started', {
-        slotCount: payload.slots?.length || 0,
-        memberCount: payload.members?.length || 0,
-        hasWeekNotes: Boolean(payload.week_notes),
-        hasLockedMeals: (payload.locked_meals?.length || 0) > 0,
-      })
-      // /plan needs a larger budget than the shared 15s default
       let { data: generated, error: functionError } = await invokeGeneratePlan(payload, { timeoutMs: 45000 })
-      console.log('[useMealPlan] generate-plan invoke resolved')
-      console.log('[useMealPlan] generate-plan response received', {
-        hasData: Boolean(generated),
-        hasPlan: Boolean(generated?.plan),
-        mealCount: generated?.plan?.meals?.length || 0,
-      })
       if (functionError) {
-        console.error('[useMealPlan] generate-plan invoke rejected', functionError)
-        console.error('[useMealPlan] generate-plan response error', functionError)
         if (String(functionError.message || '').includes('non-2xx') || String(functionError.context || '').includes('401') || functionError.status === 401) {
           toast.error('Your session expired. Please log in again.')
           throw new Error('Session expired')
@@ -287,64 +233,17 @@ export function useMealPlan(scheduleId) {
         throw new Error(functionError.message || 'generate-plan failed')
       }
 
-      console.log('[useMealPlan] generate-plan payload shape', {
-        returnedKeys: generated ? Object.keys(generated) : [],
-        planKeys: generated?.plan ? Object.keys(generated.plan) : [],
-      })
-
       const nextPlan = withMealDefaults(generated.plan, payload.slots)
-      
       const mergedPlan = {
         ...nextPlan,
         meals: [
-          ...validLockedMeals,
-          ...nextPlan.meals.filter(
-            (meal) => !validLockedMeals.some((locked) => locked.day === meal.day && locked.meal === meal.meal),
-          ),
+          ...validLockedMeals.map(applySourceDefaults),
+          ...nextPlan.meals.filter((meal) => !validLockedMeals.some((locked) => locked.day === meal.day && locked.meal === meal.meal)).map(applySourceDefaults),
         ],
       }
 
-      console.log('[PLAN_DEBUG] parsed generate-plan response:', JSON.stringify({
-        topLevelKeys: Object.keys(generated?.plan || {}),
-        hasDraftPlan: !!generated?.draft_plan,
-        hasPlan: !!generated?.plan,
-        mealsLength: (generated?.draft_plan?.meals || generated?.plan?.meals || []).length,
-        firstMeal: (generated?.draft_plan?.meals || generated?.plan?.meals || [])[0] || null,
-        allMealSlotNames: (generated?.draft_plan?.meals || generated?.plan?.meals || [])
-          .map(m => ({ day: m?.day, meal: m?.meal })),
-      }, null, 2))
-
-      console.log('[useMealPlan] response parse started')
-      console.log('[useMealPlan] save started')
-      console.log('[useMealPlan] about to save returned plan', {
-        mealCount: mergedPlan?.meals?.length || 0,
-        scheduleId: activeScheduleId,
-      })
-      const { data: savedPlan, error: saveError } = await supabase
-        .from('meal_plans')
-        .upsert({
-          ...(mealPlan?.id ? { id: mealPlan.id } : {}),
-          user_id: user.id,
-          household_id: household.id,
-          schedule_id: activeScheduleId,
-          week_of: new Date().toISOString().split('T')[0],
-          status: mealPlan?.status || 'draft',
-          plan: mergedPlan,
-          draft_plan: mergedPlan,
-          updated_at: new Date().toISOString(),
-        })
-        .select('*')
-        .single()
-
-      if (saveError) {
-        console.error('[useMealPlan] plan save failed', saveError)
-        throw saveError
-      }
-      console.log('[useMealPlan] save finished')
-      console.log('[useMealPlan] plan save succeeded', {
-        savedPlanId: savedPlan?.id,
-        mealCount: savedPlan?.draft_plan?.meals?.length || savedPlan?.plan?.meals?.length || 0,
-      })
+      const { data: savedPlan, error: saveError } = await supabase.from('meal_plans').upsert({ ...(mealPlan?.id ? { id: mealPlan.id } : {}), user_id: user.id, household_id: household.id, schedule_id: activeScheduleId, week_of: new Date().toISOString().split('T')[0], status: mealPlan?.status || 'draft', plan: mergedPlan, draft_plan: mergedPlan, updated_at: new Date().toISOString() }).select('*').single()
+      if (saveError) throw saveError
       setMealPlan({ ...savedPlan, draft_plan: withMealDefaults(savedPlan.draft_plan || savedPlan.plan || {}), plan: withMealDefaults(savedPlan.plan || savedPlan.draft_plan || {}) })
       return savedPlan
     } catch (err) {
@@ -356,54 +255,19 @@ export function useMealPlan(scheduleId) {
     }
   }, [mealPlan, scheduleId, user])
 
-  const toggleMealLock = useCallback(async (mealId, locked) => {
-    const nextPlan = {
-      ...mealPlan.draft_plan,
-      meals: mealPlan.draft_plan.meals.map((meal) => (meal.id === mealId ? { ...meal, locked } : meal)),
-    }
-    return persistPlan(nextPlan)
-  }, [mealPlan, persistPlan])
-
-  const saveMealNote = useCallback(async (mealId, userNote) => {
-    const nextPlan = {
-      ...mealPlan.draft_plan,
-      meals: mealPlan.draft_plan.meals.map((meal) => (meal.id === mealId ? { ...meal, user_note: userNote || null } : meal)),
-    }
-    return persistPlan(nextPlan)
-  }, [mealPlan, persistPlan])
+  const toggleMealLock = useCallback(async (mealId, locked) => persistPlan({ ...mealPlan.draft_plan, meals: mealPlan.draft_plan.meals.map((meal) => meal.id === mealId ? { ...meal, locked } : meal) }), [mealPlan, persistPlan])
+  const saveMealNote = useCallback(async (mealId, userNote) => persistPlan({ ...mealPlan.draft_plan, meals: mealPlan.draft_plan.meals.map((meal) => meal.id === mealId ? { ...meal, user_note: userNote || null } : meal) }), [mealPlan, persistPlan])
 
   const swapMeal = useCallback(async (mealToReplace, suggestion = '') => {
-    const optimisticPlan = mealPlan?.draft_plan
-      ? {
-          ...mealPlan.draft_plan,
-          meals: mealPlan.draft_plan.meals.map((meal) =>
-            meal.id === mealToReplace.id
-              ? {
-                  ...meal,
-                  swap_pending: true,
-                  reason: 'Finding a better fit…',
-                }
-              : meal,
-          ),
-        }
-      : null
-
-    if (optimisticPlan) {
-      setMealPlan((current) => current ? { ...current, draft_plan: optimisticPlan, plan: optimisticPlan } : current)
-    }
+    const optimisticPlan = mealPlan?.draft_plan ? { ...mealPlan.draft_plan, meals: mealPlan.draft_plan.meals.map((meal) => meal.id === mealToReplace.id ? { ...meal, swap_pending: true, reason: 'Finding a better fit…' } : meal) } : null
+    if (optimisticPlan) setMealPlan((current) => current ? { ...current, draft_plan: optimisticPlan, plan: optimisticPlan } : current)
     setSwappingMealId(mealToReplace.id)
 
     try {
       const { data: household } = await supabase.from('households').select('*').eq('user_id', user.id).limit(1).single()
       const { data: members } = await supabase.from('household_members').select('*').eq('user_id', user.id).eq('household_id', household.id)
       const { data: slots } = await supabase.from('schedule_slots').select('*').eq('user_id', user.id).eq('schedule_id', scheduleId)
-
-      // Fetch schedule for week_notes
-      const { data: schedule } = await supabase
-        .from('weekly_schedules')
-        .select('week_notes')
-        .eq('id', scheduleId)
-        .maybeSingle()
+      const { data: schedule } = await supabase.from('weekly_schedules').select('week_notes').eq('id', scheduleId).maybeSingle()
 
       const payload = {
         household: {
@@ -425,42 +289,23 @@ export function useMealPlan(scheduleId) {
           food_preferences: member.food_preferences || [],
           health_considerations: member.health_considerations || [],
         })),
-        slots: slots
-          .map((slot) => ({
-            day: typeof slot?.day === 'string' ? slot.day.trim().slice(0, 3).toLowerCase() : '',
-            meal: typeof slot?.meal === 'string' ? slot.meal.trim().toLowerCase().replace(/\s+/g, '_') : '',
-            attendees: Array.isArray(slot?.attendees) ? slot.attendees : [],
-            effort_level: slot?.effort_level,
-            planning_notes: slot?.planning_notes,
-            is_leftover: slot?.is_leftover,
-            leftover_source: slot?.leftover_source,
-          }))
-          .filter((slot) => slot.day && slot.meal),
+        slots: slots.map((slot) => ({
+          day: typeof slot?.day === 'string' ? slot.day.trim().slice(0, 3).toLowerCase() : '',
+          meal: typeof slot?.meal === 'string' ? slot.meal.trim().toLowerCase().replace(/\s+/g, '_') : '',
+          attendees: Array.isArray(slot?.attendees) ? slot.attendees : [],
+          effort_level: slot?.effort_level,
+          planning_notes: slot?.planning_notes,
+          is_leftover: slot?.is_leftover,
+          leftover_source: slot?.leftover_source,
+        })).filter((slot) => slot.day && slot.meal),
         week_notes: schedule?.week_notes || '',
         existing_plan: mealPlan.draft_plan,
         recent_meal_names: recentSwappedMealNames,
-        replace_slot: {
-          day: mealToReplace.day,
-          meal: mealToReplace.meal,
-          suggestion: suggestion,
-          reason: suggestion ? `user wants: ${suggestion}` : 'user requested swap',
-          current_meal_name: mealToReplace.name || '',
-        },
+        replace_slot: { day: mealToReplace.day, meal: mealToReplace.meal, suggestion, reason: suggestion ? `user wants: ${suggestion}` : 'user requested swap', current_meal_name: mealToReplace.name || '' },
       }
 
-      console.log('[useMealPlan] about to invoke generate-plan for swap', {
-        day: mealToReplace.day,
-        meal: mealToReplace.meal,
-        hasSuggestion: Boolean(suggestion),
-      })
       let { data: generated, error: functionError } = await invokeGeneratePlan(payload)
-      console.log('[useMealPlan] swap generate-plan response received', {
-        hasData: Boolean(generated),
-        hasPlan: Boolean(generated?.plan),
-        mealCount: generated?.plan?.meals?.length || 0,
-      })
       if (functionError) {
-        console.error('[useMealPlan] generate-plan response error', functionError)
         if (String(functionError.message || '').includes('non-2xx') || String(functionError.context || '').includes('401')) {
           toast.error('Your session expired. Please log in again.')
           throw new Error('Session expired')
@@ -468,49 +313,17 @@ export function useMealPlan(scheduleId) {
         throw functionError
       }
 
-      console.log('[useMealPlan] swap generate-plan payload shape', {
-        returnedKeys: generated ? Object.keys(generated) : [],
-        planKeys: generated?.plan ? Object.keys(generated.plan) : [],
-      })
-
-      const replacement = withMealDefaults(generated.plan, payload.slots).meals.find(
-        (meal) => meal.day === mealToReplace.day && meal.meal === mealToReplace.meal,
-      )
-
-      if (!replacement) {
-        throw new Error('No replacement meal was returned for that slot')
-      }
+      const replacement = withMealDefaults(generated.plan, payload.slots).meals.find((meal) => meal.day === mealToReplace.day && meal.meal === mealToReplace.meal)
+      if (!replacement) throw new Error('No replacement meal was returned for that slot')
 
       const nextPlan = {
         ...mealPlan.draft_plan,
-        meals: mealPlan.draft_plan.meals.map((meal) =>
-          meal.id === mealToReplace.id
-            ? normalizeMealRecord({
-                ...replacement,
-                id: meal.id,
-                locked: false,
-                user_note: meal.user_note,
-                swapped: true,
-                original_name: meal.original_name || meal.name,
-              }, { day: meal.day, meal: meal.meal })
-            : meal,
-        ),
+        meals: mealPlan.draft_plan.meals.map((meal) => meal.id === mealToReplace.id ? applySourceDefaults(normalizeMealRecord({ ...replacement, id: meal.id, locked: false, user_note: meal.user_note, swapped: true, original_name: meal.original_name || meal.name }, { day: meal.day, meal: meal.meal })) : applySourceDefaults(meal)),
       }
-
       return persistPlan(nextPlan)
     } catch (err) {
       if (optimisticPlan) {
-        setMealPlan((current) => current ? {
-          ...current,
-          draft_plan: {
-            ...mealPlan.draft_plan,
-            meals: mealPlan.draft_plan.meals.map((meal) => ({ ...meal, swap_pending: false })),
-          },
-          plan: {
-            ...mealPlan.draft_plan,
-            meals: mealPlan.draft_plan.meals.map((meal) => ({ ...meal, swap_pending: false })),
-          },
-        } : current)
+        setMealPlan((current) => current ? { ...current, draft_plan: { ...mealPlan.draft_plan, meals: mealPlan.draft_plan.meals.map((meal) => ({ ...meal, swap_pending: false })) }, plan: { ...mealPlan.draft_plan, meals: mealPlan.draft_plan.meals.map((meal) => ({ ...meal, swap_pending: false })) } } : current)
       }
       toast.error("Couldn't swap, try again.")
       throw err
@@ -521,45 +334,15 @@ export function useMealPlan(scheduleId) {
 
   const clearMealPlan = useCallback(async () => {
     if (!user || !scheduleId) throw new Error('Schedule is required before clearing a meal plan.')
-
-    const { error: mealPlanError } = await supabase
-      .from('meal_plans')
-      .delete()
-      .eq('user_id', user.id)
-      .eq('schedule_id', scheduleId)
-
+    const { error: mealPlanError } = await supabase.from('meal_plans').delete().eq('user_id', user.id).eq('schedule_id', scheduleId)
     if (mealPlanError) throw mealPlanError
-
-    const { error: listError } = await supabase
-      .from('shopping_lists')
-      .delete()
-      .eq('user_id', user.id)
-      .eq('week_of', new Date().toISOString().split('T')[0])
-
-    if (listError) {
-      console.error('[useMealPlan] Clear shopping list error:', listError)
-    }
-
+    const { error: listError } = await supabase.from('shopping_lists').delete().eq('user_id', user.id).eq('week_of', new Date().toISOString().split('T')[0])
+    if (listError) console.error('[useMealPlan] Clear shopping list error:', listError)
     setMealPlan(null)
     return true
   }, [scheduleId, user])
 
-  const finalizePlan = useCallback(async () => {
-    return persistPlan(mealPlan.draft_plan, 'active')
-  }, [mealPlan, persistPlan])
+  const finalizePlan = useCallback(async () => persistPlan(mealPlan.draft_plan, 'active'), [mealPlan, persistPlan])
 
-  return {
-    mealPlan,
-    loading,
-    generating,
-    error,
-    loadMealPlan,
-    generateMealPlan,
-    toggleMealLock,
-    saveMealNote,
-    swapMeal,
-    swappingMealId,
-    clearMealPlan,
-    finalizePlan,
-  }
+  return { mealPlan, loading, generating, error, loadMealPlan, generateMealPlan, toggleMealLock, saveMealNote, swapMeal, saveCustomMealSource, swappingMealId, clearMealPlan, finalizePlan }
 }

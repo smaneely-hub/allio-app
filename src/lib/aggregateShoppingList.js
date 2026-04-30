@@ -2,7 +2,9 @@ import { buildGroupedShoppingItems, CATEGORY_LABELS, CATEGORY_ORDER, groupItemsB
 
 export function aggregateShoppingList(mealPlan, staplesOnHand = '') {
   const meals = mealPlan?.meals || mealPlan || []
-  return buildGroupedShoppingItems(meals, staplesOnHand)
+  // Non-cooking meals don't contribute ingredients to the grocery list.
+  const cookingMeals = meals.filter((meal) => !['eat_out', 'takeout', 'delivery'].includes(meal?.meal_source || 'generated'))
+  return buildGroupedShoppingItems(cookingMeals, staplesOnHand)
 }
 
 export function shareListAsText(items, weekOf = '') {
