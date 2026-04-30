@@ -5,14 +5,20 @@ export function Logo({ className = '', size = 'md' }) {
   const [imageError, setImageError] = useState(false)
 
   const sizeClasses = {
-    sm: 'h-8',
-    md: 'h-10',
+    sm: 'h-9',
+    md: 'h-11',
     lg: 'h-16',
+  }
+
+  const textClasses = {
+    sm: 'text-xl',
+    md: 'text-2xl',
+    lg: 'text-4xl',
   }
 
   if (imageError) {
     return (
-      <Link to="/" className={`inline-flex items-center gap-2 font-display text-2xl text-text-primary ${className}`}>
+      <Link to="/" className={`inline-flex items-center gap-2 font-display ${textClasses[size]} text-text-primary ${className}`}>
         <span className="font-bold text-primary-400">A</span>
         <span>llio.life</span>
       </Link>
@@ -20,13 +26,16 @@ export function Logo({ className = '', size = 'md' }) {
   }
 
   return (
-    <Link to="/" className={`inline-flex items-center ${className}`}>
+    <Link to="/" className={`inline-flex items-center gap-2 ${className}`}>
       <img
-        src="/allio-logo-full.jpg"
-        alt="Allio.life"
-        className={`${sizeClasses[size]} w-auto rounded-2xl`}
+        src="/favicon.svg"
+        alt="Allio"
+        className={`${sizeClasses[size]} w-auto shrink-0`}
         onError={() => setImageError(true)}
       />
+      <span className={`font-display leading-none text-text-primary ${textClasses[size]}`}>
+        Allio<span className="text-primary-400">.</span><span className="font-body font-normal">life</span>
+      </span>
     </Link>
   )
 }
