@@ -4,16 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { Logo } from '../components/Logo'
 
-// Leaf decoration
-function Leaf({ className = '' }) {
-  return (
-    <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 008 17c8-20 20-8 0-13z" fill="#5FAF7A" fillOpacity="0.5"/>
-      <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 008 17c8-20 20-8 0-13z" stroke="#5FAF7A" strokeWidth="1"/>
-    </svg>
-  )
-}
 
 export function LoginPage() {
   useDocumentTitle("Log in | Allio")
@@ -128,13 +120,8 @@ export function LoginPage() {
       {/* Logo with leaf - calm design */}
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="relative inline-block">
-            <h1 className="font-display text-4xl text-text-primary">
-              Allio
-            </h1>
-            <div className="absolute -top-0 -right-5">
-              <Leaf className="w-5 h-5" />
-            </div>
+          <div className="flex justify-center">
+            <Logo size="lg" />
           </div>
           <p className="text-text-secondary mt-2 text-sm">
             Your household, simplified.
@@ -142,7 +129,7 @@ export function LoginPage() {
           <button
             type="button"
             onClick={() => navigate('/try')}
-            className="mt-4 text-sm font-semibold text-primary-600 hover:text-primary-700"
+            className="mt-4 text-sm font-semibold text-primary-400 hover:text-primary-500"
           >
             Try one dinner without signing up
           </button>
@@ -151,7 +138,7 @@ export function LoginPage() {
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-card p-6 md:p-8">
+        <div className="bg-bg-primary rounded-2xl shadow-card p-6 md:p-8 border border-border">
           {confirmationSent ? (
             <div className="text-center py-6">
               <div className="text-4xl mb-4">🎉</div>
@@ -175,7 +162,7 @@ export function LoginPage() {
                   type="button"
                   onClick={() => setMode('login')}
                   className={`rounded-lg py-2 text-sm font-medium transition-all duration-150 ${
-                    !isSignup ? 'bg-white shadow-sm text-text-primary' : 'text-text-muted'
+                    !isSignup ? 'bg-bg-primary shadow-sm text-text-primary' : 'text-text-tertiary'
                   }`}
                 >
                   Log in
@@ -184,7 +171,7 @@ export function LoginPage() {
                   type="button"
                   onClick={() => setMode('signup')}
                   className={`rounded-lg py-2 text-sm font-medium transition-all duration-150 ${
-                    isSignup ? 'bg-white shadow-sm text-text-primary' : 'text-text-muted'
+                    isSignup ? 'bg-bg-primary shadow-sm text-text-primary' : 'text-text-tertiary'
                   }`}
                 >
                   Sign up
@@ -232,7 +219,7 @@ export function LoginPage() {
               </form>
 
               {/* Bottom link */}
-              <div className="mt-6 text-center text-sm text-text-muted">
+              <div className="mt-6 text-center text-sm text-text-tertiary">
                 {isSignup ? (
                   <>
                     Already have an account?{' '}
