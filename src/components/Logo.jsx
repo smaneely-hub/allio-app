@@ -28,9 +28,9 @@ export function Logo({ className = '', size = 'md' }) {
   return (
     <Link to="/" className={`inline-flex items-center gap-2 ${className}`}>
       <img
-        src="/favicon.svg"
+        src="/allio-logo-full.jpg"
         alt="Allio"
-        className={`${sizeClasses[size]} w-auto shrink-0`}
+        className={`${sizeClasses[size]} w-auto shrink-0 rounded-2xl`}
         onError={() => setImageError(true)}
       />
       <span className={`font-display leading-none text-text-primary ${textClasses[size]}`}>

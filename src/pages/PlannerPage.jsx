@@ -224,7 +224,7 @@ export function PlannerPage() {
         />
 
         <AddMealModal
-          open={Boolean(addMealTarget && mealPlan?.id)}
+          open={Boolean(addMealTarget)}
           onClose={() => setAddMealTarget(null)}
           dayKey={addMealTarget?.day?.key || 'mon'}
           mealSlot={addMealTarget?.mealSlot || 'dinner'}
