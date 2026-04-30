@@ -134,10 +134,7 @@ export function MealPlanWorkspace({
     return next
   }, [selectedDate])
   const plannerWeek = useMemo(() => buildPlannerWeek({ weekStart: windowStart, meals }), [meals, windowStart])
-  const selectedDay = useMemo(() => {
-    const iso = selectedDate.toISOString().slice(0, 10)
-    return plannerWeek.find((day) => day.date.toISOString().slice(0, 10) === iso) || plannerWeek[0]
-  }, [plannerWeek, selectedDate])
+  const selectedDay = useMemo(() => plannerWeek[0] || null, [plannerWeek])
   const today = new Date()
 
   return (
