@@ -1,7 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Serif+Display&display=swap');
 @import "tailwindcss";
 
 html {
   scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
@@ -11,88 +14,165 @@ body {
 }
 
 @theme {
-  /* Fonts */
   --font-display: 'DM Serif Display', Georgia, serif;
-  --font-body: 'DM Sans', system-ui, sans-serif;
+  --font-body: 'DM Sans', system-ui, -apple-system, sans-serif;
 
-  /* Primary colors - brighter green */
-  --color-primary-50: #DCFCE7;
-  --color-primary-100: #BBF7D0;
-  --color-primary-200: #86EFAC;
-  --color-primary-400: #22C55E;
-  --color-primary-500: #16A34A;
-  --color-primary-600: #15803D;
-  --color-primary-700: #166534;
+  --color-primary: #7B8CF6;
+  --color-secondary: #7EDCB5;
+  --color-accent: #9B8AFA;
 
-  /* Accent colors - teal/blue */
-  --color-accent-teal: #0EA5E9;
-  --color-accent-orange: #F97316;
+  --color-primary-50: #EEF1FF;
+  --color-primary-100: #E0E6FF;
+  --color-primary-200: #C7D2FE;
+  --color-primary-400: #7B8CF6;
+  --color-primary-500: #6A7BEA;
+  --color-primary-600: #5A67D8;
+  --color-primary-700: #4957C5;
+
+  --color-accent-blue: #7B8CF6;
+  --color-accent-teal: #7EDCB5;
+  --color-accent-purple: #9B8AFA;
+  --color-accent-orange: #F59E0B;
   --color-accent-red: #EF4444;
-  --color-accent-purple: #A855F7;
+  --color-accent-green: #22C55E;
+  --color-accent-orange-soft: #F5A623;
   --color-accent-pink: #EC4899;
 
-  /* Planner redesign surface + ink tokens */
-  --color-surface-base: #F5F5F5;
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-tertiary: #94A3B8;
+  --color-text-inverse: #FFFFFF;
+
+  --color-ink-primary: #0F172A;
+  --color-ink-secondary: #475569;
+  --color-ink-tertiary: #94A3B8;
+
+  --color-bg-primary: #FFFFFF;
+  --color-bg-soft: #F8FAFC;
+  --color-bg-softer: #F1F5F9;
+
+  --color-surface-base: #F8FAFC;
   --color-surface-card: #FFFFFF;
-  --color-surface-muted: #F0F0F0;
+  --color-surface-muted: #F1F5F9;
 
-  --color-accent-blue: #4A90E2;
-  --color-accent-orange-soft: #F5A623;
-  --color-accent-green: #7ED321;
+  --color-border: #E2E8F0;
+  --color-border-focus: #7B8CF6;
 
-  --color-ink-primary: #1A1A1A;
-  --color-ink-secondary: #6B6B6B;
-  --color-ink-tertiary: #9B9B9B;
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-info: #7B8CF6;
 
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --color-warm-50: #F8FAFC;
+  --color-warm-100: #F1F5F9;
+  --color-warm-200: #E2E8F0;
+  --color-warm-400: #94A3B8;
+  --color-warm-700: #475569;
+  --color-warm-900: #0F172A;
 
-  /* Warm neutrals */
-  --color-warm-50: #FAFAF8;
-  --color-warm-100: #F5F3EF;
-  --color-warm-200: #E8E5DF;
-  --color-warm-400: #9C9589;
-  --color-warm-700: #5C564E;
-  --color-warm-900: #2D2A26;
-
-  /* Category colors */
   --color-category-produce: #4A9B6E;
   --color-category-protein: #D97B5A;
   --color-category-dairy: #6B9ED6;
   --color-category-pantry: #C4976B;
   --color-category-frozen: #8BBDD4;
   --color-category-bakery: #D4A85B;
+
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 2px 6px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --shadow-xl: 0 16px 48px rgba(15, 23, 42, 0.10);
+  --shadow-glow: 0 0 0 3px rgba(123, 140, 246, 0.15);
+  --shadow-card: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+:root {
+  --gradient-primary: linear-gradient(135deg, #7EDCB5 0%, #7B8CF6 100%);
+  --gradient-primary-hover: linear-gradient(135deg, #6BCFA8 0%, #6A7BEA 100%);
+  --gradient-subtle: linear-gradient(135deg, rgba(126, 220, 181, 0.08) 0%, rgba(123, 140, 246, 0.08) 100%);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 body {
-  @apply bg-warm-50 text-warm-900 font-body;
+  @apply bg-bg-soft text-text-primary font-body;
 }
 
-/* Typography defaults */
 h1, h2, h3, h4 {
-  @apply font-display;
+  @apply font-display text-text-primary;
 }
 
-/* Card component style */
 .card {
-  @apply bg-white rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow duration-200;
+  @apply rounded-[var(--radius-lg)] bg-bg-primary p-6 shadow-sm transition-shadow duration-200;
 }
 
-/* Button styles - pill shape */
+.card:hover {
+  box-shadow: var(--shadow-md);
+}
+
 .btn-primary {
-  @apply bg-primary-400 hover:bg-primary-500 text-white font-body font-bold px-8 py-3 rounded-full transition-all duration-150 shadow-lg active:scale-[0.98];
+  @apply rounded-[var(--radius-md)] px-6 py-3 font-body font-semibold text-white transition-all duration-200;
+  background: var(--gradient-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:hover {
+  background: var(--gradient-primary-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .btn-secondary {
-  @apply border-2 border-primary-400 text-primary-400 hover:bg-primary-50 font-semibold px-6 py-3 rounded-full transition-all duration-150 active:scale-[0.98];
+  @apply rounded-[var(--radius-md)] border px-6 py-3 font-semibold text-text-primary transition-all duration-200;
+  border-color: var(--color-border);
+  background: var(--color-bg-primary);
+}
+
+.btn-secondary:hover {
+  background: var(--color-bg-soft);
 }
 
 .btn-ghost {
-  @apply text-warm-400 hover:text-warm-700 hover:bg-warm-100 px-4 py-2 rounded-full transition-all duration-150 active:scale-[0.98];
+  @apply rounded-[var(--radius-full)] px-4 py-2 transition-all duration-150;
+  color: var(--color-primary);
 }
 
-/* Input styles */
+.btn-ghost:hover {
+  background: var(--color-bg-soft);
+}
+
 .input {
-  @apply w-full px-4 py-3 rounded-xl bg-warm-50 border border-warm-200 focus:ring-2 focus:ring-primary-400/30 focus:border-primary-400 outline-none transition-all duration-150;
+  @apply w-full rounded-[var(--radius-sm)] border px-4 py-3 outline-none transition-all duration-150;
+  color: var(--color-text-primary);
+  background: var(--color-bg-primary);
+  border-color: var(--color-border);
+}
+
+.input::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.input:focus {
+  border-color: var(--color-border-focus);
+  box-shadow: var(--shadow-glow);
 }
 /* Dark Mode */
 .dark {
