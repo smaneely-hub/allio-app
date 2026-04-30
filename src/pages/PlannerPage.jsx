@@ -191,7 +191,7 @@ export function PlannerPage() {
           <h1 className="font-display text-xl text-ink-primary">Planner</h1>
           <div className="flex gap-2">
             <button type="button" onClick={handleClearPlan} disabled={saving || generating || (!mealPlan && activeSlots.length === 0)} className="rounded-full border border-surface-muted bg-surface-card px-4 py-2 text-sm text-ink-secondary">Start Fresh</button>
-            <button type="button" onClick={handleGenerate} disabled={saving || generating} className="rounded-full bg-accent-green px-4 py-2 text-sm font-semibold text-white">{saving || generating ? 'Generating…' : 'Generate Plan'}</button>
+            <button type="button" onClick={handleGenerate} disabled={saving || generating} className="btn-primary text-sm disabled:opacity-60 disabled:cursor-not-allowed">{saving || generating ? 'Generating…' : 'Generate Plan'}</button>
           </div>
         </div>
 
