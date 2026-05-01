@@ -2,6 +2,13 @@ function asArray(value) {
   return Array.isArray(value) ? value : []
 }
 
+function firstArray(...values) {
+  for (const value of values) {
+    if (Array.isArray(value) && value.length > 0) return value
+  }
+  return []
+}
+
 function asString(value, fallback = '') {
   return typeof value === 'string' ? value : fallback
 }
@@ -57,29 +64,59 @@ function normalizeInstructionGroup(group, fallbackLabel = undefined) {
 }
 
 export function normalizeRecipe(recipe = {}) {
-  const legacyInstructionSteps = asArray(recipe.instructions).length ? asArray(recipe.instructions) : asArray(recipe.steps)
+  const nestedRecipe = recipe?.recipe && typeof recipe.recipe === 'object' ? recipe.recipe : null
 
-  const ingredientGroups = asArray(recipe.ingredientGroups).length
-    ? asArray(recipe.ingredientGroups).map((group) => normalizeIngredientGroup(group))
+  const rawIngredients = firstArray(
+    recipe.ingredients,
+    nestedRecipe?.ingredients,
+    recipe.ingredients_json,
+    nestedRecipe?.ingredients_json,
+  )
+  const rawIngredientGroups = firstArray(
+    recipe.ingredientGroups,
+    nestedRecipe?.ingredientGroups,
+    recipe.ingredient_groups,
+    nestedRecipe?.ingredient_groups,
+  )
+  const legacyInstructionSteps = firstArray(
+    recipe.instructions,
+    nestedRecipe?.instructions,
+    recipe.steps,
+    nestedRecipe?.steps,
+    recipe.instructions_json,
+    nestedRecipe?.instructions_json,
+  )
+  const rawInstructionGroups = firstArray(
+    recipe.instructionGroups,
+    nestedRecipe?.instructionGroups,
+    recipe.instruction_groups,
+    nestedRecipe?.instruction_groups,
+  )
+
+  const ingredientGroups = rawIngredientGroups.length
+    ? rawIngredientGroups.map((group) => normalizeIngredientGroup(group))
     : [normalizeIngredientGroup({
         label: undefined,
-        ingredients: asArray(recipe.ingredients).map((ingredient) => {
+        ingredients: rawIngredients.map((ingredient) => {
           if (typeof ingredient === 'string') return ingredient
           return {
             amount: ingredient?.amount ?? ingredient?.quantity ?? '',
             unit: ingredient?.unit ?? '',
-            item: ingredient?.item ?? ingredient?.name ?? '',
+            item: ingredient?.item ?? ingredient?.name ?? ingredient?.ingredient ?? '',
             note: ingredient?.note,
             optional: ingredient?.optional,
           }
         }),
       })]
 
-  const instructionGroups = asArray(recipe.instructionGroups).length
-    ? asArray(recipe.instructionGroups).map((group) => normalizeInstructionGroup(group))
+  const instructionGroups = rawInstructionGroups.length
+    ? rawInstructionGroups.map((group) => normalizeInstructionGroup(group))
     : [normalizeInstructionGroup({
         label: undefined,
-        steps: legacyInstructionSteps.map((step) => (typeof step === 'string' ? { text: step } : step)),
+        steps: legacyInstructionSteps.map((step) => {
+          if (typeof step === 'string') return { text: step }
+          return { text: step?.text ?? step?.instruction ?? step?.step ?? '', tip: step?.tip }
+        }),
       })]
 
   const prepTime = asNumber(recipe.prepTime ?? recipe.prep_time_minutes, 0)

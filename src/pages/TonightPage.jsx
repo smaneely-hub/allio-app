@@ -1689,9 +1689,12 @@ export function TonightPage() {
                 <h3 className="mb-2 text-sm font-semibold text-text-primary">Ingredients</h3>
                 <ul className="space-y-1 text-sm text-text-secondary">
                   {(activeMeal.ingredients || []).length > 0 ? (
-                    activeMeal.ingredients.map((ing, i) => (
-                      <li key={i}>{typeof ing === 'string' ? ing : ''}</li>
-                    ))
+                    activeMeal.ingredients.map((ing, i) => {
+                      const label = typeof ing === 'string'
+                        ? ing
+                        : [ing?.amount ?? ing?.quantity ?? '', ing?.unit ?? '', ing?.item ?? ing?.name ?? ing?.ingredient ?? ''].filter(Boolean).join(' ').trim()
+                      return <li key={i}>{label || 'Ingredient'}</li>
+                    })
                   ) : (
                     <li>No ingredients listed</li>
                   )}
