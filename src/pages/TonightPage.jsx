@@ -427,8 +427,71 @@ export function TonightPage() {
   const [cookingMode, setCookingMode] = useState(false)
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [ingredientChecks, setIngredientChecks] = useState({})
+  const [shoppingListItems, setShoppingListItems] = useState([])
 
   const activeMeal = mealQueue[0] || meal
+  const renderInstructions = activeMeal?.instructions || activeMeal?.steps || activeMeal?.directions || activeMeal?.method || []
+
+  async function mergeMealIntoShoppingList(targetMeal, successMessage = 'Added to shopping list ✓') {
+    if (!user?.id || !targetMeal) return null
+
+    const household = await getHousehold(user.id)
+    const today = new Date().toISOString().split('T')[0]
+    const nextItems = buildShoppingItemsFromMeal(targetMeal, staplesOnHand || household?.staples_on_hand || '')
+
+    const { data: existingList, error: loadError } = await supabase
+      .from('shopping_lists')
+      .select('id, items')
+      .eq('user_id', user.id)
+      .eq('week_of', today)
+      .maybeSingle()
+
+    if (loadError) throw loadError
+
+    const merged = new Map()
+    for (const item of Array.isArray(existingList?.items) ? existingList.items : []) {
+      const key = `${String(item?.name || '').trim().toLowerCase()}::${String(item?.unit || '').trim().toLowerCase()}`
+      if (!key) continue
+      merged.set(key, {
+        ...item,
+        quantity: Number(item?.quantity || 0),
+        used_in: Array.isArray(item?.used_in) ? [...item.used_in] : [],
+      })
+    }
+
+    for (const item of nextItems) {
+      const key = `${String(item?.name || '').trim().toLowerCase()}::${String(item?.unit || '').trim().toLowerCase()}`
+      if (!key) continue
+      const existing = merged.get(key)
+      if (existing) {
+        const existingUsedIn = new Set(Array.isArray(existing.used_in) ? existing.used_in : [])
+        const nextUsedIn = Array.isArray(item.used_in) ? item.used_in : []
+        const isSameUsage = nextUsedIn.length > 0 && nextUsedIn.every((value) => existingUsedIn.has(value))
+        if (!isSameUsage) {
+          existing.quantity += Number(item.quantity || 0)
+          for (const usage of nextUsedIn) existingUsedIn.add(usage)
+          existing.used_in = Array.from(existingUsedIn)
+        }
+      } else {
+        merged.set(key, {
+          ...item,
+          quantity: Number(item.quantity || 0),
+          used_in: Array.isArray(item.used_in) ? [...item.used_in] : [],
+        })
+      }
+    }
+
+    const mergedItems = Array.from(merged.values())
+    await upsertShoppingListForDate({
+      userId: user.id,
+      householdId: household?.id || null,
+      weekOf: today,
+      items: mergedItems,
+    })
+    setShoppingListItems(mergedItems)
+    toast.success(successMessage)
+    return mergedItems
+  }
 
   const mealFitReasons = useMemo(() => {
     if (!activeMeal) return []
@@ -450,7 +513,7 @@ export function TonightPage() {
   }, [activeMeal, selectedMembers.length, staplesOnHand])
 
   const shoppingPrepItems = useMemo(() => {
-    const parsed = (activeMeal?.ingredients || [])
+    const parsed = (shoppingListItems.length > 0 ? shoppingListItems : (activeMeal?.ingredients || []))
       .map((ingredient, index) => {
         const parsedIngredient = parseIngredient(ingredient)
         return parsedIngredient ? {
@@ -464,7 +527,7 @@ export function TonightPage() {
       .filter(Boolean)
 
     return groupItemsByCategory(parsed)
-  }, [activeMeal])
+  }, [activeMeal, shoppingListItems])
 
   const cookingProgress = useMemo(() => {
     const totalSteps = Math.max((meal?.instructions || []).length, 1)
@@ -824,6 +887,7 @@ export function TonightPage() {
       normalized = presentation.meal
       setMeal(normalized)
       setMealQueue([{ meal: normalized, image: presentation.image }])
+      await mergeMealIntoShoppingList(normalized, 'Shopping list updated ✓')
       setFeedback('')
       setRefinementChanges([])  // Clear refinement state on new generation
       setMealInstanceId(null)   // Clear old instance ID for new meal
@@ -992,6 +1056,7 @@ export function TonightPage() {
       normalized = presentation.meal
       setMeal(normalized)
       setMealQueue([{ meal: normalized, image: presentation.image }])
+      await mergeMealIntoShoppingList(normalized, 'Shopping list updated ✓')
       setFeedback('')
       setCooked(false)
       setRefinementChanges([])  // Clear refinement state on swap
@@ -1623,13 +1688,13 @@ export function TonightPage() {
               </div>
 
               <div className="mb-4 rounded-xl bg-white p-4 shadow-sm">
-                {(activeMeal.instructions || []).length > 0 ? (
+                {Array.isArray(renderInstructions) && renderInstructions.length > 0 ? (
                   <>
                     <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">Current step</div>
-                    <p className="mt-2 text-lg font-medium leading-7 text-text-primary">{activeMeal.instructions[currentStepIndex] || activeMeal.instructions[0]}</p>
+                    <p className="mt-2 text-lg font-medium leading-7 text-text-primary">{renderInstructions[currentStepIndex] || renderInstructions[0]}</p>
                   </>
                 ) : (
-                  <p className="text-sm text-text-secondary">No instructions listed</p>
+                  <p className="text-sm text-text-secondary">No instructions returned</p>
                 )}
               </div>
 
@@ -1675,8 +1740,8 @@ export function TonightPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCurrentStepIndex((prev) => Math.min(prev + 1, Math.max((activeMeal.instructions || []).length - 1, 0)))}
-                  disabled={currentStepIndex >= Math.max((activeMeal.instructions || []).length - 1, 0)}
+                  onClick={() => setCurrentStepIndex((prev) => Math.min(prev + 1, Math.max((renderInstructions || []).length - 1, 0)))}
+                  disabled={currentStepIndex >= Math.max((renderInstructions || []).length - 1, 0)}
                   className="flex-1 rounded-full bg-primary-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
                 >
                   Next step
@@ -1703,16 +1768,16 @@ export function TonightPage() {
 
               <div className="mb-4">
                 <h3 className="mb-2 text-sm font-semibold text-text-primary">Instructions</h3>
-                <ol className="space-y-2 text-sm text-text-secondary">
-                  {(activeMeal.instructions || []).length > 0 ? (
-                    activeMeal.instructions.map((step, i) => (
-                      <li key={i} className="flex gap-2">
-                        <span className="font-semibold text-text-primary">{i + 1}.</span>
+                <ol className="space-y-3 text-sm leading-7 text-text-secondary">
+                  {Array.isArray(renderInstructions) && renderInstructions.length > 0 ? (
+                    renderInstructions.map((step, i) => (
+                      <li key={i} className="flex gap-3">
+                        <span className="min-w-5 font-semibold text-text-primary">{i + 1}.</span>
                         <span>{typeof step === 'string' ? step : ''}</span>
                       </li>
                     ))
                   ) : (
-                    <li>No instructions listed</li>
+                    <li className="text-text-muted">No instructions returned</li>
                   )}
                 </ol>
               </div>
@@ -1793,6 +1858,14 @@ export function TonightPage() {
           </div>
 
           <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => mergeMealIntoShoppingList(activeMeal)}
+              disabled={generating || !activeMeal}
+              className="flex-1 rounded-full bg-warm-100 px-4 py-2 text-sm font-semibold text-text-primary shadow-sm disabled:opacity-50 hover:bg-warm-200"
+            >
+              Add to Shopping List
+            </button>
             <button
               type="button"
               onClick={refineCurrentMeal}

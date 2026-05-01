@@ -2,6 +2,14 @@ function asArray(value) {
   return Array.isArray(value) ? value : []
 }
 
+function splitInstructionString(value) {
+  if (typeof value !== 'string') return []
+  return value
+    .split(/\r?\n+/)
+    .map((step) => step.trim())
+    .filter(Boolean)
+}
+
 function firstArray(...values) {
   for (const value of values) {
     if (Array.isArray(value) && value.length > 0) return value
@@ -83,9 +91,23 @@ export function normalizeRecipe(recipe = {}) {
     nestedRecipe?.instructions,
     recipe.steps,
     nestedRecipe?.steps,
+    recipe.directions,
+    nestedRecipe?.directions,
+    recipe.method,
+    nestedRecipe?.method,
     recipe.instructions_json,
     nestedRecipe?.instructions_json,
   )
+  const instructionString = [
+    recipe.instructions,
+    nestedRecipe?.instructions,
+    recipe.steps,
+    nestedRecipe?.steps,
+    recipe.directions,
+    nestedRecipe?.directions,
+    recipe.method,
+    nestedRecipe?.method,
+  ].find((value) => typeof value === 'string' && value.trim()) || ''
   const rawInstructionGroups = firstArray(
     recipe.instructionGroups,
     nestedRecipe?.instructionGroups,
@@ -113,7 +135,7 @@ export function normalizeRecipe(recipe = {}) {
     ? rawInstructionGroups.map((group) => normalizeInstructionGroup(group))
     : [normalizeInstructionGroup({
         label: undefined,
-        steps: legacyInstructionSteps.map((step) => {
+        steps: (legacyInstructionSteps.length ? legacyInstructionSteps : splitInstructionString(instructionString)).map((step) => {
           if (typeof step === 'string') return { text: step }
           return { text: step?.text ?? step?.instruction ?? step?.step ?? '', tip: step?.tip }
         }),
