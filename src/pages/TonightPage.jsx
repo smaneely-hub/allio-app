@@ -27,6 +27,58 @@ function parseJsonField(value, fallback = []) {
   }
 }
 
+const DEFAULT_IMAGE = { url: null, photographer: null, photographerUrl: null }
+
+async function fetchRecipeImage(dishName) {
+  const query = dishName || 'food'
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-recipe-image`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ query }),
+      }
+    )
+    const data = await res.json()
+    return {
+      url: typeof data?.imageUrl === 'string' && data.imageUrl.trim() ? data.imageUrl.trim() : null,
+      photographer: typeof data?.photographer === 'string' && data.photographer.trim() ? data.photographer.trim() : null,
+      photographerUrl: typeof data?.pexelsLink === 'string' && data.pexelsLink.trim() ? data.pexelsLink.trim() : null,
+    }
+  } catch {
+    return DEFAULT_IMAGE
+  }
+}
+
+async function enrichMealPresentation(meal) {
+  if (!meal) return { meal, image: DEFAULT_IMAGE }
+  if (meal.image || meal.image_url) {
+    return {
+      meal,
+      image: {
+        url: meal.image || meal.image_url || null,
+        photographer: null,
+        photographerUrl: null,
+      },
+    }
+  }
+
+  const image = await fetchRecipeImage(meal.name)
+  const nextMeal = {
+    ...meal,
+    image: image.url || meal.image || null,
+    image_url: image.url || meal.image_url || null,
+  }
+
+  return { meal: nextMeal, image }
+}
+
 function recipeMatchesDiet(recipe, dietaryFocus = '') {
   if (!dietaryFocus) return true
 
@@ -768,8 +820,10 @@ export function TonightPage() {
         console.log('[TonightPage] received meal:', data.plan.meals[0])
         normalized = normalizeMealRecord(data.plan.meals[0])
       }
+      const presentation = await enrichMealPresentation(normalized)
+      normalized = presentation.meal
       setMeal(normalized)
-      setMealQueue([{ meal: normalized, image: normalized.image ? { url: normalized.image } : { url: null, photographer: null, photographerUrl: null } }])
+      setMealQueue([{ meal: normalized, image: presentation.image }])
       setFeedback('')
       setRefinementChanges([])  // Clear refinement state on new generation
       setMealInstanceId(null)   // Clear old instance ID for new meal
@@ -934,8 +988,10 @@ export function TonightPage() {
       } else {
         normalized = normalizeMealRecord(data.plan.meals[0])
       }
+      const presentation = await enrichMealPresentation(normalized)
+      normalized = presentation.meal
       setMeal(normalized)
-      setMealQueue([{ meal: normalized, image: normalized.image ? { url: normalized.image } : { url: null, photographer: null, photographerUrl: null } }])
+      setMealQueue([{ meal: normalized, image: presentation.image }])
       setFeedback('')
       setCooked(false)
       setRefinementChanges([])  // Clear refinement state on swap
