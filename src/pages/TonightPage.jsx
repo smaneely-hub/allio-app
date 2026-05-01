@@ -706,7 +706,7 @@ export function TonightPage() {
           {
             day: 'mon',
             meal: 'dinner',
-            effort: effort,
+            effort_level: effort,
             planning_notes: [finalDietFocus ? `diet: ${finalDietFocus}` : '', finalFeedback ? `feedback: ${finalFeedback}` : ''].filter(Boolean).join('; '),
           },
         ],
@@ -891,7 +891,7 @@ export function TonightPage() {
           {
             day: String(meal?.day || 'mon'),
             meal: String(meal?.meal || 'dinner'),
-            effort: effort,
+            effort_level: effort,
             planning_notes: [finalDietFocus ? `diet: ${finalDietFocus}` : '', finalFeedback ? `feedback: ${finalFeedback}` : ''].filter(Boolean).join('; '),
           },
         ],
