@@ -28,6 +28,8 @@ const CATEGORY_EMOJI = {
   Other: '📦',
 }
 
+const PLANNER_VIEW_MODE_KEY = 'planner.viewMode'
+
 export function PlannerPage() {
   useDocumentTitle('Weekly Plan | Allio')
   const { household, members, loading: householdLoading } = useHousehold()
@@ -38,13 +40,17 @@ export function PlannerPage() {
   const [shoppingDay, setShoppingDay] = useState('Sunday')
   const [weekNotes, setWeekNotes] = useState('')
   const [selectedDate, setSelectedDate] = useState(new Date())
-  const [viewMode, setViewMode] = useState('week')
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem(PLANNER_VIEW_MODE_KEY) || 'week')
   const [slotState, setSlotState] = useState({})
   const [saving, setSaving] = useState(false)
   const [shoppingItems, setShoppingItems] = useState([])
   const [dayActionTarget, setDayActionTarget] = useState(null)
   const [mealActionTarget, setMealActionTarget] = useState(null)
   const [addMealTarget, setAddMealTarget] = useState(null)
+
+  useEffect(() => {
+    localStorage.setItem(PLANNER_VIEW_MODE_KEY, viewMode)
+  }, [viewMode])
 
   useEffect(() => {
     if (!schedule) return
@@ -84,6 +90,7 @@ export function PlannerPage() {
   const activeSlots = Object.values(slotState).filter((slot) => slot.active && slot.attendees?.length > 0)
   const loading = householdLoading || scheduleLoading || (schedule && slots.length > 0 && Object.keys(slotState).length === 0)
   const groupedShopping = useMemo(() => groupByCategory(shoppingItems), [shoppingItems])
+  const visibleWeekDates = useMemo(() => Array.from({ length: 7 }, (_, index) => addDays(new Date(selectedDate), index - ((new Date(selectedDate).getDay() + 6) % 7)).toISOString().slice(0, 10)), [selectedDate])
 
   const handlePrevRange = () => setSelectedDate((current) => addDays(current, viewMode === 'day' ? -1 : -7))
   const handleNextRange = () => setSelectedDate((current) => addDays(current, viewMode === 'day' ? 1 : 7))
@@ -97,35 +104,17 @@ export function PlannerPage() {
     setAddMealTarget({ day, mealSlot, existingMealId })
   }
 
-  const handleCopyPreviousDay = (day) => {
-    const currentIndex = days.findIndex((label) => label.slice(0, 3).toLowerCase() === day.key)
-    if (currentIndex <= 0) return toast('There is no previous day to copy from yet.')
-    const previousKey = days[currentIndex - 1].slice(0, 3).toLowerCase()
-    const copiedEntries = Object.entries(slotState).filter(([key, slot]) => key.startsWith(`${previousKey}-`) && slot.active).map(([key, slot]) => {
-      const [, mealType] = key.split(/-(.+)/)
-      return [`${day.key}-${mealType}`, { ...slot, day_of_week: day.key, meal_type: mealType, active: true, attendees: Array.isArray(slot.attendees) ? [...slot.attendees] : [] }]
-    })
-    if (copiedEntries.length === 0) return toast(`No active slots found on the previous day to copy into ${day.dayName}.`)
-    setSlotState((current) => {
-      const next = { ...current }
-      copiedEntries.forEach(([key, value]) => { next[key] = value })
-      return next
-    })
-    setSelectedDate(day.date)
-    toast.success(`Copied ${copiedEntries.length} slot${copiedEntries.length === 1 ? '' : 's'} from the previous day.`)
-  }
-
   const handleCreateBlankDay = (day) => {
     setSelectedDate(day.date)
     setSlotState((current) => {
       const next = { ...current }
       ;['breakfast', 'lunch', 'dinner', 'snack'].forEach((mealType) => {
         const key = `${day.key}-${mealType}`
-        if (!next[key]) next[key] = { day_of_week: day.key, meal_type: mealType, active: false, attendees: [], is_leftover: false, leftover_source: '', effort_level: 'medium', planning_notes: '' }
+        next[key] = { day_of_week: day.key, meal_type: mealType, active: false, attendees: [], is_leftover: false, leftover_source: '', effort_level: 'medium', planning_notes: '' }
       })
       return next
     })
-    toast(`Blank day workspace opened for ${day.dayName}.`)
+    toast('Blank day inserted.')
   }
 
   const handleClearPlan = async () => {
@@ -145,14 +134,23 @@ export function PlannerPage() {
   const handleClearDay = (dayDate) => {
     const target = new Date(dayDate)
     const dayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][target.getDay()]
-    setSlotState((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${dayKey}-`))))
+    setSlotState((current) => Object.fromEntries(Object.entries(current).map(([key, value]) => (
+      key.startsWith(`${dayKey}-`) ? [key, { ...value, active: false, attendees: [] }] : [key, value]
+    ))))
     toast.success('Day cleared.')
   }
 
   const handleAddDayNote = (dayDate, note) => { toast(note ? `Note saved for ${dayDate}.` : 'Note cleared.') }
   const handleCopyDayTo = (dayDate, targetDate) => { toast.success(`Copied ${dayDate} to ${targetDate}.`) }
   const handleOpenMeal = () => {}
-  const handleRemoveMealFromPlan = () => { toast('TODO: remove-meal handler not found in repo, skipping wiring for now.') }
+
+  const handleMealAction = (action, meal) => {
+    if (action === 'replace') {
+      handleOpenAddMeal({ key: meal.day, date: new Date(selectedDate) }, meal.meal, meal.id)
+      return
+    }
+    toast('Coming soon')
+  }
 
   const handleGenerate = async () => {
     if (!members.length) return toast.error('Add household members first.')
@@ -186,7 +184,7 @@ export function PlannerPage() {
 
   return (
     <div className="min-h-screen bg-surface-base pb-24">
-      <div className="mx-auto max-w-md px-4 pb-24">
+      <div className="mx-auto max-w-2xl px-4 pb-24">
         <div className="flex items-center justify-between pt-4">
           <h1 className="font-display text-xl text-ink-primary">Planner</h1>
           <div className="flex gap-2">
@@ -210,7 +208,17 @@ export function PlannerPage() {
           />
         )}
 
-        <DayActionsMenu dayDate={dayActionTarget?.date?.toISOString?.().slice(0, 10) || ''} open={Boolean(dayActionTarget)} onClose={() => setDayActionTarget(null)} onRegenerateDay={() => dayActionTarget && handleGenerateDay(dayActionTarget)} onCopyDay={handleCopyDayTo} onInsertDay={() => dayActionTarget && handleCreateBlankDay(dayActionTarget)} onAddNote={handleAddDayNote} onClearDay={handleClearDay} />
+        <DayActionsMenu
+          dayDate={dayActionTarget?.date?.toISOString?.().slice(0, 10) || ''}
+          open={Boolean(dayActionTarget)}
+          onClose={() => setDayActionTarget(null)}
+          onRegenerateDay={() => dayActionTarget && handleGenerateDay(dayActionTarget)}
+          onCopyDay={handleCopyDayTo}
+          onInsertDay={() => dayActionTarget && handleCreateBlankDay(dayActionTarget)}
+          onAddNote={handleAddDayNote}
+          onClearDay={handleClearDay}
+          visibleWeekDates={visibleWeekDates}
+        />
 
         <PlannerActionSheet
           isOpen={Boolean(mealActionTarget)}
@@ -218,8 +226,9 @@ export function PlannerPage() {
           title={mealActionTarget ? `${mealActionTarget.label} actions` : 'Meal actions'}
           subtitle="Meal-level tools"
           actions={mealActionTarget ? [
-            { label: 'Change Source', onClick: () => { setMealActionTarget(null); handleOpenAddMeal({ key: mealActionTarget.meal.day, date: new Date() }, mealActionTarget.meal.meal, mealActionTarget.meal.id) } },
-            { label: 'Remove from plan', onClick: () => handleRemoveMealFromPlan(mealActionTarget.meal), danger: true },
+            { label: 'Regenerate this meal', onClick: () => handleMealAction('regenerate', mealActionTarget.meal) },
+            { label: 'Replace…', onClick: () => handleMealAction('replace', mealActionTarget.meal) },
+            { label: 'Remove', onClick: () => handleMealAction('remove', mealActionTarget.meal), danger: true },
           ] : []}
         />
 

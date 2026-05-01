@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { addDays, buildPlannerWeek, formatWeekLabel } from '../../lib/planner'
+import { useEffect, useMemo, useState } from 'react'
+import { addDays, buildPlannerWeek, getStartOfWeek } from '../../lib/planner'
 import { MealCard } from './MealCard'
 
 function ChevronLeftIcon(props) {
@@ -36,83 +36,118 @@ function MoreVerticalIcon(props) {
   )
 }
 
+function DonutMacro({ nutrition }) {
+  const carbs = Number(nutrition?.carbs || 0)
+  const fat = Number(nutrition?.fat || 0)
+  const protein = Number(nutrition?.protein || 0)
+  const total = carbs + fat + protein
+  if (!total) return null
+
+  const radius = 13
+  const circumference = 2 * Math.PI * radius
+  const segments = [
+    { value: carbs, className: 'text-primary-400' },
+    { value: fat, className: 'text-secondary-400' },
+    { value: protein, className: 'text-accent-blue' },
+  ].filter((segment) => segment.value > 0)
+
+  let offset = 0
+
+  return (
+    <svg viewBox="0 0 32 32" className="h-8 w-8 -rotate-90">
+      <circle cx="16" cy="16" r={radius} fill="none" stroke="currentColor" strokeWidth="4" className="text-surface-muted" />
+      {segments.map((segment, index) => {
+        const length = (segment.value / total) * circumference
+        const dashOffset = -offset
+        offset += length
+        return (
+          <circle
+            key={`${segment.className}-${index}`}
+            cx="16"
+            cy="16"
+            r={radius}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeDasharray={`${length} ${circumference - length}`}
+            strokeDashoffset={dashOffset}
+            className={segment.className}
+          />
+        )
+      })}
+    </svg>
+  )
+}
+
 function EmptyDayState({ onAddMeal }) {
   return (
-    <div className="rounded-xl bg-surface-card p-4 shadow-card">
-      <div className="text-sm text-ink-secondary">No meals planned</div>
-      <button type="button" onClick={onAddMeal} className="btn-secondary mt-3 text-sm">
-        Add meal
+    <div className="px-1 py-2 text-sm text-ink-secondary">
+      No meals planned{' '}
+      <button type="button" onClick={onAddMeal} className="font-medium text-ink-primary underline underline-offset-2">
+        + Add meal
       </button>
     </div>
   )
 }
 
-function DaySection({ day, defaultOpen = false, onOpenMeal, onOpenDayActions, onOpenMealActions, onOpenAddMeal }) {
-  const [open, setOpen] = useState(defaultOpen)
+function formatWeekRange(week) {
+  const start = week[0]?.date
+  const end = week[6]?.date
+  if (!start || !end) return ''
+  return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+}
+
+function formatRelativeWeekLabel(weekStart) {
+  const todayStart = getStartOfWeek(new Date())
+  const diff = Math.round((getStartOfWeek(weekStart).getTime() - todayStart.getTime()) / (1000 * 60 * 60 * 24))
+  if (diff === 0) return 'This Week'
+  if (diff === 7) return 'Next Week'
+  if (diff === -7) return 'Last Week'
+  return `Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+}
+
+function formatDayRange(date) {
+  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+}
+
+function DaySection({ day, expanded, onToggle, onOpenMeal, onOpenDayActions, onOpenMealActions, onOpenAddMeal, showHeaderActions = true }) {
+  const isToday = day.date.toDateString() === new Date().toDateString()
 
   return (
-    <section className="overflow-hidden rounded-2xl bg-surface-base">
-      <div className="flex items-center gap-3 px-1 py-3">
-        <button type="button" onClick={() => setOpen((v) => !v)} className="flex flex-1 items-center gap-3 text-left">
+    <section className="relative rounded-2xl bg-white px-3 py-2">
+      {isToday ? <span className="absolute left-0 top-4 h-10 w-1 rounded-full bg-primary-400" /> : null}
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={onToggle} className="flex flex-1 items-center gap-3 text-left">
           <div className="min-w-0 flex-1">
             <div className="font-display text-lg text-ink-primary">{day.dayName}</div>
             <div className="text-sm text-ink-secondary">{day.dateLabel}</div>
           </div>
-          <div className="text-sm text-ink-tertiary">— kcal</div>
-          <ChevronDownIcon className={`h-4 w-4 text-ink-tertiary transition-transform ${open ? 'rotate-180' : ''}`} />
+          <div className="flex items-center gap-3">
+            <DonutMacro nutrition={day.nutrition} />
+            <div className="text-right">
+              <div className="text-sm font-medium tabular-nums text-ink-primary">{day.totalCalories || '—'}</div>
+              <div className="text-xs text-ink-secondary">kcal</div>
+            </div>
+          </div>
+          <ChevronDownIcon className={`h-5 w-5 text-ink-tertiary transition-transform duration-150 ${expanded ? 'rotate-180' : ''}`} />
         </button>
-        <button type="button" onClick={() => onOpenDayActions(day)} className="flex h-10 w-10 items-center justify-center text-ink-tertiary" aria-label="Day actions">
-          <MoreVerticalIcon className="h-5 w-5" />
-        </button>
+        {showHeaderActions ? (
+          <button type="button" onClick={() => onOpenDayActions(day)} className="flex h-10 w-10 items-center justify-center text-ink-tertiary" aria-label="Day actions">
+            <MoreVerticalIcon className="h-5 w-5" />
+          </button>
+        ) : null}
       </div>
 
-      {open ? (
-        <div className="space-y-2 pb-3">
+      {expanded ? (
+        <div className="space-y-2 pb-1 pt-3 transition-all duration-150">
           {day.meals.length === 0 ? <EmptyDayState onAddMeal={() => onOpenAddMeal(day, 'dinner')} /> : null}
-          {day.mealGroups.map((group) => (
-            <div key={group.slot} className="space-y-2">
-              <div className="flex items-center justify-between px-1 pt-1">
-                <div className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">{group.label}</div>
-                {group.meals.length === 0 ? (
-                  <button type="button" onClick={() => onOpenAddMeal(day, group.slot)} className="text-xs font-medium text-accent-blue">Add meal</button>
-                ) : null}
-              </div>
-              {group.meals.length > 0 ? group.meals.map((meal) => (
-                <MealCard key={meal.id} meal={meal} onOpenMeal={onOpenMeal} onActionsClick={(mealId) => onOpenMealActions({ mealId, meal, label: meal.title || meal.name || group.label })} />
-              )) : (
-                <div className="rounded-xl border border-dashed border-surface-muted bg-surface-card px-3 py-3 text-sm text-ink-secondary">No meal planned</div>
-              )}
-            </div>
+          {day.meals.map((meal) => (
+            <MealCard key={meal.id} meal={meal} onOpenMeal={onOpenMeal} onActionsClick={() => onOpenMealActions({ meal, label: meal.title || meal.name || 'Meal' })} />
           ))}
         </div>
       ) : null}
     </section>
-  )
-}
-
-function DayViewContent({ selectedDay, onOpenMeal, onOpenMealActions, onOpenAddMeal }) {
-  if (!selectedDay) return null
-
-  return (
-    <div className="space-y-3">
-      {selectedDay.mealGroups.map((group) => (
-        <div key={group.slot} className="rounded-2xl bg-surface-card p-4 shadow-card">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="text-xs font-semibold uppercase tracking-wider text-ink-tertiary">{group.label}</div>
-            {group.meals.length === 0 ? <button type="button" onClick={() => onOpenAddMeal(selectedDay, group.slot)} className="text-xs font-medium text-accent-blue">Add meal</button> : null}
-          </div>
-          {group.meals.length > 0 ? (
-            <div className="space-y-2">
-              {group.meals.map((meal) => (
-                <MealCard key={meal.id} meal={meal} onOpenMeal={onOpenMeal} onActionsClick={(mealId) => onOpenMealActions({ mealId, meal, label: meal.title || meal.name || group.label })} />
-              ))}
-            </div>
-          ) : (
-            <EmptyDayState onAddMeal={() => onOpenAddMeal(selectedDay, group.slot)} />
-          )}
-        </div>
-      ))}
-    </div>
   )
 }
 
@@ -131,50 +166,95 @@ export function MealPlanWorkspace({
   const windowStart = useMemo(() => {
     const next = new Date(selectedDate)
     next.setHours(0, 0, 0, 0)
-    return next
-  }, [selectedDate])
-  const plannerWeek = useMemo(() => buildPlannerWeek({ weekStart: windowStart, meals }), [meals, windowStart])
-  const selectedDay = useMemo(() => plannerWeek[0] || null, [plannerWeek])
-  const today = new Date()
+    return viewMode === 'week' ? getStartOfWeek(next) : next
+  }, [selectedDate, viewMode])
+  const plannerWeek = useMemo(() => buildPlannerWeek({ weekStart: viewStart(windowStart, viewMode), meals }), [meals, windowStart, viewMode])
+  const selectedDay = useMemo(() => {
+    if (viewMode === 'day') {
+      return plannerWeek.find((day) => day.date.toDateString() === windowStart.toDateString()) || plannerWeek[0] || null
+    }
+    return plannerWeek[0] || null
+  }, [plannerWeek, viewMode, windowStart])
+  const [expandedDays, setExpandedDays] = useState({})
+  const [animateKey, setAnimateKey] = useState(0)
+
+  useEffect(() => {
+    const todayString = new Date().toDateString()
+    setExpandedDays((current) => {
+      const next = {}
+      plannerWeek.forEach((day) => {
+        next[day.key] = day.date.toDateString() === todayString
+      })
+      return Object.keys(current).length > 0 ? { ...next, ...current } : next
+    })
+  }, [plannerWeek])
+
+  useEffect(() => {
+    setAnimateKey((current) => current + 1)
+  }, [windowStart.toDateString(), viewMode])
 
   return (
     <div className="min-h-screen bg-surface-base">
-      <div className="sticky top-0 z-10 bg-surface-base pt-0">
-        <div className="mx-auto max-w-md px-4 pb-4 pt-4">
-          <div className="flex items-center justify-between">
-            <button type="button" onClick={onPrev} className="flex h-10 w-10 items-center justify-center text-ink-primary" aria-label="Previous range">
-              <ChevronLeftIcon className="h-5 w-5" />
-            </button>
-            <div className="text-center text-sm font-medium text-ink-primary">{formatWeekLabel(windowStart)}</div>
-            <button type="button" onClick={onNext} className="flex h-10 w-10 items-center justify-center text-ink-primary" aria-label="Next range">
-              <ChevronRightIcon className="h-5 w-5" />
-            </button>
+      <div className="sticky top-0 z-20 border-b border-surface-muted bg-white">
+        <div className="mx-auto max-w-2xl px-4 pb-4 pt-3">
+          <div className="flex justify-center">
+            <div className="inline-flex rounded-full bg-surface-muted p-1">
+              {['day', 'week'].map((mode) => {
+                const active = viewMode === mode
+                return (
+                  <button key={mode} type="button" onClick={() => onChangeViewMode(mode)} className={`h-9 rounded-full px-5 text-sm font-medium transition ${active ? 'bg-white text-ink-primary shadow-card' : 'text-ink-secondary'}`}>
+                    {mode === 'day' ? 'Day' : 'Week'}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
-          <div className="mt-4 inline-flex rounded-full bg-surface-muted p-1">
-            {['day', 'week'].map((mode) => {
-              const active = viewMode === mode
-              return (
-                <button key={mode} type="button" onClick={() => onChangeViewMode(mode)} className={`rounded-full px-4 py-2 text-sm font-medium transition ${active ? 'bg-surface-card text-ink-primary shadow-card' : 'text-ink-secondary'}`}>
-                  {mode === 'day' ? 'Day' : 'Week'}
-                </button>
-              )
-            })}
+          <div className="mt-3 grid grid-cols-[40px_1fr_40px] items-center gap-3">
+            <button type="button" onClick={onPrev} className="flex h-10 w-10 items-center justify-center rounded-full text-ink-primary" aria-label="Previous range">
+              <ChevronLeftIcon className="h-5 w-5" />
+            </button>
+            <div className="text-center">
+              <div className="font-display text-lg text-ink-primary">{viewMode === 'week' ? formatRelativeWeekLabel(windowStart) : selectedDay ? selectedDay.dayName : formatDayRange(windowStart)}</div>
+              <div className="text-sm text-ink-secondary">{viewMode === 'week' ? formatWeekRange(plannerWeek) : formatDayRange(windowStart)}</div>
+            </div>
+            <button type="button" onClick={onNext} className="flex h-10 w-10 items-center justify-center rounded-full text-ink-primary" aria-label="Next range">
+              <ChevronRightIcon className="h-5 w-5" />
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-md px-4 pb-24">
-        {viewMode === 'week' ? (
-          <div className="space-y-2">
-            {plannerWeek.map((day) => (
-              <DaySection key={day.key} day={day} defaultOpen={day.date.toDateString() === today.toDateString()} onOpenMeal={onOpenMeal} onOpenDayActions={onOpenDayActions} onOpenMealActions={onOpenMealActions} onOpenAddMeal={onOpenAddMeal} />
-            ))}
-          </div>
-        ) : (
-          <DayViewContent selectedDay={selectedDay} onOpenMeal={onOpenMeal} onOpenMealActions={onOpenMealActions} onOpenAddMeal={onOpenAddMeal} />
-        )}
+      <div className="mx-auto max-w-2xl px-4 pb-24 pt-4">
+        <div key={animateKey} className="animate-fadeIn space-y-3">
+          {viewMode === 'week' ? plannerWeek.map((day) => (
+            <DaySection
+              key={day.key}
+              day={day}
+              expanded={Boolean(expandedDays[day.key])}
+              onToggle={() => setExpandedDays((current) => ({ ...current, [day.key]: !current[day.key] }))}
+              onOpenMeal={onOpenMeal}
+              onOpenDayActions={onOpenDayActions}
+              onOpenMealActions={onOpenMealActions}
+              onOpenAddMeal={onOpenAddMeal}
+            />
+          )) : selectedDay ? (
+            <DaySection
+              day={selectedDay}
+              expanded
+              onToggle={() => {}}
+              onOpenMeal={onOpenMeal}
+              onOpenDayActions={onOpenDayActions}
+              onOpenMealActions={onOpenMealActions}
+              onOpenAddMeal={onOpenAddMeal}
+            />
+          ) : null}
+        </div>
       </div>
     </div>
   )
+}
+
+function viewStart(date, viewMode) {
+  return viewMode === 'week' ? getStartOfWeek(date) : getStartOfWeek(date)
 }

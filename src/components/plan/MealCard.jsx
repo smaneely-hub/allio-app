@@ -106,8 +106,8 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
 
   if (meal.swap_pending) {
     return (
-      <div className="flex items-center gap-3 rounded-xl bg-surface-card p-3 shadow-card">
-        <div className="h-16 w-16 shrink-0 animate-pulse rounded-lg bg-surface-muted" />
+      <div className="card flex items-center gap-3 p-3">
+        <div className="h-16 w-16 shrink-0 animate-pulse rounded-xl bg-surface-muted" />
         <div className="flex-1 space-y-2 animate-pulse">
           <div className="h-4 w-2/3 rounded bg-surface-muted" />
           <div className="h-3 w-1/3 rounded bg-surface-muted" />
@@ -122,36 +122,40 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
     const title = meal.place_name || meta.label
     const subtitle = meal.source_note ? `${meta.label} · ${meal.source_note}` : meta.label
     return (
-      <div className="flex items-center gap-3 rounded-xl bg-surface-card p-3 shadow-card">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-surface-muted text-ink-secondary">
-          <Icon className="h-6 w-6" />
+      <>
+        <div className="card flex items-center gap-3 p-3">
+          <button type="button" onClick={() => { setShowDetail(true); onOpenMeal?.(meal) }} className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-surface-muted text-ink-secondary">
+            <Icon className="h-6 w-6" />
+          </button>
+          <button type="button" onClick={() => { setShowDetail(true); onOpenMeal?.(meal) }} className="min-w-0 flex-1 text-left">
+            <div className="truncate text-sm font-medium text-ink-primary">{title}</div>
+            <div className="mt-1 truncate text-sm text-ink-secondary">{subtitle}</div>
+          </button>
+          <button type="button" onClick={(event) => { event.stopPropagation(); onActionsClick?.(meal) }} className="flex h-10 w-10 shrink-0 items-center justify-center text-ink-tertiary" aria-label="Meal actions">
+            <MoreVerticalIcon className="h-5 w-5" />
+          </button>
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium text-ink-primary">{title}</div>
-          <div className="mt-1 truncate text-sm text-ink-secondary">{subtitle}</div>
-        </div>
-        <button type="button" onClick={(event) => { event.stopPropagation(); onActionsClick?.(meal.id) }} className="flex h-10 w-10 shrink-0 items-center justify-center text-ink-tertiary" aria-label="Meal actions">
-          <MoreVerticalIcon className="h-5 w-5" />
-        </button>
-      </div>
+        <MealDetailModal meal={meal} isOpen={showDetail} onClose={() => setShowDetail(false)} />
+      </>
     )
   }
 
-  const servings = meal.servings || recipe.servings || null
+  const servings = meal.servings || recipe.servings || 1
   const mealTitle = meal.title || meal.name || 'Meal'
-  const mealImage = meal.image_url || recipe.image_url || null
+  const mealImage = meal.image_url || recipe.imageUrl || null
+  const calories = meal.calories || meal.nutrition?.calories || '—'
 
   return (
     <>
-      <div className="flex items-center gap-3 rounded-xl bg-surface-card p-3 shadow-card">
-        <button type="button" onClick={() => { setShowDetail(true); onOpenMeal?.(meal) }} className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-muted focus:outline-none" aria-label={`Open ${mealTitle}`}>
+      <div className="card flex items-center gap-3 p-3">
+        <button type="button" onClick={() => { setShowDetail(true); onOpenMeal?.(meal) }} className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface-muted focus:outline-none" aria-label={`Open ${mealTitle}`}>
           {mealImage ? <img src={mealImage} alt={mealTitle} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-surface-muted" />}
         </button>
         <button type="button" onClick={() => { setShowDetail(true); onOpenMeal?.(meal) }} className="min-w-0 flex-1 text-left focus:outline-none">
           <div className="truncate text-sm font-medium text-ink-primary">{mealTitle}</div>
-          <div className="mt-1 text-sm text-ink-secondary">{servings || 1} servings · — kcal</div>
+          <div className="mt-1 text-sm text-ink-secondary">{servings} servings · {calories} kcal</div>
         </button>
-        <button type="button" onClick={(event) => { event.stopPropagation(); onActionsClick?.(meal.id) }} className="flex h-10 w-10 shrink-0 items-center justify-center text-ink-tertiary" aria-label="Meal actions">
+        <button type="button" onClick={(event) => { event.stopPropagation(); onActionsClick?.(meal) }} className="flex h-10 w-10 shrink-0 items-center justify-center text-ink-tertiary" aria-label="Meal actions">
           <MoreVerticalIcon className="h-5 w-5" />
         </button>
       </div>
