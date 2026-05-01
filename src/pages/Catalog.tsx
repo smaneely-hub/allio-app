@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { listUserRecipes } from '../hooks/useRecipeMutations'
 import { normalizeRecipe } from '../lib/recipeSchema'
 import { ClipRecipeModal } from '../components/ClipRecipeModal'
@@ -13,33 +13,33 @@ function SearchIcon(props: any) {
   )
 }
 
-function XIcon(props: any) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
-      <path d="M18 6 6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
 export function Catalog() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialQuery = searchParams.get('q') || ''
   const [recipes, setRecipes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState(initialQuery)
+  const [search, setSearch] = useState(initialQuery)
   const [cuisine, setCuisine] = useState('')
   const [minRating, setMinRating] = useState('')
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [sortBy, setSortBy] = useState<'newest' | 'rating' | 'favorites'>('newest')
   const [showClipModal, setShowClipModal] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
-  const [searchExpanded, setSearchExpanded] = useState(false)
   const searchRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
-    const handle = window.setTimeout(() => setSearch(searchInput), 200)
+    const handle = window.setTimeout(() => setSearch(searchInput.trim()), 200)
     return () => window.clearTimeout(handle)
   }, [searchInput])
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams)
+    if (search) next.set('q', search)
+    else next.delete('q')
+    setSearchParams(next, { replace: true })
+  }, [search, searchParams, setSearchParams])
 
   useEffect(() => {
     let cancelled = false
@@ -49,7 +49,6 @@ export function Catalog() {
       minRating: minRating ? Number(minRating) : undefined,
       favoritesOnly,
       sortBy,
-      search: search || undefined,
     })
       .then((data) => {
         if (!cancelled) setRecipes(data)
@@ -60,7 +59,7 @@ export function Catalog() {
     return () => {
       cancelled = true
     }
-  }, [cuisine, minRating, favoritesOnly, sortBy, search, refreshKey])
+  }, [cuisine, minRating, favoritesOnly, sortBy, refreshKey])
 
   const normalized = useMemo(() => recipes.map((recipeRow) => normalizeRecipe({
     ...recipeRow,
@@ -86,53 +85,51 @@ export function Catalog() {
     category: recipeRow.category,
   })), [recipes])
 
+  const filteredRecipes = useMemo(() => {
+    if (!search) return normalized
+    const needle = search.toLowerCase()
+    return normalized.filter((recipe) => {
+      const titleMatch = String(recipe.title || '').toLowerCase().includes(needle)
+      const ingredientMatch = (recipe.ingredientGroups || []).some((group) =>
+        (group.ingredients || []).some((ingredient) => String(ingredient.item || ingredient.name || '').toLowerCase().includes(needle)),
+      )
+      return titleMatch || ingredientMatch
+    })
+  }, [normalized, search])
+
   const cuisines = useMemo(() => Array.from(new Set(normalized.map((recipe) => recipe.cuisine).filter(Boolean))).sort(), [normalized])
 
   useEffect(() => {
-    if (searchExpanded) {
-      window.requestAnimationFrame(() => searchRef.current?.focus())
-    }
-  }, [searchExpanded])
+    window.requestAnimationFrame(() => searchRef.current?.focus())
+  }, [])
 
   return (
     <div className="px-3 pb-24 pt-0 md:px-0">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <div className="min-w-0 flex-1">
-              <h1 className="font-display text-3xl text-text-primary">My Recipes</h1>
-              <p className="text-sm text-text-muted">{normalized.length} recipes</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setSearchExpanded((open) => !open)}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-divider bg-white text-text-primary shadow-sm"
-              aria-label={searchExpanded ? 'Close search' : 'Open search'}
-            >
-              {searchExpanded ? <XIcon className="h-5 w-5" /> : <SearchIcon className="h-5 w-5" />}
-            </button>
-          </div>
-
-          {searchExpanded ? (
-            <div className="mt-3">
-              <input
-                ref={searchRef}
-                type="search"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search recipes..."
-                className="input w-full"
-              />
-            </div>
-          ) : null}
+          <h1 className="font-display text-3xl text-text-primary">My Recipes</h1>
+          <p className="text-sm text-text-muted">{filteredRecipes.length} recipes</p>
         </div>
         <button type="button" onClick={() => setShowClipModal(true)} className="btn-primary shrink-0">
           + Add Recipe
         </button>
       </div>
 
-      <div className="space-y-3 rounded-2xl border border-divider bg-surface p-3 shadow-sm">
+      <div className="mb-4 max-w-md">
+        <div className="relative">
+          <SearchIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-text-muted" />
+          <input
+            ref={searchRef}
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search recipes or ingredients"
+            className="input w-full pl-11"
+          />
+        </div>
+      </div>
 
+      <div className="space-y-3 rounded-2xl border border-divider bg-surface p-3 shadow-sm">
         <div className="grid gap-2 sm:grid-cols-4">
           <select className="input w-full" value={cuisine} onChange={(e) => setCuisine(e.target.value)}>
             <option value="">All cuisines</option>
@@ -158,11 +155,18 @@ export function Catalog() {
 
       {loading ? (
         <div className="card mt-4 p-6 text-sm text-text-muted">Loading recipes...</div>
-      ) : normalized.length === 0 ? (
-        <div className="card mt-4 p-6 text-sm text-text-muted">No recipes yet — clip one or generate one to get started.</div>
+      ) : filteredRecipes.length === 0 ? (
+        <div className="card mt-4 p-6 text-sm text-text-muted">
+          No recipes match ‘{search}’
+          {search ? (
+            <button type="button" onClick={() => setSearchInput('')} className="ml-2 font-medium text-text-primary underline underline-offset-2">
+              Clear search
+            </button>
+          ) : null}
+        </div>
       ) : (
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {normalized.map((recipe) => (
+          {filteredRecipes.map((recipe) => (
             <button
               key={recipe.id}
               type="button"

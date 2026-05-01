@@ -81,7 +81,7 @@ export function formatShoppingListEmail(items, weekLabel = 'This Week', househol
                 </div>
               </div>
               <div style="margin-top: 32px; text-align: center;">
-                <a href="https://allio.life/shop" style="display: inline-block; background-color: #4A9B6E; color: #FFFFFF; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px; text-decoration: none;">
+                <a href="https://allio.life/groceries" style="display: inline-block; background-color: #4A9B6E; color: #FFFFFF; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px; text-decoration: none;">
                   Open in Allio
                 </a>
               </div>

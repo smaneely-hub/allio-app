@@ -77,7 +77,7 @@ export function formatMealPlanEmail(planData, householdName = 'My Household', we
               
               <!-- CTA Button -->
               <div style="margin-top: 32px; text-align: center;">
-                <a href="https://allio.life/plan" style="display: inline-block; background-color: #4A9B6E; color: #FFFFFF; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px; text-decoration: none;">
+                <a href="https://allio.life/plannerner" style="display: inline-block; background-color: #4A9B6E; color: #FFFFFF; font-size: 15px; font-weight: 600; padding: 14px 32px; border-radius: 8px; text-decoration: none;">
                   View full plan
                 </a>
               </div>

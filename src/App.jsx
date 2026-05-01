@@ -17,7 +17,7 @@ import { PlannerPage } from './pages/PlannerPage'
 import { TonightPage } from './pages/TonightPage'
 import { RecipesPage } from './pages/RecipesPage'
 import { Catalog } from './pages/Catalog'
-
+import { HouseholdPage } from './pages/HouseholdPage'
 import { ShopPage } from './pages/ShopPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { PricingPage } from './pages/PricingPage'
@@ -26,27 +26,24 @@ import { PrivacyPage } from './pages/PrivacyPage'
 import { TermsPage } from './pages/TermsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
-// Connection check component - skip since we hardcoded Supabase credentials
 function ConnectionCheck({ children }) {
   return children
 }
 
-// Home page: show landing for visitors, dashboard for logged-in users
 function HomePage() {
   const { user, loading } = useAuth()
   const navigate = useNavigate()
-  
+
   useEffect(() => {
     if (user && !loading) {
-      // Logged in users go to dashboard
       navigate('/dashboard', { replace: true })
     }
   }, [user, loading, navigate])
-  
+
   if (loading) {
     return <div className="p-6 text-center">Loading...</div>
   }
-  
+
   return <LandingPage />
 }
 
@@ -88,7 +85,7 @@ export default function App() {
                   }
                 />
                 <Route
-                  path="/plan"
+                  path="/planner"
                   element={
                     <ProtectedRoute>
                       <PlannerPage />
@@ -104,7 +101,7 @@ export default function App() {
                   }
                 />
                 <Route
-                  path="/shop"
+                  path="/groceries"
                   element={
                     <ProtectedRoute>
                       <ShopPage />
@@ -120,7 +117,7 @@ export default function App() {
                   }
                 />
                 <Route
-                  path="/catalog"
+                  path="/search"
                   element={
                     <ProtectedRoute>
                       <Catalog />
@@ -143,13 +140,24 @@ export default function App() {
                     </ProtectedRoute>
                   }
                 />
-                <Route path="/family" element={<Navigate to="/settings" replace />} />
+                <Route
+                  path="/household"
+                  element={
+                    <ProtectedRoute>
+                      <HouseholdPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route path="/family" element={<Navigate to="/household" replace />} />
                 <Route path="/profile" element={<Navigate to="/settings" replace />} />
-                <Route path="/household" element={<Navigate to="/settings" replace />} />
-                <Route path="/plans" element={<Navigate to="/plan" replace />} />
-                <Route path="/planner" element={<Navigate to="/plan" replace />} />
-                <Route path="/shopping-list" element={<Navigate to="/shop" replace />} />
-                <Route path="/groceries" element={<Navigate to="/shop" replace />} />
+                <Route path="/settings/profile" element={<Navigate to="/settings" replace />} />
+                <Route path="/settings/account" element={<Navigate to="/settings" replace />} />
+                <Route path="/planner" element={<Navigate to="/planner" replace />} />
+                <Route path="/plans" element={<Navigate to="/planner" replace />} />
+                <Route path="/search" element={<Navigate to="/search" replace />} />
+                <Route path="/find" element={<Navigate to="/search" replace />} />
+                <Route path="/groceries" element={<Navigate to="/groceries" replace />} />
+                <Route path="/shopping-list" element={<Navigate to="/groceries" replace />} />
                 <Route path="/cook" element={<Navigate to="/tonight" replace />} />
                 <Route path="/cooking" element={<Navigate to="/tonight" replace />} />
                 <Route path="/meals" element={<Navigate to="/recipes" replace />} />

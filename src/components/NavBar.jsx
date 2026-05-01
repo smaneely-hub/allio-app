@@ -41,10 +41,10 @@ function SettingsIcon(props) {
 }
 
 const links = [
-  { to: '/plan', label: 'Planner', icon: CalendarDaysIcon, aliases: ['/planner'] },
-  { to: '/catalog', label: 'Search', icon: SearchIcon, aliases: ['/search', '/recipes'] },
-  { to: '/shop', label: 'Groceries', icon: ShoppingCartIcon, aliases: ['/groceries'] },
-  { to: '/settings', label: 'Settings', icon: SettingsIcon, aliases: [] },
+  { to: '/planner', label: 'Planner', icon: CalendarDaysIcon, aliases: ['/planner'] },
+  { to: '/search', label: 'Search', icon: SearchIcon, aliases: ['/search', '/recipes', '/find'] },
+  { to: '/groceries', label: 'Groceries', icon: ShoppingCartIcon, aliases: ['/groceries'] },
+  { to: '/settings', label: 'Settings', icon: SettingsIcon, aliases: ['/profile'] },
 ]
 
 export function NavBar() {

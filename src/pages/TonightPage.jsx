@@ -1641,7 +1641,7 @@ export function TonightPage() {
               {cookingMode ? 'Exit cooking mode' : 'Start cooking mode'}
             </button>
             <Link
-              to="/shop"
+              to="/groceries"
               className="rounded-full border border-divider bg-white px-4 py-2 text-sm font-semibold text-text-primary"
             >
               View shopping list

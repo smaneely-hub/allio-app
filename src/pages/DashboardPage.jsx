@@ -60,14 +60,14 @@ export function DashboardPage() {
             Quick meal
           </div>
         </Link>
-        <Link to="/plan" className="card hover:shadow-md transition-shadow">
+        <Link to="/planner" className="card hover:shadow-md transition-shadow">
           <div className="text-2xl mb-1">🍽️</div>
           <div className="text-sm font-medium text-text-primary">Meal Plan</div>
           <div className="text-xs text-text-muted">
             {schedule ? 'This week planned' : 'Set up your week'}
           </div>
         </Link>
-        <Link to="/shop" className="card hover:shadow-md transition-shadow">
+        <Link to="/groceries" className="card hover:shadow-md transition-shadow">
           <div className="text-2xl mb-1">🛒</div>
           <div className="text-sm font-medium text-text-primary">Shopping</div>
           <div className="text-xs text-text-muted">
@@ -116,14 +116,14 @@ export function DashboardPage() {
             <span className="text-text-muted">→</span>
           </Link>
           <Link 
-            to="/plan" 
+            to="/planner" 
             className="flex items-center justify-between p-3 rounded-xl bg-bg-primary hover:bg-primary-50 transition-colors min-h-[48px]"
           >
             <span className="text-sm text-text-primary">Weekly Meal Plan</span>
             <span className="text-text-muted">→</span>
           </Link>
           <Link 
-            to="/shop" 
+            to="/groceries" 
             className="flex items-center justify-between p-3 rounded-xl bg-bg-primary hover:bg-primary-50 transition-colors min-h-[48px]"
           >
             <span className="text-sm text-text-primary">Shopping List</span>
