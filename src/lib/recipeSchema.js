@@ -38,6 +38,18 @@ function splitInstructionString(value) {
 function firstArray(...values) {
   for (const value of values) {
     if (Array.isArray(value) && value.length > 0) return value
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim()
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(trimmed)
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed
+        } catch {
+          // ignore malformed JSON-like strings
+        }
+      }
+    }
   }
   return []
 }
@@ -133,6 +145,8 @@ export function normalizeRecipe(recipe = {}) {
     nestedRecipe?.directions,
     recipe.method,
     nestedRecipe?.method,
+    recipe.instructions_json,
+    nestedRecipe?.instructions_json,
   ].find((value) => typeof value === 'string' && value.trim()) || ''
   const rawInstructionGroups = firstArray(
     recipe.instructionGroups,
