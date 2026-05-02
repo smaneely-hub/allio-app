@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { normalizeRecipe } from '../../lib/recipeSchema'
+import { formatIngredientAmount } from '../../utils/formatFractions'
 
 function CloseIcon(props) {
   return (
@@ -30,7 +31,7 @@ function PlusIcon(props) {
 function formatQuantity(value) {
   const number = Number(value)
   if (!Number.isFinite(number)) return value || ''
-  return Number(number.toFixed(2)).toString()
+  return formatIngredientAmount(number)
 }
 
 function normalizeDirections(meal, recipe) {

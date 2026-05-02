@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { normalizeRecipe } from '../lib/recipeSchema'
+import { formatIngredientAmount } from '../utils/formatFractions'
 import { InstructionText } from './TimerChip'
 
 function formatNutrition(nutrition) {
@@ -234,7 +235,7 @@ export function SwipeCard({ meal, image, onAccept, onReject }) {
                     <ul className="space-y-3">
                       {group.ingredients.map((ingredient, index) => (
                         <li key={`${groupIndex}-${index}-${ingredient.item}`} className="rounded-2xl bg-warm-50 px-4 py-3 text-sm leading-6 text-text-primary">
-                          <strong>{[ingredient.amount, ingredient.unit].filter(Boolean).join(' ')}</strong>
+                          <strong>{[formatIngredientAmount(ingredient.amount), ingredient.unit].filter(Boolean).join(' ')}</strong>
                           {(ingredient.amount || ingredient.unit) ? ' ' : ''}
                           {ingredient.item}
                           {ingredient.note ? <span className="text-text-secondary"> ({ingredient.note})</span> : null}
