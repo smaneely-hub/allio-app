@@ -6,7 +6,30 @@ function asArray(value) {
 
 function splitInstructionString(value) {
   if (typeof value !== 'string') return []
-  return value
+
+  const trimmed = value.trim()
+  if (!trimmed) return []
+
+  if ((trimmed.startsWith('[') && trimmed.endsWith(']')) || (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((step) => {
+            if (typeof step === 'string') return step.trim()
+            if (typeof step?.text === 'string') return step.text.trim()
+            if (typeof step?.instruction === 'string') return step.instruction.trim()
+            if (typeof step?.step === 'string') return step.step.trim()
+            return ''
+          })
+          .filter(Boolean)
+      }
+    } catch {
+      // fall back to newline splitting below
+    }
+  }
+
+  return trimmed
     .split(/\r?\n+/)
     .map((step) => step.trim())
     .filter(Boolean)
@@ -117,6 +140,9 @@ export function normalizeRecipe(recipe = {}) {
     recipe.instruction_groups,
     nestedRecipe?.instruction_groups,
   )
+  const normalizedLegacyInstructionSteps = legacyInstructionSteps.length
+    ? legacyInstructionSteps
+    : splitInstructionString(instructionString)
 
   const ingredientGroups = rawIngredientGroups.length
     ? rawIngredientGroups.map((group) => normalizeIngredientGroup(group))
@@ -138,7 +164,7 @@ export function normalizeRecipe(recipe = {}) {
     ? rawInstructionGroups.map((group) => normalizeInstructionGroup(group))
     : [normalizeInstructionGroup({
         label: undefined,
-        steps: (legacyInstructionSteps.length ? legacyInstructionSteps : splitInstructionString(instructionString)).map((step) => {
+        steps: normalizedLegacyInstructionSteps.map((step) => {
           if (typeof step === 'string') return { text: step }
           return { text: step?.text ?? step?.instruction ?? step?.step ?? '', tip: step?.tip }
         }),
