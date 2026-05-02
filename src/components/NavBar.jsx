@@ -12,11 +12,11 @@ function CalendarDaysIcon(props) {
   )
 }
 
-function SearchIcon(props) {
+function BookIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.5-3.5" strokeLinecap="round" />
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -40,9 +40,16 @@ function SettingsIcon(props) {
   )
 }
 
-const links = [
+const desktopLinks = [
   { to: '/planner', label: 'Planner', icon: CalendarDaysIcon, aliases: ['/planner'] },
-  { to: '/search', label: 'Search', icon: SearchIcon, aliases: ['/search', '/recipes', '/find'] },
+  { to: '/search', label: 'Recipes', icon: BookIcon, aliases: ['/search', '/recipes', '/find'] },
+  { to: '/groceries', label: 'Groceries', icon: ShoppingCartIcon, aliases: ['/groceries'] },
+  { to: '/settings', label: 'Settings', icon: SettingsIcon, aliases: ['/profile'] },
+]
+
+const mobileLinks = [
+  { to: '/planner', label: 'Planner', icon: CalendarDaysIcon, aliases: ['/planner'] },
+  { to: '/search', label: 'Recipes', icon: BookIcon, aliases: ['/search', '/recipes', '/find'] },
   { to: '/groceries', label: 'Groceries', icon: ShoppingCartIcon, aliases: ['/groceries'] },
   { to: '/settings', label: 'Settings', icon: SettingsIcon, aliases: ['/profile'] },
 ]
@@ -65,7 +72,7 @@ export function NavBar() {
           {user ? (
             <div className="flex items-center gap-6">
               <nav className="flex items-center gap-5 text-sm font-medium">
-                {links.map((link) => (
+                {desktopLinks.map((link) => (
                   <Link key={link.to} to={link.to} className={isActive(link) ? 'text-accent-blue' : 'text-ink-secondary hover:text-ink-primary'}>
                     {link.label}
                   </Link>
@@ -97,7 +104,7 @@ export function NavBar() {
       {user ? (
         <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-surface-muted bg-surface-card pb-safe">
           <div className="mx-auto flex h-16 max-w-xl items-center justify-around">
-            {links.map((link) => {
+            {mobileLinks.map((link) => {
               const Icon = link.icon
               const active = isActive(link)
               return (
