@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { listUserRecipes } from '../hooks/useRecipeMutations'
+import { deleteRecipe, listUserRecipes } from '../hooks/useRecipeMutations'
 import { normalizeRecipe } from '../lib/recipeSchema'
 import { ClipRecipeModal } from '../components/ClipRecipeModal'
 
@@ -27,6 +27,7 @@ export function Catalog() {
   const [sortBy, setSortBy] = useState<'newest' | 'rating' | 'favorites'>('newest')
   const [showClipModal, setShowClipModal] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const searchRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -103,6 +104,17 @@ export function Catalog() {
     window.requestAnimationFrame(() => searchRef.current?.focus())
   }, [])
 
+  async function handleDelete(recipeId: string, title: string) {
+    if (!window.confirm(`Remove “${title}” from your catalog?`)) return
+    setDeletingId(recipeId)
+    try {
+      await deleteRecipe(recipeId)
+      setRefreshKey((k) => k + 1)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   return (
     <div className="px-3 pb-24 pt-0 md:px-0">
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -167,27 +179,38 @@ export function Catalog() {
       ) : (
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredRecipes.map((recipe) => (
-            <button
-              key={recipe.id}
-              type="button"
-              onClick={() => navigate(`/recipes/${recipe.slug || recipe.id}`)}
-              className="card overflow-hidden p-0 text-left shadow-sm transition-shadow hover:shadow-md"
-            >
-              {recipe.imageUrl ? (
-                <img src={recipe.imageUrl} alt={recipe.title} className="h-40 w-full object-cover" />
-              ) : null}
-              <div className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <h2 className="font-display text-xl text-text-primary">{recipe.title}</h2>
-                  {recipe.isFavorite ? <span className="text-lg text-primary-500">♥</span> : null}
+            <div key={recipe.id} className="card overflow-hidden p-0 text-left shadow-sm transition-shadow hover:shadow-md">
+              <button
+                type="button"
+                onClick={() => navigate(`/recipes/${recipe.slug || recipe.id}`)}
+                className="block w-full text-left"
+              >
+                {recipe.imageUrl ? (
+                  <img src={recipe.imageUrl} alt={recipe.title} className="h-40 w-full object-cover" />
+                ) : null}
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <h2 className="font-display text-xl text-text-primary">{recipe.title}</h2>
+                    {recipe.isFavorite ? <span className="text-lg text-primary-500">♥</span> : null}
+                  </div>
+                  {recipe.cuisine ? <p className="mt-1 text-sm text-text-secondary">{recipe.cuisine}</p> : null}
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-text-muted">
+                    {recipe.rating ? <span className="rounded-full bg-warm-100 px-3 py-1">★ {recipe.rating}</span> : null}
+                    <span className="rounded-full bg-warm-100 px-3 py-1">Prep {recipe.prepTime} min</span>
+                  </div>
                 </div>
-                {recipe.cuisine ? <p className="mt-1 text-sm text-text-secondary">{recipe.cuisine}</p> : null}
-                <div className="mt-3 flex flex-wrap gap-2 text-xs text-text-muted">
-                  {recipe.rating ? <span className="rounded-full bg-warm-100 px-3 py-1">★ {recipe.rating}</span> : null}
-                  <span className="rounded-full bg-warm-100 px-3 py-1">Prep {recipe.prepTime} min</span>
-                </div>
+              </button>
+              <div className="border-t border-divider px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => handleDelete(recipe.id, recipe.title)}
+                  disabled={deletingId === recipe.id}
+                  className="text-sm font-medium text-red-600 disabled:opacity-50"
+                >
+                  {deletingId === recipe.id ? 'Removing…' : 'Remove recipe'}
+                </button>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       )}

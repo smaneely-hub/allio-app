@@ -1,30 +1,7 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import { normalizeRecipe } from '../lib/recipeSchema'
-import { supabase } from '../lib/supabase'
 import { markCooked, rateRecipe, toggleFavorite } from '../hooks/useRecipeMutations'
-
-// Pexels image fetcher
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-
-async function fetchRecipeImage(dishName) {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch(
-      `${supabaseUrl}/functions/v1/fetch-recipe-image`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token || supabaseAnonKey}`,
-          apikey: supabaseAnonKey,
-        },
-        body: JSON.stringify({ query: dishName }),
-      }
-    );
-    return await res.json();
-  } catch { return { imageUrl: null, photographer: null, pexelsLink: null }; }
-}
+import { formatIngredientAmount } from '../utils/formatFractions'
 
 function HeartIcon({ filled = false }) {
   return (
@@ -55,18 +32,18 @@ function Chevron({ expanded }) {
   )
 }
 
-function CollapsibleSection({ title, expanded, onToggle, children, defaultOpen = false }) {
+function CollapsibleSection({ title, expanded, onToggle, children }) {
   return (
-    <section className="rounded-[28px] border border-divider bg-white/95 shadow-[0_10px_30px_rgba(15,23,42,0.05)] backdrop-blur-sm">
+    <section className="rounded-[24px] border border-divider bg-white shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
       <button
         type="button"
         onClick={onToggle}
         className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
       >
-        <h3 className="font-display text-2xl text-text-primary">{title}</h3>
+        <h3 className="font-display text-xl text-text-primary">{title}</h3>
         <Chevron expanded={expanded} />
       </button>
-      <div className={`grid overflow-hidden transition-[grid-template-rows,opacity] duration-300 ease-out ${expanded || defaultOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+      <div className={`grid overflow-hidden transition-[grid-template-rows,opacity] duration-300 ease-out ${expanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
         <div className="min-h-0 px-5 pb-5">{children}</div>
       </div>
     </section>
@@ -80,7 +57,6 @@ export function RecipeDetail({ meal, onClose }) {
     prepTime: meal?.prep_time_minutes,
     cookTime: meal?.cook_time_minutes,
     totalTime: meal?.total_time_minutes,
-    // Accept both camelCase (already-normalized) and DB snake_case column names
     ingredientGroups: meal?.ingredientGroups ?? meal?.ingredient_groups_json,
     instructionGroups: meal?.instructionGroups ?? meal?.instruction_groups_json,
     ingredients: meal?.ingredients ?? meal?.ingredients_json,
@@ -93,27 +69,10 @@ export function RecipeDetail({ meal, onClose }) {
     imagePrompt: meal?.imagePrompt ?? meal?.image_prompt,
   }), [meal])
 
-  const [imageUrl, setImageUrl] = useState(recipe.imageUrl || null);
-  const [photographer, setPhotographer] = useState(null);
   const [isFavorite, setIsFavorite] = useState(Boolean(meal?.is_favorite ?? meal?.isFavorite))
   const [rating, setRating] = useState(meal?.rating ?? null)
   const [cookedAt, setCookedAt] = useState(meal?.cooked_at || meal?.cookedAt || '')
   const [ratingFocus, setRatingFocus] = useState(false)
-
-  useEffect(() => {
-    // Only fetch a Pexels image when the recipe has no stored image
-    if (recipe.title && !recipe.imageUrl) {
-      fetchRecipeImage(recipe.title).then((result) => {
-        if (result.imageUrl) {
-          setImageUrl(result.imageUrl);
-          setPhotographer(result.photographer);
-        }
-      });
-    } else {
-      setImageUrl(recipe.imageUrl || null);
-    }
-  }, [recipe.title, recipe.imageUrl]);
-
   const [sections, setSections] = useState({
     ingredients: true,
     instructions: true,
@@ -136,26 +95,25 @@ export function RecipeDetail({ meal, onClose }) {
 
   return (
     <div className="min-h-screen bg-[#faf7f2] text-text-primary">
-      <div className="sticky top-0 z-20 border-b border-black/5 bg-[#faf7f2]/90 px-4 py-4 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-3xl items-center justify-between">
+      <div className="sticky top-0 z-20 border-b border-black/5 bg-[#faf7f2]/90 px-4 py-3 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-2xl items-center justify-between">
           <button type="button" onClick={onClose} className="text-sm font-semibold text-text-primary">← Back</button>
           <div className="text-xs font-semibold uppercase tracking-[0.22em] text-text-muted">Recipe</div>
           <div className="w-12" />
         </div>
       </div>
 
-      <div className="mx-auto max-w-3xl px-4 pb-16 pt-6">
-        <header className="rounded-[32px] bg-white px-5 py-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
-          {imageUrl ? (
-            <div className="mb-4">
-              <img src={imageUrl} alt={recipe.title} className="h-48 w-full rounded-t-2xl object-cover" loading="lazy" />
-              {photographer && <p className="px-1 pt-1 text-xs text-gray-400">Photo by {photographer} on Pexels</p>}
+      <div className="mx-auto max-w-2xl px-4 pb-12 pt-5">
+        <header className="rounded-[28px] bg-white px-5 py-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+          {recipe.imageUrl ? (
+            <div className="mb-4 overflow-hidden rounded-2xl">
+              <img src={recipe.imageUrl} alt={recipe.title} className="h-56 w-full object-cover" loading="lazy" />
             </div>
           ) : null}
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.24em] text-text-muted">Allio Recipe</div>
-              <h1 className="mt-3 font-display text-4xl leading-tight text-text-primary sm:text-5xl">{recipe.title}</h1>
+              <h1 className="mt-2 font-display text-3xl leading-tight text-text-primary sm:text-4xl">{recipe.title}</h1>
             </div>
             <button
               type="button"
@@ -174,9 +132,9 @@ export function RecipeDetail({ meal, onClose }) {
               <HeartIcon filled={isFavorite} />
             </button>
           </div>
-          {recipe.description ? <p className="mt-4 max-w-2xl text-[15px] leading-7 text-text-secondary">{recipe.description}</p> : null}
+          {recipe.description ? <p className="mt-3 text-[15px] leading-7 text-text-secondary">{recipe.description}</p> : null}
 
-          <div className="mt-5 flex flex-wrap items-center gap-2 text-sm text-text-secondary">
+          <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-text-secondary">
             <span className="rounded-full bg-warm-50 px-3 py-1.5">Prep {recipe.prepTime || 0} min</span>
             <span className="rounded-full bg-warm-50 px-3 py-1.5">Cook {recipe.cookTime || 0} min</span>
             <span className="rounded-full bg-warm-50 px-3 py-1.5">Total {recipe.totalTime || recipe.prepTime + recipe.cookTime} min</span>
@@ -184,7 +142,7 @@ export function RecipeDetail({ meal, onClose }) {
             <span className="rounded-full border border-primary-100 bg-primary-50 px-3 py-1.5 font-semibold text-primary-700">{recipe.difficulty}</span>
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-3">
+          <div className="mt-4 flex flex-wrap gap-3">
             <button
               type="button"
               onClick={async () => {
@@ -226,7 +184,7 @@ export function RecipeDetail({ meal, onClose }) {
           ) : null}
         </header>
 
-        <div className="mt-6 space-y-4">
+        <div className="mt-5 space-y-4">
           <CollapsibleSection title="Ingredients" expanded={sections.ingredients} onToggle={() => toggleSection('ingredients')}>
             <div className="space-y-5">
               {recipe.ingredientGroups.map((group, groupIndex) => (
@@ -236,6 +194,7 @@ export function RecipeDetail({ meal, onClose }) {
                     {group.ingredients.map((ingredient, index) => {
                       const key = `${groupIndex}-${index}-${ingredient.item}`
                       const checked = Boolean(checkedIngredients[key])
+                      const amountText = formatIngredientAmount(ingredient.amount)
                       return (
                         <li key={key}>
                           <button
@@ -245,8 +204,8 @@ export function RecipeDetail({ meal, onClose }) {
                           >
                             <span className={`mt-1 h-5 w-5 shrink-0 rounded-full border ${checked ? 'border-primary-500 bg-primary-500' : 'border-divider bg-white'}`} />
                             <span className={`block text-[15px] leading-7 ${checked ? 'line-through' : ''}`}>
-                              <strong className="font-semibold text-text-primary">{[ingredient.amount, ingredient.unit].filter(Boolean).join(' ')}</strong>
-                              {ingredient.amount || ingredient.unit ? ' ' : ''}
+                              <strong className="font-semibold text-text-primary">{[amountText, ingredient.unit].filter(Boolean).join(' ')}</strong>
+                              {amountText || ingredient.unit ? ' ' : ''}
                               <span className="text-text-primary">{ingredient.item}</span>
                               {ingredient.note ? <span className="text-text-secondary"> ({ingredient.note})</span> : null}
                               {ingredient.optional ? <span className="text-text-muted"> (optional)</span> : null}
@@ -275,7 +234,7 @@ export function RecipeDetail({ meal, onClose }) {
                           <div key={`${step.text}-${index}`} className="flex gap-4">
                             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-warm-100 text-sm font-semibold text-text-primary">{stepCounter}</div>
                             <div className="min-w-0 flex-1">
-                              <p className="text-[16px] leading-8 text-text-primary">{step.text}</p>
+                              <p className="text-[15px] leading-7 text-text-primary">{step.text}</p>
                               {step.tip ? (
                                 <div className="mt-3 rounded-2xl bg-[#f4efe6] px-4 py-3 text-sm leading-6 text-text-secondary">
                                   <div className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">💡 Tip</div>
