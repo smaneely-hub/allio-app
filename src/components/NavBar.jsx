@@ -42,14 +42,14 @@ function SettingsIcon(props) {
 
 const desktopLinks = [
   { to: '/planner', label: 'Planner', icon: CalendarDaysIcon, aliases: ['/planner'] },
-  { to: '/search', label: 'Recipes', icon: BookIcon, aliases: ['/search', '/recipes', '/find'] },
+  { to: '/recipes', label: 'Recipes', icon: BookIcon, aliases: ['/recipes', '/search', '/find'] },
   { to: '/groceries', label: 'Groceries', icon: ShoppingCartIcon, aliases: ['/groceries'] },
   { to: '/settings', label: 'Settings', icon: SettingsIcon, aliases: ['/profile'] },
 ]
 
 const mobileLinks = [
   { to: '/planner', label: 'Planner', icon: CalendarDaysIcon, aliases: ['/planner'] },
-  { to: '/search', label: 'Recipes', icon: BookIcon, aliases: ['/search', '/recipes', '/find'] },
+  { to: '/recipes', label: 'Recipes', icon: BookIcon, aliases: ['/recipes', '/search', '/find'] },
   { to: '/groceries', label: 'Groceries', icon: ShoppingCartIcon, aliases: ['/groceries'] },
   { to: '/settings', label: 'Settings', icon: SettingsIcon, aliases: ['/profile'] },
 ]
