@@ -63,24 +63,10 @@ export function ClipRecipeModal({ onClose, onSaved }) {
         body: JSON.stringify({ url: trimmed }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Import failed')
-      const r = data.recipe || {}
-      const nextForm = {
-        title: r.title || '',
-        description: r.description || '',
-        meal_type: 'dinner',
-        prep_time_minutes: r.prep_time_minutes ?? '',
-        cook_time_minutes: r.cook_time_minutes ?? '',
-        servings: r.servings ?? '',
-        image_url: r.image_url || '',
-        source_url: r.source_url || trimmed,
-        source_domain: r.source_domain || '',
-        ingredients_text: (r.ingredients || []).join('\n'),
-        steps_text: (r.steps || []).join('\n'),
-      }
-      setForm(nextForm)
-      setStep('preview')
-      setShowSavePrompt(true)
+      if (!res.ok || !data?.ok) throw new Error(data.error || 'Import failed')
+      toast.success(`Saved “${data.title || 'recipe'}” to your catalog!`)
+      onSaved?.()
+      onClose()
     } catch (e) {
       setError(e.message)
     } finally {
