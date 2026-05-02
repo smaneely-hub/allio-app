@@ -16,7 +16,6 @@ import { PlanPage } from './pages/PlanPage'
 import { PlannerPage } from './pages/PlannerPage'
 import { TonightPage } from './pages/TonightPage'
 import { RecipesPage } from './pages/RecipesPage'
-import { Catalog } from './pages/Catalog'
 import { HouseholdPage } from './pages/HouseholdPage'
 import { ShopPage } from './pages/ShopPage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -120,7 +119,7 @@ export default function App() {
                   path="/search"
                   element={
                     <ProtectedRoute>
-                      <Catalog />
+                      <RecipesPage />
                     </ProtectedRoute>
                   }
                 />
