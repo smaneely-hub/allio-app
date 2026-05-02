@@ -46,9 +46,8 @@ export function RecipesPage() {
     loadRecipes()
   }, [loadRecipes])
 
-  const personalRecipes = useMemo(() => recipes.filter((recipe) => recipe.is_favorite || recipe.cooked_at || recipe.source_url), [recipes])
-  const availableTags = useMemo(() => getAvailableTags(personalRecipes), [personalRecipes])
-  const filteredRecipes = useMemo(() => filterRecipesByTags(personalRecipes, selectedTags), [personalRecipes, selectedTags])
+  const availableTags = useMemo(() => getAvailableTags(recipes), [recipes])
+  const filteredRecipes = useMemo(() => filterRecipesByTags(recipes, selectedTags), [recipes, selectedTags])
 
   const toggleTag = (tag) => {
     setSelectedTags((current) => current.includes(tag)
@@ -89,7 +88,7 @@ export function RecipesPage() {
         imagePrompt: recipeRow.image_prompt,
       }))
       .find((recipe) => String(recipe.id) === String(recipeId) || String(recipe.slug) === String(recipeId)) || null
-  }, [recipeId, personalRecipes])
+  }, [recipeId, recipes])
 
   if (selectedRecipe) {
     return <RecipeDetail meal={selectedRecipe} onClose={() => navigate('/recipes')} />
