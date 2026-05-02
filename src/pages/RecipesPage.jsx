@@ -5,6 +5,7 @@ import { FilterBar } from '../components/FilterBar'
 import { RecipeDetail } from '../components/RecipeDetail'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useAuth } from '../hooks/useAuth'
+import { deleteRecipe } from '../hooks/useRecipeMutations'
 import { filterRecipesByTags, getAvailableTags } from '../lib/recipeFilters'
 import { normalizeRecipe } from '../lib/recipeSchema'
 import { supabase } from '../lib/supabase'
@@ -19,6 +20,7 @@ export function RecipesPage() {
   const [loading, setLoading] = useState(true)
   const [selectedTags, setSelectedTags] = useState([])
   const [showClipModal, setShowClipModal] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
 
   const loadRecipes = useCallback(async () => {
     setLoading(true)
@@ -52,6 +54,17 @@ export function RecipesPage() {
       ? current.filter((entry) => entry !== tag)
       : [...current, tag]
     )
+  }
+
+  async function handleDelete(recipeId, title) {
+    if (!window.confirm(`Remove “${title}” from your recipes?`)) return
+    setDeletingId(recipeId)
+    try {
+      await deleteRecipe(recipeId)
+      await loadRecipes()
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   const selectedRecipe = useMemo(() => {
@@ -127,48 +140,67 @@ export function RecipesPage() {
             const tags = [recipe.tags.cuisine, recipe.tags.mealType, ...recipe.tags.dietary, ...(recipe.tags.cookingMethod || [])].filter(Boolean)
 
             return (
-              <button
-                key={recipe.id}
-                type="button"
-                onClick={() => navigate(`/recipes/${recipe.slug || recipe.id}`)}
-                className="card w-full p-4 text-left shadow-sm transition-shadow duration-200 hover:shadow-md"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start gap-3">
-                      {recipe.imageUrl ? (
-                        <img src={recipe.imageUrl} alt={recipe.title} className="h-16 w-16 shrink-0 rounded-2xl object-cover" />
-                      ) : null}
-                      <div className="min-w-0 flex-1">
-                        <h2 className="font-display text-xl text-text-primary">{recipe.title}</h2>
-                        <p className="mt-1 text-sm text-text-secondary">{recipe.description}</p>
-                        {recipe.sourceNote ? <p className="mt-2 text-xs text-text-muted">{recipe.sourceNote}</p> : null}
+              <div key={recipe.id} className="card w-full p-4 text-left shadow-sm transition-shadow duration-200 hover:shadow-md">
+                <button
+                  type="button"
+                  onClick={() => navigate(`/recipes/${recipe.slug || recipe.id}`)}
+                  className="block w-full text-left"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start gap-3">
+                        {recipe.imageUrl ? (
+                          <img src={recipe.imageUrl} alt={recipe.title} className="h-16 w-16 shrink-0 rounded-2xl object-cover" />
+                        ) : null}
+                        <div className="min-w-0 flex-1">
+                          <h2 className="font-display text-xl text-text-primary">{recipe.title}</h2>
+                          <p className="mt-1 text-sm text-text-secondary">{recipe.description}</p>
+                          {recipe.sourceNote ? <p className="mt-2 text-xs text-text-muted">{recipe.sourceNote}</p> : null}
+                        </div>
                       </div>
                     </div>
+                    <div className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary-600">
+                      {recipe.difficulty}
+                    </div>
                   </div>
-                  <div className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary-600">
-                    {recipe.difficulty}
+
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-text-muted">
+                    {recipe.tags.cuisine ? <span className="rounded-full bg-warm-100 px-3 py-1">{recipe.tags.cuisine}</span> : null}
+                    <span className="rounded-full bg-warm-100 px-3 py-1">Prep {recipe.prepTime} min</span>
+                    <span className="rounded-full bg-warm-100 px-3 py-1">Cook {recipe.cookTime} min</span>
+                    <span className="rounded-full bg-warm-100 px-3 py-1">Total {recipe.totalTime} min</span>
+                    <span className="rounded-full bg-warm-100 px-3 py-1">{recipe.yield || 'Yield varies'}</span>
                   </div>
-                </div>
 
-                <div className="mt-3 flex flex-wrap gap-2 text-xs text-text-muted">
-                  {recipe.tags.cuisine ? <span className="rounded-full bg-warm-100 px-3 py-1">{recipe.tags.cuisine}</span> : null}
-                  <span className="rounded-full bg-warm-100 px-3 py-1">Prep {recipe.prepTime} min</span>
-                  <span className="rounded-full bg-warm-100 px-3 py-1">Cook {recipe.cookTime} min</span>
-                  <span className="rounded-full bg-warm-100 px-3 py-1">Total {recipe.totalTime} min</span>
-                  <span className="rounded-full bg-warm-100 px-3 py-1">{recipe.yield || 'Yield varies'}</span>
-                </div>
+                  {recipe.tips.length > 0 ? <p className="mt-3 text-sm text-text-secondary">{recipe.tips[0]}</p> : null}
 
-                {recipe.tips.length > 0 ? <p className="mt-3 text-sm text-text-secondary">{recipe.tips[0]}</p> : null}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {tags.map((tag) => (
+                      <span key={tag} className="rounded-full border border-divider bg-white px-3 py-1 text-xs font-medium text-text-secondary">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </button>
 
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {tags.map((tag) => (
-                    <span key={tag} className="rounded-full border border-divider bg-white px-3 py-1 text-xs font-medium text-text-secondary">
-                      {tag}
-                    </span>
-                  ))}
+                <div className="mt-4 flex gap-3 border-t border-divider pt-3">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/recipes/${recipe.slug || recipe.id}`)}
+                    className="text-sm font-medium text-text-primary"
+                  >
+                    Edit recipe
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(recipe.id, recipe.title)}
+                    disabled={deletingId === recipe.id}
+                    className="text-sm font-medium text-red-600 disabled:opacity-50"
+                  >
+                    {deletingId === recipe.id ? 'Removing…' : 'Remove recipe'}
+                  </button>
                 </div>
-              </button>
+              </div>
             )
           })}
 
