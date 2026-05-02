@@ -46,6 +46,11 @@ export async function deleteRecipe(recipeId: string): Promise<void> {
   if (error) throw error
 }
 
+export async function updateRecipe(recipeId: string, payload: Record<string, unknown>): Promise<void> {
+  const { error } = await supabase.from('recipes').update(payload).eq('id', recipeId)
+  if (error) throw error
+}
+
 export async function updateCategories(recipeId: string, categories: string[]): Promise<void> {
   const { error } = await supabase.from('recipes').update({ category: categories }).eq('id', recipeId)
   if (error) throw error

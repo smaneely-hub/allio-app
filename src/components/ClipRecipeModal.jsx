@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
+import { updateRecipe } from '../hooks/useRecipeMutations'
 
 function SaveToCatalogPrompt({ recipe, onSave, onEditFirst, loading }) {
   return (
@@ -34,8 +35,8 @@ function slugify(text) {
     .slice(0, 50)
 }
 
-export function ClipRecipeModal({ onClose, onSaved }) {
-  const [step, setStep] = useState('url') // 'url' | 'preview'
+export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
+  const [step, setStep] = useState(initialRecipe ? 'preview' : 'url')
   const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -44,6 +45,28 @@ export function ClipRecipeModal({ onClose, onSaved }) {
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
   const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+  useEffect(() => {
+    if (!initialRecipe) return
+    setForm({
+      id: initialRecipe.id,
+      title: initialRecipe.title || '',
+      description: initialRecipe.description || '',
+      meal_type: initialRecipe.tags?.mealType || initialRecipe.meal_type || 'dinner',
+      prep_time_minutes: initialRecipe.prepTime ?? initialRecipe.prep_time_minutes ?? '',
+      cook_time_minutes: initialRecipe.cookTime ?? initialRecipe.cook_time_minutes ?? '',
+      servings: initialRecipe.yield?.match(/\d+/)?.[0] || '',
+      image_url: initialRecipe.imageUrl || initialRecipe.image_url || '',
+      source_url: initialRecipe.source_url || '',
+      source_domain: initialRecipe.source_domain || '',
+      ingredients_text: (initialRecipe.ingredientGroups || []).flatMap((group) =>
+        (group.ingredients || []).map((ingredient) => [ingredient.amount, ingredient.unit, ingredient.item].filter(Boolean).join(' ').trim()),
+      ).join('\n'),
+      steps_text: (initialRecipe.instructionGroups || []).flatMap((group) =>
+        (group.steps || []).map((step) => step.text).filter(Boolean),
+      ).join('\n'),
+    })
+  }, [initialRecipe])
 
   async function handleImport() {
     const trimmed = url.trim()
@@ -78,16 +101,16 @@ export function ClipRecipeModal({ onClose, onSaved }) {
     const title = formState.title?.trim()
     const ingredients = formState.ingredients_text.split('\n').map((s) => s.trim()).filter(Boolean)
     const steps = formState.steps_text.split('\n').map((s) => s.trim()).filter(Boolean)
-    const slug = `${slugify(title) || 'recipe'}-${Date.now()}`
+    const slug = formState.id ? undefined : `${slugify(title) || 'recipe'}-${Date.now()}`
 
     const prepMin = parseInt(formState.prep_time_minutes, 10) || null
     const cookMin = parseInt(formState.cook_time_minutes, 10) || null
     const servings = parseInt(formState.servings, 10) || null
 
     return {
+      ...(slug ? { slug } : {}),
       user_id: userId,
       title,
-      slug,
       description: formState.description || null,
       meal_type: formState.meal_type || 'dinner',
       prep_time_minutes: prepMin,
@@ -113,7 +136,6 @@ export function ClipRecipeModal({ onClose, onSaved }) {
   }
 
   async function saveRecipe(formState) {
-    console.log('[CLIP_SAVE] handler fired')
     const title = formState?.title?.trim()
     if (!title) {
       throw new Error('Title is required')
@@ -121,14 +143,31 @@ export function ClipRecipeModal({ onClose, onSaved }) {
 
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
-    console.log('[CLIP_SAVE] user:', user)
     if (!user) throw new Error('Not authenticated')
 
     const row = buildRecipeRow(formState, user.id)
-    console.log('[CLIP_SAVE] payload:', row)
 
-    const { data, error } = await supabase.from('recipes').insert(row)
-    console.log('[CLIP_SAVE] insert response:', { data, error })
+    if (formState.id) {
+      await updateRecipe(formState.id, {
+        title: row.title,
+        description: row.description,
+        meal_type: row.meal_type,
+        prep_time_minutes: row.prep_time_minutes,
+        cook_time_minutes: row.cook_time_minutes,
+        total_time_minutes: row.total_time_minutes,
+        servings: row.servings,
+        ingredients_json: row.ingredients_json,
+        instructions_json: row.instructions_json,
+        ingredient_groups_json: row.ingredient_groups_json,
+        instruction_groups_json: row.instruction_groups_json,
+        source_url: row.source_url,
+        source_domain: row.source_domain,
+        image_url: row.image_url,
+      })
+      return
+    }
+
+    const { error } = await supabase.from('recipes').insert(row)
     if (error) throw new Error(error.message)
   }
 
@@ -143,7 +182,7 @@ export function ClipRecipeModal({ onClose, onSaved }) {
     setError(null)
     try {
       await saveRecipe(form)
-      toast.success('Recipe saved to your catalog!')
+      toast.success(form.id ? 'Recipe updated!' : 'Recipe saved to your catalog!')
       setShowSavePrompt(false)
       onSaved?.()
       onClose()
@@ -172,9 +211,8 @@ export function ClipRecipeModal({ onClose, onSaved }) {
             onEditFirst={() => setShowSavePrompt(false)}
           />
         ) : null}
-        {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-divider bg-surface px-4 py-3">
-          <h2 className="font-display text-lg text-text-primary">Add Recipe</h2>
+          <h2 className="font-display text-lg text-text-primary">{initialRecipe ? 'Edit Recipe' : 'Add Recipe'}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -185,7 +223,6 @@ export function ClipRecipeModal({ onClose, onSaved }) {
         </div>
 
         <div className="p-4">
-          {/* Step 1: URL input */}
           {step === 'url' && (
             <div className="space-y-4">
               <p className="text-sm text-text-secondary">
@@ -217,21 +254,25 @@ export function ClipRecipeModal({ onClose, onSaved }) {
             </div>
           )}
 
-          {/* Step 2: Preview & edit */}
           {step === 'preview' && form && !showSavePrompt && (
             <div className="space-y-4">
-              {/* Source badge */}
               <div className="rounded-xl bg-warm-100 px-3 py-2 text-xs text-text-muted">
-                Imported from{' '}
-                <a
-                  href={form.source_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline"
-                >
-                  {form.source_domain || form.source_url}
-                </a>
-                {' '}· Edit any fields before saving.
+                {form.source_url ? (
+                  <>
+                    Imported from{' '}
+                    <a
+                      href={form.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline"
+                    >
+                      {form.source_domain || form.source_url}
+                    </a>
+                    {' '}· Edit any fields before saving.
+                  </>
+                ) : (
+                  <>Edit any fields before saving.</>
+                )}
               </div>
 
               <div>
@@ -354,20 +395,22 @@ export function ClipRecipeModal({ onClose, onSaved }) {
               {error && <p className="text-sm text-red-500">{error}</p>}
 
               <div className="flex gap-2 pb-2">
-                <button
-                  type="button"
-                  onClick={() => { setStep('url'); setError(null) }}
-                  className="btn-secondary flex-1"
-                >
-                  Back
-                </button>
+                {!initialRecipe ? (
+                  <button
+                    type="button"
+                    onClick={() => { setStep('url'); setError(null) }}
+                    className="btn-secondary flex-1"
+                  >
+                    Back
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={handleSave}
                   disabled={loading || !form.title?.trim()}
                   className="btn-primary flex-1"
                 >
-                  {loading ? 'Saving…' : 'Save Recipe'}
+                  {loading ? 'Saving…' : initialRecipe ? 'Save changes' : 'Save Recipe'}
                 </button>
               </div>
             </div>

@@ -20,6 +20,7 @@ export function RecipesPage() {
   const [loading, setLoading] = useState(true)
   const [selectedTags, setSelectedTags] = useState([])
   const [showClipModal, setShowClipModal] = useState(false)
+  const [editingRecipe, setEditingRecipe] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
 
   const loadRecipes = useCallback(async () => {
@@ -186,7 +187,7 @@ export function RecipesPage() {
                 <div className="mt-4 flex gap-3 border-t border-divider pt-3">
                   <button
                     type="button"
-                    onClick={() => navigate(`/recipes/${recipe.slug || recipe.id}`)}
+                    onClick={() => setEditingRecipe(recipe)}
                     className="text-sm font-medium text-text-primary"
                   >
                     Edit recipe
@@ -216,6 +217,17 @@ export function RecipesPage() {
         <ClipRecipeModal
           onClose={() => setShowClipModal(false)}
           onSaved={loadRecipes}
+        />
+      )}
+
+      {editingRecipe && (
+        <ClipRecipeModal
+          initialRecipe={editingRecipe}
+          onClose={() => setEditingRecipe(null)}
+          onSaved={() => {
+            setEditingRecipe(null)
+            loadRecipes()
+          }}
         />
       )}
     </div>

@@ -31,10 +31,11 @@ function asNumber(value, fallback = 0) {
 function normalizeIngredientGroup(group, fallbackLabel = undefined) {
   const ingredients = asArray(group?.ingredients).map((ingredient) => {
     if (typeof ingredient === 'string') {
+      const match = ingredient.trim().match(/^([0-9]*\.?[0-9]+)\s+(.*)$/)
       return {
-        amount: '',
+        amount: match ? formatIngredientAmount(match[1]) : '',
         unit: '',
-        item: ingredient,
+        item: match ? match[2] : ingredient,
         note: undefined,
         optional: false,
       }
