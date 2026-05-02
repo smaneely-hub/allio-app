@@ -43,7 +43,20 @@ export function formatIngredientAmount(amount) {
   const text = String(amount).trim()
   if (!text) return ''
   if (text.includes('/')) return text
-  const numeric = Number(text)
-  if (!Number.isFinite(numeric)) return text
-  return decimalToFraction(numeric)
+
+  const directNumeric = Number(text)
+  if (Number.isFinite(directNumeric)) {
+    return decimalToFraction(directNumeric)
+  }
+
+  const leadingDecimal = text.match(/^([0-9]*\.?[0-9]+)(\s+.*)?$/)
+  if (leadingDecimal) {
+    const numeric = Number(leadingDecimal[1])
+    if (Number.isFinite(numeric)) {
+      const suffix = leadingDecimal[2] || ''
+      return `${decimalToFraction(numeric)}${suffix}`.trim()
+    }
+  }
+
+  return text
 }
