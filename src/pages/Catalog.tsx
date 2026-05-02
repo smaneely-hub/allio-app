@@ -120,7 +120,6 @@ export function Catalog() {
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-3xl text-text-primary">My Recipes</h1>
-          <p className="text-sm text-text-muted">{filteredRecipes.length} recipes</p>
         </div>
         <button type="button" onClick={() => setShowClipModal(true)} className="btn-primary shrink-0">
           + Add Recipe

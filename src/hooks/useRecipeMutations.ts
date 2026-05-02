@@ -42,7 +42,7 @@ export async function markCooked(recipeId: string): Promise<void> {
 }
 
 export async function deleteRecipe(recipeId: string): Promise<void> {
-  const { error } = await supabase.from('recipes').update({ active: false }).eq('id', recipeId)
+  const { error } = await supabase.from('recipes').delete().eq('id', recipeId)
   if (error) throw error
 }
 
