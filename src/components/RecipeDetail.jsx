@@ -104,7 +104,7 @@ export function RecipeDetail({ meal, onClose }) {
         </div>
       </div>
 
-      <div className="mx-auto max-w-2xl px-4 pb-12 pt-5">
+      <div className="mx-auto max-w-2xl px-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] pt-5">
         <header className="rounded-[28px] bg-white px-5 py-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
           {recipe.imageUrl ? (
             <div className="mb-4 overflow-hidden rounded-2xl">
