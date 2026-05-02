@@ -153,6 +153,7 @@ export default function App() {
                 <Route path="/settings/account" element={<Navigate to="/settings" replace />} />
                 <Route path="/planner" element={<Navigate to="/planner" replace />} />
                 <Route path="/plans" element={<Navigate to="/planner" replace />} />
+                <Route path="/this-week" element={<Navigate to="/planner" replace />} />
                 <Route path="/search" element={<Navigate to="/search" replace />} />
                 <Route path="/find" element={<Navigate to="/search" replace />} />
                 <Route path="/groceries" element={<Navigate to="/groceries" replace />} />

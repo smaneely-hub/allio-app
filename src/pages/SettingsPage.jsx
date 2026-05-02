@@ -13,6 +13,13 @@ const DEFAULT_PREFERENCES = {
   default_servings: 4,
 }
 
+function isMissingPreferencesTable(error) {
+  const message = String(error?.message || error?.details || '')
+  return message.includes("Could not find the table 'public.user_preferences'")
+    || message.includes('relation "public.user_preferences" does not exist')
+    || message.includes('relation "user_preferences" does not exist')
+}
+
 function ToggleRow({ label, checked, onChange }) {
   return (
     <label className="flex items-center justify-between rounded-2xl border border-divider bg-white px-4 py-3">
@@ -55,6 +62,9 @@ export function SettingsPage() {
       if (!mounted) return
       if (error) {
         console.error('[SettingsPage] loadPreferences error', error)
+        if (!isMissingPreferencesTable(error)) {
+          toast.error('Could not load saved settings')
+        }
         setPreferences(DEFAULT_PREFERENCES)
       } else {
         setPreferences({
@@ -90,7 +100,11 @@ export function SettingsPage() {
       .upsert(payload, { onConflict: 'user_id' })
 
     if (error) {
-      toast.error(error.message || 'Could not save preferences')
+      if (isMissingPreferencesTable(error)) {
+        toast.error('Settings storage is not deployed yet')
+      } else {
+        toast.error(error.message || 'Could not save preferences')
+      }
       return
     }
 
