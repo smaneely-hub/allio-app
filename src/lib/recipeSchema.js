@@ -1,3 +1,5 @@
+import { formatIngredientAmount } from '../utils/formatFractions'
+
 function asArray(value) {
   return Array.isArray(value) ? value : []
 }
@@ -39,7 +41,7 @@ function normalizeIngredientGroup(group, fallbackLabel = undefined) {
     }
 
     return {
-      amount: asString(ingredient?.amount ?? ingredient?.quantity, ''),
+      amount: formatIngredientAmount(asString(ingredient?.amount ?? ingredient?.quantity, '')),
       unit: asString(ingredient?.unit, ''),
       item: asString(ingredient?.item ?? ingredient?.name, ''),
       note: typeof ingredient?.note === 'string' ? ingredient.note : undefined,
@@ -122,7 +124,7 @@ export function normalizeRecipe(recipe = {}) {
         ingredients: rawIngredients.map((ingredient) => {
           if (typeof ingredient === 'string') return ingredient
           return {
-            amount: ingredient?.amount ?? ingredient?.quantity ?? '',
+            amount: formatIngredientAmount(ingredient?.amount ?? ingredient?.quantity ?? ''),
             unit: ingredient?.unit ?? '',
             item: ingredient?.item ?? ingredient?.name ?? ingredient?.ingredient ?? '',
             note: ingredient?.note,
