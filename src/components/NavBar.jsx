@@ -102,7 +102,10 @@ export function NavBar() {
       </header>
 
       {user ? (
-        <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-surface-muted bg-surface-card pb-safe">
+        <nav
+          className="fixed left-0 right-0 z-50 border-t border-surface-muted bg-surface-card"
+          style={{ bottom: 'env(safe-area-inset-bottom, 0px)' }}
+        >
           <div className="mx-auto flex h-16 max-w-xl items-center justify-around">
             {mobileLinks.map((link) => {
               const Icon = link.icon
@@ -118,7 +121,7 @@ export function NavBar() {
         </nav>
       ) : null}
 
-      <div className="h-16 md:hidden" style={{ height: 'calc(4rem + env(safe-area-inset-bottom, 20px))' }}></div>
+      <div className="md:hidden" style={{ height: 'calc(4rem + env(safe-area-inset-bottom, 0px) + 16px)' }}></div>
     </>
   )
 }
