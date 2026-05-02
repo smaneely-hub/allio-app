@@ -4,6 +4,7 @@ import { ClipRecipeModal } from '../components/ClipRecipeModal'
 import { FilterBar } from '../components/FilterBar'
 import { RecipeDetail } from '../components/RecipeDetail'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { useAuth } from '../hooks/useAuth'
 import { filterRecipesByTags, getAvailableTags } from '../lib/recipeFilters'
 import { normalizeRecipe } from '../lib/recipeSchema'
 import { supabase } from '../lib/supabase'
@@ -13,6 +14,7 @@ export function RecipesPage() {
   useDocumentTitle('Recipes | Allio')
   const navigate = useNavigate()
   const { recipeId } = useParams()
+  const { user } = useAuth()
   const [recipes, setRecipes] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedTags, setSelectedTags] = useState([])
@@ -20,10 +22,17 @@ export function RecipesPage() {
 
   const loadRecipes = useCallback(async () => {
     setLoading(true)
+    if (!user?.id) {
+      setRecipes([])
+      setLoading(false)
+      return
+    }
+
     const { data } = await supabase
       .from('recipes')
-      .select('id, title, slug, description, cuisine, meal_type, prep_time_minutes, cook_time_minutes, total_time_minutes, servings, yield_text, difficulty, ingredients_json, instructions_json, ingredient_groups_json, instruction_groups_json, nutrition_json, tips_json, substitutions_json, tags_json, tags_v2_json, source_note, source_domain, source_url, image_prompt, created_at, updated_at, active')
+      .select('id, user_id, title, slug, description, cuisine, meal_type, prep_time_minutes, cook_time_minutes, total_time_minutes, servings, yield_text, difficulty, ingredients_json, instructions_json, ingredient_groups_json, instruction_groups_json, nutrition_json, tips_json, substitutions_json, tags_json, tags_v2_json, source_note, source_domain, source_url, image_prompt, created_at, updated_at, active, is_favorite, cooked_at, image_url')
       .eq('active', true)
+      .eq('user_id', user.id)
       .order('title', { ascending: true })
 
     setRecipes(data || [])
@@ -34,8 +43,9 @@ export function RecipesPage() {
     loadRecipes()
   }, [loadRecipes])
 
-  const availableTags = useMemo(() => getAvailableTags(recipes), [recipes])
-  const filteredRecipes = useMemo(() => filterRecipesByTags(recipes, selectedTags), [recipes, selectedTags])
+  const personalRecipes = useMemo(() => recipes.filter((recipe) => recipe.is_favorite || recipe.cooked_at || recipe.source_url), [recipes])
+  const availableTags = useMemo(() => getAvailableTags(personalRecipes), [personalRecipes])
+  const filteredRecipes = useMemo(() => filterRecipesByTags(personalRecipes, selectedTags), [personalRecipes, selectedTags])
 
   const toggleTag = (tag) => {
     setSelectedTags((current) => current.includes(tag)
@@ -64,7 +74,7 @@ export function RecipesPage() {
         imagePrompt: recipeRow.image_prompt,
       }))
       .find((recipe) => String(recipe.id) === String(recipeId) || String(recipe.slug) === String(recipeId)) || null
-  }, [recipeId, recipes])
+  }, [recipeId, personalRecipes])
 
   if (selectedRecipe) {
     return <RecipeDetail meal={selectedRecipe} onClose={() => navigate('/recipes')} />
@@ -76,7 +86,7 @@ export function RecipesPage() {
         <div>
           <div className="h-1 w-12 rounded-full bg-gradient-to-r from-primary-400 via-teal-400 to-purple-400 mb-2" />
           <h1 className="font-display text-2xl text-text-primary md:text-3xl">Recipes</h1>
-          <p className="text-sm text-text-muted">Browse the recipe library and filter by the tags that fit your household.</p>
+          <p className="text-sm text-text-muted">See only the recipes you’ve imported, cooked, or favorited.</p>
         </div>
         <button
           type="button"
