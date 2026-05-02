@@ -135,7 +135,7 @@ export function Catalog() {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search recipes or ingredients"
-            className="input w-full pl-11"
+            className="input w-full pl-12 pr-4"
           />
         </div>
       </div>
