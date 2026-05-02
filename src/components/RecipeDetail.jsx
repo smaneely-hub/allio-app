@@ -54,9 +54,10 @@ export function RecipeDetail({ meal, onClose }) {
   const recipe = useMemo(() => normalizeRecipe({
     ...meal,
     title: meal?.title || meal?.name,
-    prepTime: meal?.prep_time_minutes,
-    cookTime: meal?.cook_time_minutes,
-    totalTime: meal?.total_time_minutes,
+    prepTime: meal?.prepTime ?? meal?.prep_time_minutes,
+    cookTime: meal?.cookTime ?? meal?.cook_time_minutes,
+    totalTime: meal?.totalTime ?? meal?.total_time_minutes,
+    imageUrl: meal?.imageUrl ?? meal?.image_url,
     ingredientGroups: meal?.ingredientGroups ?? meal?.ingredient_groups_json,
     instructionGroups: meal?.instructionGroups ?? meal?.instruction_groups_json,
     ingredients: meal?.ingredients ?? meal?.ingredients_json,

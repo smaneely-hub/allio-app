@@ -63,6 +63,7 @@ export function RecipesPage() {
         prepTime: recipeRow.prep_time_minutes,
         cookTime: recipeRow.cook_time_minutes,
         totalTime: recipeRow.total_time_minutes,
+        image_url: recipeRow.image_url,
         ingredientGroups: recipeRow.ingredient_groups_json,
         instructionGroups: recipeRow.instruction_groups_json,
         ingredients: recipeRow.ingredients_json,
@@ -112,6 +113,7 @@ export function RecipesPage() {
               prepTime: recipeRow.prep_time_minutes,
               cookTime: recipeRow.cook_time_minutes,
               totalTime: recipeRow.total_time_minutes,
+              image_url: recipeRow.image_url,
               ingredientGroups: recipeRow.ingredient_groups_json,
               instructionGroups: recipeRow.instruction_groups_json,
               ingredients: recipeRow.ingredients_json,
@@ -132,10 +134,17 @@ export function RecipesPage() {
                 className="card w-full p-4 text-left shadow-sm transition-shadow duration-200 hover:shadow-md"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h2 className="font-display text-xl text-text-primary">{recipe.title}</h2>
-                    <p className="mt-1 text-sm text-text-secondary">{recipe.description}</p>
-                    {recipe.sourceNote ? <p className="mt-2 text-xs text-text-muted">{recipe.sourceNote}</p> : null}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start gap-3">
+                      {recipe.imageUrl ? (
+                        <img src={recipe.imageUrl} alt={recipe.title} className="h-16 w-16 shrink-0 rounded-2xl object-cover" />
+                      ) : null}
+                      <div className="min-w-0 flex-1">
+                        <h2 className="font-display text-xl text-text-primary">{recipe.title}</h2>
+                        <p className="mt-1 text-sm text-text-secondary">{recipe.description}</p>
+                        {recipe.sourceNote ? <p className="mt-2 text-xs text-text-muted">{recipe.sourceNote}</p> : null}
+                      </div>
+                    </div>
                   </div>
                   <div className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary-600">
                     {recipe.difficulty}
