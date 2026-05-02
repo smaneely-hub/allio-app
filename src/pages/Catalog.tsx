@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { deleteRecipe, listUserRecipes } from '../hooks/useRecipeMutations'
 import { normalizeRecipe } from '../lib/recipeSchema'
 import { ClipRecipeModal } from '../components/ClipRecipeModal'
+import { useAuth } from '../hooks/useAuth'
 
 function SearchIcon(props: any) {
   return (
@@ -15,6 +16,7 @@ function SearchIcon(props: any) {
 
 export function Catalog() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const initialQuery = searchParams.get('q') || ''
   const [recipes, setRecipes] = useState<any[]>([])
@@ -46,6 +48,7 @@ export function Catalog() {
     let cancelled = false
     setLoading(true)
     listUserRecipes({
+      userId: user?.id,
       cuisine: cuisine || undefined,
       minRating: minRating ? Number(minRating) : undefined,
       favoritesOnly,
@@ -60,7 +63,7 @@ export function Catalog() {
     return () => {
       cancelled = true
     }
-  }, [cuisine, minRating, favoritesOnly, sortBy, refreshKey])
+  }, [user?.id, cuisine, minRating, favoritesOnly, sortBy, refreshKey])
 
   const normalized = useMemo(() => recipes.map((recipeRow) => normalizeRecipe({
     ...recipeRow,
@@ -128,14 +131,14 @@ export function Catalog() {
 
       <div className="mb-4 max-w-md">
         <div className="relative">
-          <SearchIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-text-muted" />
+          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
           <input
             ref={searchRef}
             type="search"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search recipes or ingredients"
-            className="input w-full pl-12 pr-4"
+            className="input w-full pl-[2.75rem] pr-4"
           />
         </div>
       </div>
@@ -199,16 +202,18 @@ export function Catalog() {
                   </div>
                 </div>
               </button>
-              <div className="border-t border-divider px-4 py-3">
-                <button
-                  type="button"
-                  onClick={() => handleDelete(recipe.id, recipe.title)}
-                  disabled={deletingId === recipe.id}
-                  className="text-sm font-medium text-red-600 disabled:opacity-50"
-                >
-                  {deletingId === recipe.id ? 'Removing…' : 'Remove recipe'}
-                </button>
-              </div>
+              {recipe.user_id === user?.id ? (
+                <div className="border-t border-divider px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(recipe.id, recipe.title)}
+                    disabled={deletingId === recipe.id}
+                    className="text-sm font-medium text-red-600 disabled:opacity-50"
+                  >
+                    {deletingId === recipe.id ? 'Removing…' : 'Remove recipe'}
+                  </button>
+                </div>
+              ) : null}
             </div>
           ))}
         </div>
