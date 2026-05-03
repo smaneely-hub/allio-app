@@ -41,6 +41,7 @@ export function useShoppingList(userId, listId = null) {
       if (!targetList?.id) {
         setShoppingList(null)
         setItems([])
+        setLoading(false)
         return null
       }
 
@@ -49,6 +50,8 @@ export function useShoppingList(userId, listId = null) {
       setItems(nextItems)
       return { ...targetList, items: nextItems }
     } catch (err) {
+      setShoppingList(null)
+      setItems([])
       setError(err)
       toast.error(err.message || 'Could not load shopping list')
       return null

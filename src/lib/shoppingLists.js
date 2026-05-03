@@ -33,7 +33,19 @@ export async function ensureDefaultShoppingList(userId) {
         .eq('id', firstList.id)
         .select('*')
         .single()
-      if (updateError) throw updateError
+      if (updateError) {
+        if (updateError.code === '23505') {
+          const { data: winner, error: winnerError } = await supabase
+            .from('shopping_lists')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('is_default', true)
+            .single()
+          if (winnerError) throw winnerError
+          return winner
+        }
+        throw updateError
+      }
       return updated
     }
     return firstList
@@ -49,7 +61,19 @@ export async function ensureDefaultShoppingList(userId) {
     .select('*')
     .single()
 
-  if (createError) throw createError
+  if (createError) {
+    if (createError.code === '23505') {
+      const { data: winner, error: winnerError } = await supabase
+        .from('shopping_lists')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_default', true)
+        .single()
+      if (winnerError) throw winnerError
+      return winner
+    }
+    throw createError
+  }
   return created
 }
 
