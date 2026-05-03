@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase'
 import { normalizeMealRecord } from '../lib/mealSchema'
 import { invokePlannerFunction, refineMeal } from '../lib/plannerFunction'
 import { buildShoppingItemsFromMeal, upsertShoppingListForDate } from '../lib/tonightPersistence'
+import { addItemsToShoppingList, ensureDefaultShoppingList, getShoppingListItems } from '../lib/shoppingLists'
 import { calculateServings, logServingsCalculation, getDemographicBucket } from '../hooks/useServings'
 import { CATEGORY_LABELS, CATEGORY_ORDER, groupItemsByCategory, parseIngredient } from '../lib/shoppingListUtils'
 
@@ -436,58 +437,15 @@ export function TonightPage() {
     if (!user?.id || !targetMeal) return null
 
     const household = await getHousehold(user.id)
-    const today = new Date().toISOString().split('T')[0]
     const nextItems = buildShoppingItemsFromMeal(targetMeal, staplesOnHand || household?.staples_on_hand || '')
-
-    const { data: existingList, error: loadError } = await supabase
-      .from('shopping_lists')
-      .select('id, items')
-      .eq('user_id', user.id)
-      .eq('week_of', today)
-      .maybeSingle()
-
-    if (loadError) throw loadError
-
-    const merged = new Map()
-    for (const item of Array.isArray(existingList?.items) ? existingList.items : []) {
-      const key = `${String(item?.name || '').trim().toLowerCase()}::${String(item?.unit || '').trim().toLowerCase()}`
-      if (!key) continue
-      merged.set(key, {
-        ...item,
-        quantity: Number(item?.quantity || 0),
-        used_in: Array.isArray(item?.used_in) ? [...item.used_in] : [],
-      })
-    }
-
-    for (const item of nextItems) {
-      const key = `${String(item?.name || '').trim().toLowerCase()}::${String(item?.unit || '').trim().toLowerCase()}`
-      if (!key) continue
-      const existing = merged.get(key)
-      if (existing) {
-        const existingUsedIn = new Set(Array.isArray(existing.used_in) ? existing.used_in : [])
-        const nextUsedIn = Array.isArray(item.used_in) ? item.used_in : []
-        const isSameUsage = nextUsedIn.length > 0 && nextUsedIn.every((value) => existingUsedIn.has(value))
-        if (!isSameUsage) {
-          existing.quantity += Number(item.quantity || 0)
-          for (const usage of nextUsedIn) existingUsedIn.add(usage)
-          existing.used_in = Array.from(existingUsedIn)
-        }
-      } else {
-        merged.set(key, {
-          ...item,
-          quantity: Number(item.quantity || 0),
-          used_in: Array.isArray(item.used_in) ? [...item.used_in] : [],
-        })
-      }
-    }
-
-    const mergedItems = Array.from(merged.values())
-    await upsertShoppingListForDate({
+    const defaultList = await ensureDefaultShoppingList(user.id)
+    const mergedItems = await addItemsToShoppingList({
       userId: user.id,
-      householdId: household?.id || null,
-      weekOf: today,
-      items: mergedItems,
+      listId: defaultList?.id || null,
+      items: nextItems,
+      source: 'tonight',
     })
+
     setShoppingListItems(mergedItems)
     toast.success(successMessage)
     return mergedItems
@@ -515,6 +473,16 @@ export function TonightPage() {
   const shoppingPrepItems = useMemo(() => {
     const parsed = (shoppingListItems.length > 0 ? shoppingListItems : (activeMeal?.ingredients || []))
       .map((ingredient, index) => {
+        if (ingredient?.id && ingredient?.name) {
+          return {
+            id: ingredient.id,
+            name: ingredient.name,
+            quantity: ingredient.quantity,
+            unit: ingredient.unit || '',
+            category: ingredient.category,
+          }
+        }
+
         const parsedIngredient = parseIngredient(ingredient)
         return parsedIngredient ? {
           id: `${parsedIngredient.normalizedName}-${parsedIngredient.unit}-${index}`,
@@ -550,6 +518,11 @@ export function TonightPage() {
     initialDataLoadedRef.current = true
 
     const today = new Date().toISOString().split('T')[0]
+
+    ensureDefaultShoppingList(user.id)
+      .then((list) => getShoppingListItems(list?.id))
+      .then((rows) => setShoppingListItems(rows || []))
+      .catch((error) => console.error('[TonightPage] load shopping list items error:', error))
 
     // Load today's meal
     supabase

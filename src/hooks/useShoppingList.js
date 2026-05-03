@@ -2,16 +2,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { groupItemsByCategory } from '../lib/shoppingListUtils'
+import { ensureDefaultShoppingList, getShoppingListItems } from '../lib/shoppingLists'
 
-/** Load and persist the shopping list for the active week. */
-export function useShoppingList(userId, weekOf) {
+export function useShoppingList(userId, listId = null) {
   const [shoppingList, setShoppingList] = useState(null)
+  const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   const refreshShoppingList = useCallback(async () => {
-    if (!userId || !weekOf) {
+    if (!userId) {
       setShoppingList(null)
+      setItems([])
       setLoading(false)
       return null
     }
@@ -20,16 +22,32 @@ export function useShoppingList(userId, weekOf) {
     setError(null)
 
     try {
-      const { data, error: loadError } = await supabase
-        .from('shopping_lists')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('week_of', weekOf)
-        .maybeSingle()
+      let targetList = null
 
-      if (loadError) throw loadError
-      setShoppingList(data)
-      return data
+      if (listId) {
+        const { data, error: listError } = await supabase
+          .from('shopping_lists')
+          .select('*')
+          .eq('id', listId)
+          .eq('user_id', userId)
+          .maybeSingle()
+
+        if (listError) throw listError
+        targetList = data
+      } else {
+        targetList = await ensureDefaultShoppingList(userId)
+      }
+
+      if (!targetList?.id) {
+        setShoppingList(null)
+        setItems([])
+        return null
+      }
+
+      const nextItems = await getShoppingListItems(targetList.id)
+      setShoppingList(targetList)
+      setItems(nextItems)
+      return { ...targetList, items: nextItems }
     } catch (err) {
       setError(err)
       toast.error(err.message || 'Could not load shopping list')
@@ -37,39 +55,92 @@ export function useShoppingList(userId, weekOf) {
     } finally {
       setLoading(false)
     }
-  }, [userId, weekOf])
+  }, [listId, userId])
 
   useEffect(() => {
     refreshShoppingList()
   }, [refreshShoppingList])
 
-  const saveItems = useCallback(async (items) => {
-    if (!shoppingList?.id) return null
+  const toggleItem = useCallback(async (itemId) => {
+    const currentItem = items.find((item) => item.id === itemId)
+    if (!currentItem) return null
 
-    const { data, error: saveError } = await supabase
-      .from('shopping_lists')
-      .update({ items })
-      .eq('id', shoppingList.id)
+    const { error: updateError } = await supabase
+      .from('shopping_list_items')
+      .update({ checked: !currentItem.checked })
+      .eq('id', itemId)
+
+    if (updateError) {
+      toast.error(updateError.message)
+      throw updateError
+    }
+
+    const nextItems = items.map((item) => item.id === itemId ? { ...item, checked: !item.checked } : item)
+    setItems(nextItems)
+    return nextItems
+  }, [items])
+
+  const clearChecked = useCallback(async () => {
+    if (!shoppingList?.id) return []
+
+    const checkedIds = items.filter((item) => item.checked).map((item) => item.id)
+    if (!checkedIds.length) return items
+
+    const { error: deleteError } = await supabase
+      .from('shopping_list_items')
+      .delete()
+      .in('id', checkedIds)
+
+    if (deleteError) {
+      toast.error(deleteError.message)
+      throw deleteError
+    }
+
+    const nextItems = items.filter((item) => !item.checked)
+    setItems(nextItems)
+    return nextItems
+  }, [items, shoppingList?.id])
+
+  const addItem = useCallback(async (targetListId, item) => {
+    const resolvedListId = targetListId || shoppingList?.id
+    if (!userId || !resolvedListId) return null
+
+    const payload = {
+      list_id: resolvedListId,
+      user_id: userId,
+      name: String(item?.name || '').trim(),
+      quantity: String(item?.quantity || '').trim() || null,
+      category: item?.category || 'other',
+      checked: Boolean(item?.checked),
+      source: item?.source || 'manual',
+    }
+
+    const { data, error: insertError } = await supabase
+      .from('shopping_list_items')
+      .insert(payload)
       .select('*')
       .single()
 
-    if (saveError) {
-      toast.error(saveError.message)
-      throw saveError
+    if (insertError) {
+      toast.error(insertError.message)
+      throw insertError
     }
 
-    setShoppingList(data)
+    setItems((current) => [...current, data])
     return data
-  }, [shoppingList?.id])
+  }, [shoppingList?.id, userId])
 
-  const groupedItems = useMemo(() => groupItemsByCategory(shoppingList?.items || []), [shoppingList])
+  const groupedItems = useMemo(() => groupItemsByCategory(items || []), [items])
 
   return {
     shoppingList,
+    items,
     groupedItems,
     loading,
     error,
     refreshShoppingList,
-    saveItems,
+    toggleItem,
+    clearChecked,
+    addItem,
   }
 }

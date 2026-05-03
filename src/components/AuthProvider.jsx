@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, useRef } from 
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
+import { ensureDefaultShoppingList } from '../lib/shoppingLists'
 
 const AuthContext = createContext(null)
 
@@ -60,6 +61,13 @@ export function AuthProvider({ children }) {
       
       prevUserRef.current = session?.user ?? null
       setUser(session?.user ?? null)
+      if (session?.user?.id) {
+        try {
+          await ensureDefaultShoppingList(session.user.id)
+        } catch (error) {
+          console.error('[AuthProvider] ensureDefaultShoppingList error:', error)
+        }
+      }
       setLoading(false)
     })
 

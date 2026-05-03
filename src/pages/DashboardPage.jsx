@@ -10,19 +10,32 @@ export function DashboardPage() {
   const { user, loading: authLoading } = useAuth()
   const { household, members, loading: householdLoading } = useHousehold()
   const { schedule } = useSchedule()
-  const [shoppingList, setShoppingList] = useState(null)
+  const [shoppingItems, setShoppingItems] = useState([])
 
   useEffect(() => {
     async function loadShoppingList() {
       if (!user) return
-      const { data } = await supabase
+
+      const { data: defaultList } = await supabase
         .from('shopping_lists')
-        .select('*')
+        .select('id')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+        .eq('is_default', true)
         .limit(1)
         .maybeSingle()
-      setShoppingList(data)
+
+      if (!defaultList?.id) {
+        setShoppingItems([])
+        return
+      }
+
+      const { data } = await supabase
+        .from('shopping_list_items')
+        .select('*')
+        .eq('list_id', defaultList.id)
+        .order('created_at', { ascending: true })
+
+      setShoppingItems(data || [])
     }
     loadShoppingList()
   }, [user])
@@ -35,8 +48,8 @@ export function DashboardPage() {
     )
   }
 
-  const checkedItems = shoppingList?.items?.filter(i => i.checked).length || 0
-  const totalItems = shoppingList?.items?.length || 0
+  const checkedItems = shoppingItems.filter(i => i.checked).length || 0
+  const totalItems = shoppingItems.length || 0
 
   return (
     <div className="px-3 pb-24 md:px-0 pt-2 space-y-4">

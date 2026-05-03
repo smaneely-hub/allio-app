@@ -10,7 +10,7 @@ import { EmptyState } from '../components/LoadingStates'
 import { UpgradePrompt } from '../components/UpgradePrompt'
 import { AdSlot } from '../components/AdSlot'
 import { useShoppingList } from '../hooks/useShoppingList'
-import { CATEGORY_LABELS, CATEGORY_ORDER } from '../lib/shoppingListUtils'
+import { CATEGORY_LABELS, CATEGORY_ORDER, categorizeIngredient } from '../lib/shoppingListUtils'
 
 const categoryColors = {
   produce: { border: '#22C55E', bg: 'bg-green-50' },
@@ -27,17 +27,18 @@ export function ShopPage() {
   useDocumentTitle('Shopping List | Allio')
   const { user } = useAuth()
   const { isPremium, trackUsage } = useSubscription()
-  const today = new Date().toISOString().split('T')[0]
-  const { shoppingList, loading, saveItems } = useShoppingList(user?.id, today)
+  const { shoppingList, items, loading, toggleItem, clearChecked, addItem } = useShoppingList(user?.id)
+  const [newItemName, setNewItemName] = useState('')
+  const [newItemQuantity, setNewItemQuantity] = useState('')
   const displayGroups = useMemo(() => {
     return CATEGORY_ORDER.reduce((acc, category) => {
-      const items = (shoppingList?.items || [])
-        .map((item, index) => ({ ...item, __itemKey: `${item.name}-${item.unit}-${index}` }))
+      const grouped = (items || [])
+        .map((item) => ({ ...item, __itemKey: item.id }))
         .filter((item) => (item.category || 'other') === category)
-      if (items.length) acc[category] = items
+      if (grouped.length) acc[category] = grouped
       return acc
     }, {})
-  }, [shoppingList])
+  }, [items])
   const [openCategories, setOpenCategories] = useState({})
   const [emailing, setEmailing] = useState(false)
   const [upgradeFeature, setUpgradeFeature] = useState(null)
@@ -59,7 +60,6 @@ export function ShopPage() {
   }, [displayGroups])
 
   const progress = useMemo(() => {
-    const items = shoppingList?.items || []
     const checked = items.filter((item) => item.checked).length
     return {
       checked,
@@ -67,20 +67,27 @@ export function ShopPage() {
       percent: items.length > 0 ? Math.round((checked / items.length) * 100) : 0,
       label: `${items.length} items (${checked} checked)`
     }
-  }, [shoppingList])
-
-  const toggleItem = async (itemKey) => {
-    const items = (shoppingList?.items || []).map((item, index) => {
-      const key = `${item.name}-${item.unit}-${index}`
-      return key === itemKey ? { ...item, checked: !item.checked } : item
-    })
-    await saveItems(items)
-  }
+  }, [items])
 
   const clearAllChecks = async () => {
-    const items = (shoppingList?.items || []).map((item) => ({ ...item, checked: false }))
-    await saveItems(items)
-    toast.success('All items unchecked')
+    await clearChecked()
+    toast.success('Checked items cleared')
+  }
+
+  const handleAddItem = async (event) => {
+    event.preventDefault()
+    if (!newItemName.trim()) return
+
+    await addItem(shoppingList?.id, {
+      name: newItemName.trim(),
+      quantity: newItemQuantity.trim(),
+      category: categorizeIngredient(newItemName),
+      source: 'manual',
+    })
+
+    setNewItemName('')
+    setNewItemQuantity('')
+    toast.success('Item added')
   }
 
   const handleShare = async () => {
@@ -89,7 +96,7 @@ export function ShopPage() {
       return
     }
 
-    const text = shareListAsText(shoppingList?.items || [], today)
+    const text = shareListAsText(items || [], shoppingList?.name || 'Shopping List')
     await navigator.clipboard.writeText(text)
     toast.success('Shopping list copied!')
   }
@@ -108,9 +115,9 @@ export function ShopPage() {
         return
       }
 
-      const weekLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      const itemCount = shoppingList?.items?.length || 0
-      const html = formatShoppingListEmail(shoppingList?.items || [], weekLabel, 'My Household')
+      const weekLabel = shoppingList?.name || 'Shopping List'
+      const itemCount = items?.length || 0
+      const html = formatShoppingListEmail(items || [], weekLabel, 'My Household')
 
       const { error } = await supabase.functions.invoke('send-email', {
         body: { to: authUser.email, subject: `Your Allio shopping list — ${itemCount} items`, html }
@@ -149,7 +156,7 @@ export function ShopPage() {
     )
   }
 
-  if (!shoppingList?.items?.length) {
+  if (!items?.length) {
     return (
       <div className="px-3 pb-24 pt-2">
         <EmptyState
@@ -169,8 +176,8 @@ export function ShopPage() {
         <div className="flex items-center justify-between">
           <div>
             <div className="h-1 w-12 bg-gradient-to-r from-primary-400 via-teal-400 to-purple-400 rounded-full mb-2"></div>
-            <h1 className="font-display text-2xl md:text-3xl text-text-primary">Shopping List</h1>
-            <p className="text-sm text-text-muted">Week of {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+            <h1 className="font-display text-2xl md:text-3xl text-text-primary">{shoppingList?.name || 'Shopping List'}</h1>
+            <p className="text-sm text-text-muted">Your default grocery list</p>
           </div>
           <button
             type="button"
@@ -184,6 +191,21 @@ export function ShopPage() {
       </div>
 
       <div className="card p-4 mb-3 shadow-sm hover:shadow-md transition-shadow duration-200">
+        <form onSubmit={handleAddItem} className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_140px_auto]">
+          <input
+            value={newItemName}
+            onChange={(e) => setNewItemName(e.target.value)}
+            className="input w-full"
+            placeholder="Add an item"
+          />
+          <input
+            value={newItemQuantity}
+            onChange={(e) => setNewItemQuantity(e.target.value)}
+            className="input w-full"
+            placeholder="Qty"
+          />
+          <button type="submit" className="btn-primary">Add</button>
+        </form>
         <div className="flex items-start justify-between gap-3 mb-3">
           <div>
             <div className="inline-flex items-center rounded-full bg-primary-50 px-3 py-1 text-sm font-medium text-text-secondary">

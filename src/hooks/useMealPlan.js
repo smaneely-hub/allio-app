@@ -336,8 +336,6 @@ export function useMealPlan(scheduleId) {
     if (!user || !scheduleId) throw new Error('Schedule is required before clearing a meal plan.')
     const { error: mealPlanError } = await supabase.from('meal_plans').delete().eq('user_id', user.id).eq('schedule_id', scheduleId)
     if (mealPlanError) throw mealPlanError
-    const { error: listError } = await supabase.from('shopping_lists').delete().eq('user_id', user.id).eq('week_of', new Date().toISOString().split('T')[0])
-    if (listError) console.error('[useMealPlan] Clear shopping list error:', listError)
     setMealPlan(null)
     return true
   }, [scheduleId, user])
