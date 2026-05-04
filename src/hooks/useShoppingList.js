@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { groupItemsByCategory } from '../lib/shoppingListUtils'
-import { ensureDefaultShoppingList, getShoppingListItems } from '../lib/shoppingLists'
+import { addItemsToShoppingList, ensureDefaultShoppingList, getShoppingListItems } from '../lib/shoppingLists'
 
 export function useShoppingList(userId, listId = null) {
   const [shoppingList, setShoppingList] = useState(null)
@@ -105,32 +105,29 @@ export function useShoppingList(userId, listId = null) {
   }, [items, shoppingList?.id])
 
   const addItem = useCallback(async (targetListId, item) => {
-    const resolvedListId = targetListId || shoppingList?.id
-    if (!userId || !resolvedListId) return null
+    const name = String(item?.name || '').trim()
+    if (!userId || !name) return null
 
-    const payload = {
-      list_id: resolvedListId,
-      user_id: userId,
-      name: String(item?.name || '').trim(),
-      quantity: String(item?.quantity || '').trim() || null,
-      category: item?.category || 'other',
-      checked: Boolean(item?.checked),
-      source: item?.source || 'manual',
-    }
+    try {
+      const nextItems = await addItemsToShoppingList({
+        userId,
+        listId: targetListId || shoppingList?.id || null,
+        items: [{
+          name,
+          quantity: String(item?.quantity || '').trim() || null,
+          category: item?.category || 'other',
+          checked: Boolean(item?.checked),
+          source: item?.source || 'manual',
+        }],
+        source: item?.source || 'manual',
+      })
 
-    const { data, error: insertError } = await supabase
-      .from('shopping_list_items')
-      .insert(payload)
-      .select('*')
-      .single()
-
-    if (insertError) {
+      setItems(nextItems)
+      return nextItems?.find((entry) => String(entry?.name || '').trim().toLowerCase() === name.toLowerCase()) || null
+    } catch (insertError) {
       toast.error(insertError.message)
       throw insertError
     }
-
-    setItems((current) => [...current, data])
-    return data
   }, [shoppingList?.id, userId])
 
   const groupedItems = useMemo(() => groupItemsByCategory(items || []), [items])
