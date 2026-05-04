@@ -4,7 +4,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useAuth } from '../hooks/useAuth'
 import { useHousehold } from '../hooks/useHousehold'
 import { useSchedule } from '../hooks/useSchedule'
-import { supabase } from '../lib/supabase'
+import { ensureDefaultShoppingList, getShoppingListItems } from '../lib/shoppingLists'
 
 export function DashboardPage() {
   const { user, loading: authLoading } = useAuth()
@@ -13,32 +13,27 @@ export function DashboardPage() {
   const [shoppingItems, setShoppingItems] = useState([])
 
   useEffect(() => {
+    let mounted = true
+
     async function loadShoppingList() {
-      if (!user) return
-
-      const { data: defaultList } = await supabase
-        .from('shopping_lists')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('is_default', true)
-        .limit(1)
-        .maybeSingle()
-
-      if (!defaultList?.id) {
-        setShoppingItems([])
+      if (!user?.id) {
+        if (mounted) setShoppingItems([])
         return
       }
 
-      const { data } = await supabase
-        .from('shopping_list_items')
-        .select('*')
-        .eq('list_id', defaultList.id)
-        .order('created_at', { ascending: true })
-
-      setShoppingItems(data || [])
+      try {
+        const defaultList = await ensureDefaultShoppingList(user.id)
+        const data = await getShoppingListItems(defaultList?.id)
+        if (mounted) setShoppingItems(data || [])
+      } catch (error) {
+        console.error('[DashboardPage] loadShoppingList error:', error)
+        if (mounted) setShoppingItems([])
+      }
     }
+
     loadShoppingList()
-  }, [user])
+    return () => { mounted = false }
+  }, [user?.id])
 
   if (authLoading || householdLoading) {
     return (

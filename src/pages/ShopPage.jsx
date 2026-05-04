@@ -217,7 +217,7 @@ export function ShopPage() {
             onClick={clearAllChecks}
             className="rounded-full border border-divider bg-white px-3 py-1.5 text-sm font-medium text-text-secondary transition-colors hover:bg-warm-50"
           >
-            Uncheck All
+            Clear checked
           </button>
         </div>
         <div className="flex justify-between text-sm mb-2">
@@ -287,9 +287,11 @@ export function ShopPage() {
                             </div>
                           )}
                         </div>
-                        <div className="text-sm text-warm-500 bg-warm-100 rounded-full px-2 flex-shrink-0">
-                          {item.quantity} {item.unit}
-                        </div>
+                        {(item.quantity || '').trim() ? (
+                          <div className="text-sm text-warm-500 bg-warm-100 rounded-full px-2 flex-shrink-0">
+                            {item.quantity}
+                          </div>
+                        ) : null}
                       </button>
                     )
                   })}
