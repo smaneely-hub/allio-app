@@ -48,9 +48,9 @@ export function AuthProvider({ children }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return
-      
+
       // Handle session expiry - compare with ref, not state
       // Skip the toast/redirect if this was triggered by intentional sign-out
       if (!session && prevUserRef.current && !intentionalSignOutRef.current) {
@@ -58,15 +58,13 @@ export function AuthProvider({ children }) {
         navigate('/', { replace: true })
       }
       intentionalSignOutRef.current = false
-      
+
       prevUserRef.current = session?.user ?? null
       setUser(session?.user ?? null)
       if (session?.user?.id) {
-        try {
-          await ensureDefaultShoppingList(session.user.id)
-        } catch (error) {
+        ensureDefaultShoppingList(session.user.id).catch((error) => {
           console.error('[AuthProvider] ensureDefaultShoppingList error:', error)
-        }
+        })
       }
       setLoading(false)
     })
