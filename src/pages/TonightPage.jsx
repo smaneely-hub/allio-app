@@ -6,6 +6,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { normalizeMealRecord } from '../lib/mealSchema'
+import { getLocalDateString } from '../lib/date'
 import { invokePlannerFunction, refineMeal } from '../lib/plannerFunction'
 import { buildShoppingItemsFromMeal, upsertShoppingListForDate } from '../lib/tonightPersistence'
 import { addItemsToShoppingList, ensureDefaultShoppingList, getShoppingListItems } from '../lib/shoppingLists'
@@ -242,7 +243,7 @@ const MEMBER_FEEDBACK_OPTIONS = [
 ]
 
 async function persistTonightMealState({ userId, householdId, meal, staplesOnHand = '' }) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = getLocalDateString()
   const planPayload = {
     meals: [{ ...meal, id: `${meal.day}-${meal.meal}` }],
   }
@@ -517,7 +518,7 @@ export function TonightPage() {
     if (!user || initialDataLoadedRef.current) return
     initialDataLoadedRef.current = true
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = getLocalDateString()
 
     ensureDefaultShoppingList(user.id)
       .then((list) => getShoppingListItems(list?.id))

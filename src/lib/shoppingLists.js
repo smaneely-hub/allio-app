@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { parseIngredient } from './shoppingListUtils'
+import { normalizeIngredientName, parseIngredient } from './shoppingListUtils'
 
 // Module-level cache: prevents multiple concurrent callers from racing the same userId.
 const ensureDefaultInFlight = new Map()
@@ -167,13 +167,34 @@ export function buildShoppingItemRows(meal, staplesOnHand = '', source = 'tonigh
     }))
 }
 
+function parseStoredQuantity(value) {
+  const text = String(value || '').trim()
+  if (!text) return { numeric: null, text: '' }
+
+  const parts = text.split('+').map((part) => part.trim()).filter(Boolean)
+  const numerics = parts.map((part) => Number(part)).filter((num) => Number.isFinite(num))
+  if (numerics.length === parts.length && numerics.length > 0) {
+    return { numeric: numerics.reduce((sum, num) => sum + num, 0), text }
+  }
+
+  const parsed = Number(text)
+  if (Number.isFinite(parsed)) return { numeric: parsed, text }
+  return { numeric: null, text }
+}
+
+function formatStoredQuantity(value) {
+  if (!Number.isFinite(value)) return null
+  const rounded = Math.round(value * 100) / 100
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded)
+}
+
 function mergeQuantities(existingQuantity, nextQuantity) {
-  const left = String(existingQuantity || '').trim()
-  const right = String(nextQuantity || '').trim()
-  if (!left) return right
-  if (!right) return left
-  if (left.toLowerCase() === right.toLowerCase()) return left
-  return `${left} + ${right}`
+  const left = parseStoredQuantity(existingQuantity)
+  const right = parseStoredQuantity(nextQuantity)
+  if (left.numeric != null && right.numeric != null) {
+    return formatStoredQuantity(left.numeric + right.numeric)
+  }
+  return String(nextQuantity || existingQuantity || '').trim() || null
 }
 
 export async function addItemsToShoppingList({ userId, listId = null, items = [], source = 'tonight' }) {
@@ -187,7 +208,7 @@ export async function addItemsToShoppingList({ userId, listId = null, items = []
   const uncheckedMap = new Map()
   for (const item of existingItems) {
     if (item.checked) continue
-    const key = String(item.name || '').trim().toLowerCase()
+    const key = `${normalizeIngredientName(item.name || '')}::${String(item.category || '').trim().toLowerCase()}`
     if (!key) continue
     if (!uncheckedMap.has(key)) uncheckedMap.set(key, item)
   }
@@ -195,7 +216,7 @@ export async function addItemsToShoppingList({ userId, listId = null, items = []
   for (const rawItem of items) {
     const name = String(rawItem?.name || '').trim()
     if (!name) continue
-    const key = name.toLowerCase()
+    const key = `${normalizeIngredientName(name)}::${String(rawItem.category || 'other').trim().toLowerCase()}`
     const existing = uncheckedMap.get(key)
 
     if (existing) {

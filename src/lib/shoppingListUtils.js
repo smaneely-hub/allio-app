@@ -41,7 +41,13 @@ function fractionToNumber(value = '') {
     if (!Number.isNaN(num) && !Number.isNaN(den) && den) return num / den
   }
   const parsed = Number(text)
-  return Number.isNaN(parsed) ? 1 : parsed
+  return Number.isNaN(parsed) ? NaN : parsed
+}
+
+function formatQuantity(value) {
+  if (!Number.isFinite(value)) return ''
+  const rounded = Math.round(value * 100) / 100
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded)
 }
 
 /** Normalize ingredient names for matching and grouping. */
@@ -81,7 +87,8 @@ export function parseIngredient(rawIngredient) {
   let name = source
 
   if (rawIngredient && typeof rawIngredient === 'object' && (rawIngredient.item || rawIngredient.name)) {
-    quantity = Number(rawIngredient.quantity) || 1
+    quantity = fractionToNumber(rawIngredient.quantity ?? rawIngredient.amount ?? 1)
+    if (!Number.isFinite(quantity)) quantity = 1
     unit = rawIngredient.unit || 'piece'
     name = String(rawIngredient.item || rawIngredient.name).trim()
   } else {
@@ -104,6 +111,7 @@ export function parseIngredient(rawIngredient) {
     name,
     normalizedName: normalizeIngredientName(name),
     quantity,
+    quantityText: formatQuantity(quantity),
     unit,
     category: categorizeIngredient(name),
   }
