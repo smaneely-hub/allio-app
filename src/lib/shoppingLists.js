@@ -1,8 +1,25 @@
 import { supabase } from './supabase'
 import { parseIngredient } from './shoppingListUtils'
 
+// Module-level cache: prevents multiple concurrent callers from racing the same userId.
+const ensureDefaultInFlight = new Map()
+
 export async function ensureDefaultShoppingList(userId) {
   if (!userId) return null
+
+  if (ensureDefaultInFlight.has(userId)) {
+    return ensureDefaultInFlight.get(userId)
+  }
+
+  const promise = _ensureDefaultShoppingListInner(userId)
+    .finally(() => ensureDefaultInFlight.delete(userId))
+
+  ensureDefaultInFlight.set(userId, promise)
+  return promise
+}
+
+async function _ensureDefaultShoppingListInner(userId) {
+  console.log('[ensureDefault] enter', { userId })
 
   const { data: existing, error: existingError } = await supabase
     .from('shopping_lists')
@@ -12,10 +29,16 @@ export async function ensureDefaultShoppingList(userId) {
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle()
+  if (existingError) {
+    console.error('[ensureDefault] existing select failed', existingError)
+    throw existingError
+  }
+  if (existing) {
+    console.log('[ensureDefault] found existing default', existing.id)
+    return existing
+  }
 
-  if (existingError) throw existingError
-  if (existing) return existing
-
+  console.log('[ensureDefault] no default found, checking for any list')
   const { data: firstList, error: firstListError } = await supabase
     .from('shopping_lists')
     .select('*')
@@ -23,58 +46,81 @@ export async function ensureDefaultShoppingList(userId) {
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle()
-
-  if (firstListError) throw firstListError
+  if (firstListError) {
+    console.error('[ensureDefault] firstList select failed', firstListError)
+    throw firstListError
+  }
   if (firstList?.id) {
-    if (!firstList.is_default) {
-      const { data: updated, error: updateError } = await supabase
-        .from('shopping_lists')
-        .update({ is_default: true })
-        .eq('id', firstList.id)
-        .select('*')
-        .single()
-      if (updateError) {
-        if (updateError.code === '23505') {
-          const { data: winner, error: winnerError } = await supabase
-            .from('shopping_lists')
-            .select('*')
-            .eq('user_id', userId)
-            .eq('is_default', true)
-            .single()
-          if (winnerError) throw winnerError
-          return winner
-        }
-        throw updateError
+    if (firstList.is_default) return firstList
+    console.log('[ensureDefault] found non-default list, will UPDATE to default:', firstList.id)
+    const { data: updated, error: updateError } = await supabase
+      .from('shopping_lists')
+      .update({ is_default: true })
+      .eq('id', firstList.id)
+      .select('*')
+      .single()
+    if (updateError) {
+      console.warn('[ensureDefault] update failed, attempting recovery', updateError)
+      if (updateError.code === '23505') {
+        return await _recoverDefaultList(userId)
       }
-      return updated
+      throw updateError
     }
-    return firstList
+    return updated
   }
 
+  console.log('[ensureDefault] no list, inserting')
   const { data: created, error: createError } = await supabase
     .from('shopping_lists')
-    .insert({
-      user_id: userId,
-      name: 'My Shopping List',
-      is_default: true,
-    })
+    .insert({ user_id: userId, name: 'My Shopping List', is_default: true })
     .select('*')
     .single()
-
   if (createError) {
+    console.warn('[ensureDefault] insert failed, attempting recovery', createError)
     if (createError.code === '23505') {
-      const { data: winner, error: winnerError } = await supabase
-        .from('shopping_lists')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('is_default', true)
-        .single()
-      if (winnerError) throw winnerError
-      return winner
+      return await _recoverDefaultList(userId)
     }
     throw createError
   }
   return created
+}
+
+async function _recoverDefaultList(userId) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data: winner, error: winnerError } = await supabase
+      .from('shopping_lists')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_default', true)
+      .maybeSingle()
+    if (winnerError) {
+      console.error('[recoverDefault] winner read failed', winnerError)
+      throw winnerError
+    }
+    if (winner) {
+      console.log('[recoverDefault] found winner default on attempt', attempt)
+      return winner
+    }
+
+    const { data: anyList, error: anyListError } = await supabase
+      .from('shopping_lists')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    if (anyListError) {
+      console.error('[recoverDefault] anyList read failed', anyListError)
+      throw anyListError
+    }
+    if (anyList) {
+      console.log('[recoverDefault] no default visible but found anyList on attempt', attempt, anyList.id)
+      return anyList
+    }
+
+    await new Promise((r) => setTimeout(r, 50 * (attempt + 1)))
+  }
+  throw new Error(`ensureDefaultShoppingList: 23505 conflict but no row visible after retries (userId=${userId})`)
 }
 
 export async function getDefaultShoppingList(userId) {
