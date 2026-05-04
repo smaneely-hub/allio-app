@@ -244,7 +244,7 @@ const MEMBER_FEEDBACK_OPTIONS = [
 async function persistTonightMealState({ userId, householdId, meal, staplesOnHand = '' }) {
   const today = new Date().toISOString().split('T')[0]
   const planPayload = {
-    meals: [{ ...meal, id: `${activeMeal.day}-${activeMeal.meal}` }],
+    meals: [{ ...meal, id: `${meal.day}-${meal.meal}` }],
   }
 
   const { data: existingPlan, error: planLoadError } = await supabase
