@@ -39,8 +39,8 @@ export function HouseholdPage() {
   }
 
   return (
-    <div className="px-3 pb-24 pt-2 md:px-0">
-      <div className="mx-auto max-w-4xl space-y-4">
+    <div className="mx-auto max-w-6xl px-4 pb-24 pt-4 md:px-6 md:pt-6">
+      <div className="space-y-4">
         <div>
           <div className="mb-2 h-1 w-12 rounded-full bg-gradient-to-r from-primary-400 via-teal-400 to-purple-400" />
           <h1 className="font-display text-2xl text-text-primary md:text-3xl">Family demographics</h1>

@@ -168,8 +168,8 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="px-3 pb-24 pt-2 md:px-0">
-      <div className="mx-auto max-w-2xl space-y-4">
+    <div className="mx-auto max-w-6xl px-4 pb-24 pt-4 md:px-6 md:pt-6">
+      <div className="mx-auto max-w-3xl space-y-4">
         <div>
           <h1 className="font-display text-2xl text-text-primary">Settings</h1>
           <p className="mt-1 text-sm text-text-secondary">Manage your profile, reminders, household members, and app defaults.</p>

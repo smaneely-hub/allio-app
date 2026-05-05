@@ -141,14 +141,14 @@ export function ShopPage() {
 
   if (loading) {
     return (
-      <div className="px-3 pb-24 md:px-0 pt-2">
+      <div className="mx-auto max-w-6xl px-4 pb-24 pt-4 md:px-6 md:pt-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 w-32 bg-primary-100 rounded"></div>
-          <div className="h-4 w-48 bg-primary-100 rounded"></div>
+          <div className="h-8 w-32 rounded bg-primary-100"></div>
+          <div className="h-4 w-48 rounded bg-primary-100"></div>
           <div className="card p-4">
-            <div className="h-6 w-24 bg-primary-100 rounded mb-3"></div>
+            <div className="mb-3 h-6 w-24 rounded bg-primary-100"></div>
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-12 bg-primary-50 rounded mb-2"></div>
+              <div key={i} className="mb-2 h-12 rounded bg-primary-50"></div>
             ))}
           </div>
         </div>
@@ -158,7 +158,7 @@ export function ShopPage() {
 
   if (!items?.length) {
     return (
-      <div className="px-3 pb-24 pt-2">
+      <div className="mx-auto max-w-6xl px-4 pb-24 pt-4 md:px-6 md:pt-6">
         <EmptyState
           emoji="🛒"
           headline="No shopping list yet"
@@ -171,8 +171,8 @@ export function ShopPage() {
   }
 
   return (
-    <div className="px-3 pb-24 md:px-0 pt-2">
-      <div className="mb-3">
+    <div className="mx-auto max-w-6xl px-4 pb-24 pt-4 md:px-6 md:pt-6">
+      <div className="mb-4">
         <div className="flex items-center justify-between">
           <div>
             <div className="h-1 w-12 bg-gradient-to-r from-primary-400 via-teal-400 to-purple-400 rounded-full mb-2"></div>
