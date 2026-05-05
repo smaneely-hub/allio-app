@@ -65,7 +65,7 @@ export function CatalogPickerModal({ open, onClose, onPick }: Props) {
       <div className="fixed inset-x-0 bottom-0 top-0 overflow-hidden bg-surface-card sm:inset-8 sm:mx-auto sm:max-w-2xl sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-surface-muted px-4 py-4">
           <div className="text-lg font-semibold text-ink-primary">Pick a recipe</div>
-          <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center text-ink-tertiary" aria-label="Close">
+          <button type="button" onClick={onClose} className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full p-2 text-ink-tertiary transition-colors duration-150 hover:bg-stone-100 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label="Close">
             <CloseIcon className="h-5 w-5" />
           </button>
         </div>
@@ -76,7 +76,7 @@ export function CatalogPickerModal({ open, onClose, onPick }: Props) {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search recipes"
-            className="w-full rounded-xl border border-surface-muted bg-surface-base px-3 py-2 text-sm text-ink-primary focus:outline-none"
+            className="w-full rounded-xl border border-surface-muted bg-surface-base px-3 py-2 text-sm text-ink-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2"
           />
         </div>
 
@@ -92,7 +92,7 @@ export function CatalogPickerModal({ open, onClose, onPick }: Props) {
                   key={recipe.id}
                   type="button"
                   onClick={() => onPick(recipe)}
-                  className="flex w-full items-center gap-3 rounded-xl bg-surface-card p-3 text-left shadow-card"
+                  className="group flex w-full cursor-pointer items-center gap-3 rounded-xl bg-surface-card p-3 text-left shadow-card transition duration-150 hover:bg-stone-50 hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2"
                 >
                   {recipe.image_url ? (
                     <img src={recipe.image_url} alt={recipe.title} className="h-12 w-12 rounded-lg object-cover" />
@@ -100,8 +100,8 @@ export function CatalogPickerModal({ open, onClose, onPick }: Props) {
                     <div className="h-12 w-12 rounded-lg bg-surface-muted" />
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium text-ink-primary">{recipe.title}</div>
-                    <div className="truncate text-sm text-ink-secondary">{recipe.cuisine || 'Recipe'}</div>
+                    <div className="truncate text-sm font-medium text-ink-primary transition-colors duration-150 group-hover:text-stone-900">{recipe.title}</div>
+                    <div className="truncate text-sm text-ink-secondary transition-colors duration-150 group-hover:text-ink-primary">{recipe.cuisine || 'Recipe'}</div>
                   </div>
                 </button>
               ))}

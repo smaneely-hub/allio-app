@@ -83,7 +83,7 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
     return (
       <div className="fixed inset-0 z-50 flex flex-col bg-text-primary">
         <div className="flex items-center justify-between bg-text-primary p-4">
-          <button onClick={exitCooking} className="font-medium text-white">← Exit</button>
+          <button onClick={exitCooking} className="cursor-pointer rounded-md font-medium text-white transition-colors duration-150 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 focus-visible:ring-offset-text-primary">← Exit</button>
           <div className="text-sm text-white">Step {currentStep + 1} of {totalSteps}</div>
           <div className="w-16"></div>
         </div>
@@ -97,8 +97,8 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
           <div className="flex flex-wrap gap-2">{(meal.ingredients || []).slice(0, 6).map((ing, i) => <span key={i} className="rounded-full bg-text-secondary px-3 py-1 text-sm text-white/80">{ing}</span>)}</div>
         </div>
         <div className="flex gap-4 bg-text-primary p-4">
-          <button onClick={prevStep} disabled={currentStep === 0} className={`flex-1 rounded-xl py-4 text-lg font-medium ${currentStep === 0 ? 'bg-text-secondary text-text-muted' : 'bg-text-secondary text-white'}`}>← Previous</button>
-          <button onClick={nextStep} disabled={currentStep === totalSteps - 1} className={`flex-1 rounded-xl py-4 text-lg font-medium ${currentStep === totalSteps - 1 ? 'bg-text-secondary text-text-muted' : 'bg-primary-400 text-white'}`}>{currentStep === totalSteps - 1 ? 'All done!' : 'Next step →'}</button>
+          <button onClick={prevStep} disabled={currentStep === 0} className={`flex-1 rounded-xl py-4 text-lg font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 focus-visible:ring-offset-text-primary ${currentStep === 0 ? 'cursor-not-allowed bg-text-secondary text-text-muted opacity-50' : 'cursor-pointer bg-text-secondary text-white hover:bg-white/15'}`}>← Previous</button>
+          <button onClick={nextStep} disabled={currentStep === totalSteps - 1} className={`flex-1 rounded-xl py-4 text-lg font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 focus-visible:ring-offset-text-primary ${currentStep === totalSteps - 1 ? 'cursor-not-allowed bg-text-secondary text-text-muted opacity-50' : 'cursor-pointer bg-primary-400 text-white hover:bg-primary-500'}`}>{currentStep === totalSteps - 1 ? 'All done!' : 'Next step →'}</button>
         </div>
       </div>
     )
@@ -124,14 +124,14 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
     return (
       <>
         <div className="card flex items-center gap-3 p-3">
-          <button type="button" onClick={() => { setShowDetail(true); onOpenMeal?.(meal) }} className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-surface-muted text-ink-secondary">
-            <Icon className="h-6 w-6" />
+          <button type="button" onClick={() => { setShowDetail(true); onOpenMeal?.(meal) }} className="group flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-surface-muted text-ink-secondary transition duration-150 hover:bg-stone-100 hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2">
+            <Icon className="h-6 w-6 transition-colors duration-150 group-hover:text-ink-primary" />
           </button>
-          <button type="button" onClick={() => { setShowDetail(true); onOpenMeal?.(meal) }} className="min-w-0 flex-1 text-left">
-            <div className="truncate text-sm font-medium text-ink-primary">{title}</div>
-            <div className="mt-1 truncate text-sm text-ink-secondary">{subtitle}</div>
+          <button type="button" onClick={() => { setShowDetail(true); onOpenMeal?.(meal) }} className="group min-w-0 flex-1 cursor-pointer rounded-xl p-1 text-left transition duration-150 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2">
+            <div className="truncate text-sm font-medium text-ink-primary transition-colors duration-150 group-hover:text-stone-900">{title}</div>
+            <div className="mt-1 truncate text-sm text-ink-secondary transition-colors duration-150 group-hover:text-ink-primary">{subtitle}</div>
           </button>
-          <button type="button" onClick={(event) => { event.stopPropagation(); onActionsClick?.(meal) }} className="flex h-10 w-10 shrink-0 items-center justify-center text-ink-tertiary" aria-label="Meal actions">
+          <button type="button" onClick={(event) => { event.stopPropagation(); onActionsClick?.(meal) }} className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full p-2 text-ink-tertiary transition-colors duration-150 hover:bg-stone-100 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label="Meal actions">
             <MoreVerticalIcon className="h-5 w-5" />
           </button>
         </div>
@@ -148,14 +148,14 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
   return (
     <>
       <div className="card flex items-center gap-3 p-3">
-        <button type="button" onClick={() => { setShowDetail(true); onOpenMeal?.(meal) }} className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface-muted focus:outline-none" aria-label={`Open ${mealTitle}`}>
+        <button type="button" onClick={() => { setShowDetail(true); onOpenMeal?.(meal) }} className="h-16 w-16 shrink-0 cursor-pointer overflow-hidden rounded-xl bg-surface-muted transition duration-150 hover:bg-stone-100 hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label={`Open ${mealTitle}`}>
           {mealImage ? <img src={mealImage} alt={mealTitle} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-surface-muted" />}
         </button>
-        <button type="button" onClick={() => { setShowDetail(true); onOpenMeal?.(meal) }} className="min-w-0 flex-1 text-left focus:outline-none">
-          <div className="truncate text-sm font-medium text-ink-primary">{mealTitle}</div>
-          <div className="mt-1 text-sm text-ink-secondary">{servings} servings · {calories} kcal</div>
+        <button type="button" onClick={() => { setShowDetail(true); onOpenMeal?.(meal) }} className="group min-w-0 flex-1 cursor-pointer rounded-xl p-1 text-left transition duration-150 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2">
+          <div className="truncate text-sm font-medium text-ink-primary transition-colors duration-150 group-hover:text-stone-900">{mealTitle}</div>
+          <div className="mt-1 text-sm text-ink-secondary transition-colors duration-150 group-hover:text-ink-primary">{servings} servings · {calories} kcal</div>
         </button>
-        <button type="button" onClick={(event) => { event.stopPropagation(); onActionsClick?.(meal) }} className="flex h-10 w-10 shrink-0 items-center justify-center text-ink-tertiary" aria-label="Meal actions">
+        <button type="button" onClick={(event) => { event.stopPropagation(); onActionsClick?.(meal) }} className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full p-2 text-ink-tertiary transition-colors duration-150 hover:bg-stone-100 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label="Meal actions">
           <MoreVerticalIcon className="h-5 w-5" />
         </button>
       </div>

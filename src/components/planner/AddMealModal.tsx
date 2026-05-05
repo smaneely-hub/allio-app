@@ -98,14 +98,14 @@ export function AddMealModal({ open, onClose, dayKey, mealSlot, existingMealId, 
                       onClose()
                     }
                   }}
-                  className={`flex min-h-14 w-full items-center gap-3 bg-surface-card p-4 text-left ${index > 0 ? 'border-t border-surface-muted' : ''} ${disabled ? 'opacity-50' : ''}`}
+                  className={`group flex min-h-14 w-full items-center gap-3 bg-surface-card p-4 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 ${index > 0 ? 'border-t border-surface-muted' : ''} ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-stone-50'}`}
                 >
-                  <Icon className="h-5 w-5 text-accent-blue" />
+                  <Icon className="h-5 w-5 text-accent-blue transition-colors duration-150 group-hover:text-primary-500" />
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-ink-primary">{meta.label}</div>
+                    <div className="text-sm font-medium text-ink-primary transition-colors duration-150 group-hover:text-stone-900">{meta.label}</div>
                     <div className="text-sm text-ink-secondary">{disabled ? 'Select household members first' : meta.sublabel}</div>
                   </div>
-                  <ChevronRightIcon className="h-4 w-4 text-ink-tertiary" />
+                  <ChevronRightIcon className="h-4 w-4 text-ink-tertiary transition-colors duration-150 group-hover:text-ink-primary" />
                 </button>
               )
             })}

@@ -98,7 +98,7 @@ export function MealDetailModal({ meal, isOpen, onClose }) {
         <div className="min-h-full bg-white md:min-h-0 md:w-full md:max-w-2xl md:overflow-hidden md:rounded-[28px]">
           <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface-muted">
             {image ? <img src={image} alt={meal.title || meal.name || 'Meal'} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-surface-muted" />}
-            <button type="button" onClick={onClose} className="absolute left-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/80 text-ink-primary backdrop-blur" aria-label="Close meal detail">
+            <button type="button" onClick={onClose} className="absolute left-4 top-4 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white/80 p-2 text-ink-primary backdrop-blur transition-colors duration-150 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label="Close meal detail">
               <CloseIcon className="h-5 w-5" />
             </button>
           </div>
@@ -112,11 +112,11 @@ export function MealDetailModal({ meal, isOpen, onClose }) {
             <div className="flex items-center justify-between rounded-2xl bg-surface-card px-4 py-3">
               <span className="text-sm font-semibold text-ink-primary">Servings</span>
               <div className="flex items-center gap-3">
-                <button type="button" onClick={() => setServings((current) => Math.max(1, current - 1))} className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-muted text-ink-primary" aria-label="Decrease servings">
+                <button type="button" onClick={() => setServings((current) => Math.max(1, current - 1))} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-surface-muted p-2 text-ink-primary transition-colors duration-150 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label="Decrease servings">
                   <MinusIcon className="h-4 w-4" />
                 </button>
                 <span className="min-w-[2ch] text-center text-sm font-semibold tabular-nums text-ink-primary">{servings}</span>
-                <button type="button" onClick={() => setServings((current) => Math.min(12, current + 1))} className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-muted text-ink-primary" aria-label="Increase servings">
+                <button type="button" onClick={() => setServings((current) => Math.min(12, current + 1))} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-surface-muted p-2 text-ink-primary transition-colors duration-150 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label="Increase servings">
                   <PlusIcon className="h-4 w-4" />
                 </button>
               </div>

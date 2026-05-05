@@ -84,7 +84,7 @@ function EmptyDayState({ onAddMeal }) {
   return (
     <div className="px-1 py-2 text-sm text-ink-secondary">
       No meals planned{' '}
-      <button type="button" onClick={onAddMeal} className="font-medium text-ink-primary underline underline-offset-2">
+      <button type="button" onClick={onAddMeal} className="font-medium text-ink-primary underline underline-offset-2 transition-colors duration-150 hover:text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 cursor-pointer rounded-md">
         + Add meal
       </button>
     </div>
@@ -118,7 +118,7 @@ function DaySection({ day, expanded, onToggle, onOpenMeal, onOpenDayActions, onO
     <section className="relative rounded-2xl bg-white px-3 py-2">
       {isToday ? <span className="absolute left-0 top-4 h-10 w-1 rounded-full bg-primary-400" /> : null}
       <div className="flex items-center gap-3">
-        <button type="button" onClick={onToggle} className="flex flex-1 items-center gap-3 text-left">
+        <button type="button" onClick={onToggle} className="flex flex-1 cursor-pointer items-center gap-3 rounded-2xl text-left transition-colors duration-150 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2">
           <div className="min-w-0 flex-1">
             <div className="font-display text-lg text-ink-primary">{day.dayName}</div>
             <div className="text-sm text-ink-secondary">{day.dateLabel}</div>
@@ -133,7 +133,7 @@ function DaySection({ day, expanded, onToggle, onOpenMeal, onOpenDayActions, onO
           <ChevronDownIcon className={`h-5 w-5 text-ink-tertiary transition-transform duration-150 ${expanded ? 'rotate-180' : ''}`} />
         </button>
         {showHeaderActions ? (
-          <button type="button" onClick={() => onOpenDayActions(day)} className="flex h-10 w-10 items-center justify-center text-ink-tertiary" aria-label="Day actions">
+          <button type="button" onClick={() => onOpenDayActions(day)} className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full p-2 text-ink-tertiary transition-colors duration-150 hover:bg-stone-100 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label="Day actions">
             <MoreVerticalIcon className="h-5 w-5" />
           </button>
         ) : null}
@@ -202,7 +202,7 @@ export function MealPlanWorkspace({
               {['day', 'week'].map((mode) => {
                 const active = viewMode === mode
                 return (
-                  <button key={mode} type="button" onClick={() => onChangeViewMode(mode)} className={`h-9 rounded-full px-5 text-sm font-medium transition ${active ? 'bg-white text-ink-primary shadow-card' : 'text-ink-secondary'}`}>
+                  <button key={mode} type="button" onClick={() => onChangeViewMode(mode)} className={`h-9 cursor-pointer rounded-full px-5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 ${active ? 'bg-white text-ink-primary shadow-card' : 'text-ink-secondary hover:bg-stone-100 hover:text-ink-primary'}`}>
                     {mode === 'day' ? 'Day' : 'Week'}
                   </button>
                 )
@@ -211,14 +211,14 @@ export function MealPlanWorkspace({
           </div>
 
           <div className="mt-3 grid grid-cols-[40px_1fr_40px] items-center gap-3">
-            <button type="button" onClick={onPrev} className="flex h-10 w-10 items-center justify-center rounded-full text-ink-primary" aria-label="Previous range">
+            <button type="button" onClick={onPrev} className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full p-2 text-ink-primary transition-colors duration-150 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label="Previous range">
               <ChevronLeftIcon className="h-5 w-5" />
             </button>
             <div className="text-center">
               <div className="font-display text-lg text-ink-primary">{viewMode === 'week' ? formatRelativeWeekLabel(windowStart) : selectedDay ? selectedDay.dayName : formatDayRange(windowStart)}</div>
               <div className="text-sm text-ink-secondary">{viewMode === 'week' ? formatWeekRange(plannerWeek) : formatDayRange(windowStart)}</div>
             </div>
-            <button type="button" onClick={onNext} className="flex h-10 w-10 items-center justify-center rounded-full text-ink-primary" aria-label="Next range">
+            <button type="button" onClick={onNext} className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full p-2 text-ink-primary transition-colors duration-150 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label="Next range">
               <ChevronRightIcon className="h-5 w-5" />
             </button>
           </div>

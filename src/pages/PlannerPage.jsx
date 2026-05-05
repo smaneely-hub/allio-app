@@ -188,8 +188,8 @@ export function PlannerPage() {
         <div className="flex items-center justify-between pt-4">
           <h1 className="font-display text-xl text-ink-primary">Planner</h1>
           <div className="flex gap-2">
-            <button type="button" onClick={handleClearPlan} disabled={saving || generating || (!mealPlan && activeSlots.length === 0)} className="rounded-full border border-surface-muted bg-surface-card px-4 py-2 text-sm text-ink-secondary">Start Fresh</button>
-            <button type="button" onClick={handleGenerate} disabled={saving || generating} className="btn-primary text-sm disabled:opacity-60 disabled:cursor-not-allowed">{saving || generating ? 'Generating…' : 'Generate Plan'}</button>
+            <button type="button" onClick={handleClearPlan} disabled={saving || generating || (!mealPlan && activeSlots.length === 0)} className="rounded-full border border-surface-muted bg-surface-card px-4 py-2 text-sm text-ink-secondary transition-colors duration-150 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer">Start Fresh</button>
+            <button type="button" onClick={handleGenerate} disabled={saving || generating} className="btn-primary text-sm transition-colors duration-150 hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">{saving || generating ? 'Generating…' : 'Generate Plan'}</button>
           </div>
         </div>
 

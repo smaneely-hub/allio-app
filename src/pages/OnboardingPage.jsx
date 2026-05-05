@@ -201,7 +201,7 @@ export function OnboardingPage() {
                 <div className="text-sm font-medium text-text-primary mb-2">Total people</div>
                 <div className="flex flex-wrap gap-2">
                   {(['1','2','3','4','5+']).map((o) => (
-                    <button type="button" key={o} className={`rounded-full border px-4 py-2 text-sm ${form.total_people === o ? 'bg-white border-primary-400 text-primary-600' : 'border-divider text-text-primary'}`} onClick={() => updateForm('total_people', o)}>{o}</button>
+                    <button type="button" key={o} className={`rounded-full border px-4 py-2 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 cursor-pointer ${form.total_people === o ? 'bg-white border-primary-400 text-primary-600' : 'border-divider text-text-primary hover:bg-stone-50 hover:border-stone-300'}`} onClick={() => updateForm('total_people', o)}>{o}</button>
                   ))}
                 </div>
               </div>
@@ -251,7 +251,7 @@ export function OnboardingPage() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-xl text-text-primary">Household Members</h2>
-              <button type="button" onClick={() => setMembers((c) => [...c, { id: undefined, name: '', age: '', label: `Member ${members.length + 1}` }])} className="btn-secondary text-sm">Add member</button>
+              <button type="button" onClick={() => setMembers((c) => [...c, { id: undefined, name: '', age: '', label: `Member ${members.length + 1}` }])} className="btn-secondary text-sm transition-colors duration-150 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 cursor-pointer">Add member</button>
             </div>
             {members.map((m, idx) => (
               <div key={m.id ?? idx} className="card p-5">
@@ -292,7 +292,7 @@ export function OnboardingPage() {
                   <div className="text-xs font-medium text-warm-600 mb-2">Dietary restrictions (optional)</div>
                   <div className="flex flex-wrap gap-2">
                     {['vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'nut allergy', 'shellfish allergy', 'egg allergy', 'soy allergy', 'kosher', 'halal'].map((opt) => (
-                      <button key={opt} type="button" onClick={() => toggleMemberChip(idx, 'dietary_restrictions', opt)} className={`rounded-full border px-3 py-1 text-xs ${(m.dietary_restrictions || []).includes(opt) ? 'bg-primary-50 border-primary-400 text-primary-700' : 'border-divider text-text-primary'}`}>{opt}</button>
+                      <button key={opt} type="button" onClick={() => toggleMemberChip(idx, 'dietary_restrictions', opt)} className={`rounded-full border px-3 py-1 text-xs transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 cursor-pointer ${(m.dietary_restrictions || []).includes(opt) ? 'bg-primary-50 border-primary-400 text-primary-700' : 'border-divider text-text-primary hover:bg-stone-50 hover:border-stone-300'}`}>{opt}</button>
                     ))}
                   </div>
                 </div>
@@ -302,7 +302,7 @@ export function OnboardingPage() {
                   <div className="text-xs font-medium text-warm-600 mb-2">Food preferences (optional)</div>
                   <div className="flex flex-wrap gap-2">
                     {['loves spicy', 'prefers mild', 'picky eater', 'adventurous', 'comfort food lover'].map((opt) => (
-                      <button key={opt} type="button" onClick={() => toggleMemberChip(idx, 'food_preferences', opt)} className={`rounded-full border px-3 py-1 text-xs ${(m.food_preferences || []).includes(opt) ? 'bg-primary-50 border-primary-400 text-primary-700' : 'border-divider text-text-primary'}`}>{opt}</button>
+                      <button key={opt} type="button" onClick={() => toggleMemberChip(idx, 'food_preferences', opt)} className={`rounded-full border px-3 py-1 text-xs transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 cursor-pointer ${(m.food_preferences || []).includes(opt) ? 'bg-primary-50 border-primary-400 text-primary-700' : 'border-divider text-text-primary hover:bg-stone-50 hover:border-stone-300'}`}>{opt}</button>
                     ))}
                   </div>
                 </div>
@@ -312,7 +312,7 @@ export function OnboardingPage() {
                   <div className="text-xs font-medium text-warm-600 mb-2">Health considerations (optional)</div>
                   <div className="flex flex-wrap gap-2">
                     {['low sodium', 'low sugar', 'heart-healthy', 'high protein', 'low carb', 'anti-inflammatory', 'pregnancy-safe'].map((opt) => (
-                      <button key={opt} type="button" onClick={() => toggleMemberChip(idx, 'health_considerations', opt)} className={`rounded-full border px-3 py-1 text-xs ${(m.health_considerations || []).includes(opt) ? 'bg-primary-50 border-primary-400 text-primary-700' : 'border-divider text-text-primary'}`}>{opt}</button>
+                      <button key={opt} type="button" onClick={() => toggleMemberChip(idx, 'health_considerations', opt)} className={`rounded-full border px-3 py-1 text-xs transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 cursor-pointer ${(m.health_considerations || []).includes(opt) ? 'bg-primary-50 border-primary-400 text-primary-700' : 'border-divider text-text-primary hover:bg-stone-50 hover:border-stone-300'}`}>{opt}</button>
                     ))}
                   </div>
                   <p className="mt-2 text-xs text-text-muted">Health info is optional and helps us suggest better meals. Not medical advice.</p>
@@ -353,7 +353,7 @@ export function OnboardingPage() {
               <div className="text-sm font-medium text-text-primary mb-3">Planning priorities</div>
               <div className="flex flex-wrap gap-2">
                 {['healthy eating','reduce grocery chaos','kid-friendly dinners','lower food waste','support lunches with leftovers','stay on budget'].map((p) => (
-                  <button key={p} type="button" onClick={() => togglePriority(p)} className={`rounded-full border px-3 py-1 text-sm ${form.planning_priorities.includes(p) ? 'bg-primary-50 border-primary-400 text-primary-600' : 'border-divider text-text-primary'}`}>
+                  <button key={p} type="button" onClick={() => togglePriority(p)} className={`rounded-full border px-3 py-1 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 cursor-pointer ${form.planning_priorities.includes(p) ? 'bg-primary-50 border-primary-400 text-primary-600' : 'border-divider text-text-primary hover:bg-stone-50 hover:border-stone-300'}`}>
                     {p}
                   </button>
                 ))}
@@ -363,15 +363,15 @@ export function OnboardingPage() {
         ) : null}
       </div>
       <div className="flex items-center justify-between pt-6 gap-3">
-        <button type="button" onClick={() => setStep(s => Math.max(1, s - 1))} disabled={step === 1 || submitting || isEditMode} className="btn-ghost">Back</button>
+        <button type="button" onClick={() => setStep(s => Math.max(1, s - 1))} disabled={step === 1 || submitting || isEditMode} className="btn-ghost transition-colors duration-150 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">Back</button>
         {isEditMode ? (
-          <button type="button" onClick={handleSave} disabled={submitting || !members.every((mm) => mm.name !== '' && mm.age !== '')} className="btn-primary">
+          <button type="button" onClick={handleSave} disabled={submitting || !members.every((mm) => mm.name !== '' && mm.age !== '')} className="btn-primary transition-colors duration-150 hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
             {submitting ? 'Saving...' : 'Save Changes'}
           </button>
         ) : step < 3 ? (
-          <button type="button" onClick={() => setStep(s => s + 1)} disabled={!stepValid || submitting} className="btn-primary">Next</button>
+          <button type="button" onClick={() => setStep(s => s + 1)} disabled={!stepValid || submitting} className="btn-primary transition-colors duration-150 hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">Next</button>
         ) : (
-          <button type="button" onClick={handleSave} disabled={!stepValid || submitting} className="btn-primary">{submitting ? 'Saving...' : 'Save & Continue'}</button>
+          <button type="button" onClick={handleSave} disabled={!stepValid || submitting} className="btn-primary transition-colors duration-150 hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">{submitting ? 'Saving...' : 'Save & Continue'}</button>
         )}
       </div>
     </div>
