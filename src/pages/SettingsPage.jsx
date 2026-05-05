@@ -4,7 +4,6 @@ import toast from 'react-hot-toast'
 import { useHousehold } from '../hooks/useHousehold'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
-import { HouseholdMembersModal } from '../components/planner/HouseholdMembersModal'
 
 const DEFAULT_PREFERENCES = {
   weekly_meal_reminders: true,
@@ -38,13 +37,12 @@ function ToggleRow({ label, checked, onChange }) {
 }
 
 export function SettingsPage() {
-  const { household, members, saveHousehold, saveMembers, repairMembers } = useHousehold()
+  const { household, members, saveHousehold, repairMembers } = useHousehold()
   const { user, signOut } = useAuth()
   const [name, setName] = useState('')
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES)
   const [loadingPrefs, setLoadingPrefs] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [familyModalOpen, setFamilyModalOpen] = useState(false)
   const [savingMembers, setSavingMembers] = useState(false)
 
   useEffect(() => {
@@ -141,19 +139,6 @@ export function SettingsPage() {
     }
   }
 
-  const handleSaveMembers = async (nextMembers) => {
-    setSavingMembers(true)
-    try {
-      await saveMembers(nextMembers)
-      toast.success('Family demographics saved')
-      setFamilyModalOpen(false)
-    } catch (error) {
-      toast.error(error?.message || 'Could not save family demographics')
-    } finally {
-      setSavingMembers(false)
-    }
-  }
-
   const handleRepairMembers = async () => {
     setSavingMembers(true)
     try {
@@ -210,11 +195,8 @@ export function SettingsPage() {
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
               <h2 className="font-display text-xl text-text-primary">Family demographics</h2>
-              <p className="mt-1 text-sm text-text-secondary">Edit household members, ages, dietary restrictions, and food preferences right from Settings.</p>
+              <p className="mt-1 text-sm text-text-secondary">Manage member details from the dedicated family demographics page.</p>
             </div>
-            <button type="button" onClick={() => setFamilyModalOpen(true)} className="btn-secondary text-sm">
-              Edit family
-            </button>
           </div>
           <div className="space-y-3 text-sm">
             <div className="flex items-center justify-between rounded-2xl border border-divider bg-surface px-4 py-3">
@@ -235,7 +217,7 @@ export function SettingsPage() {
                 {savingMembers ? 'Restoring members…' : 'Restore default family members'}
               </button>
             ) : null}
-            <Link to="/household" className="inline-block text-sm font-medium text-text-primary underline underline-offset-2">Open full family demographics page</Link>
+            <Link to="/household" className="inline-block text-sm font-medium text-text-primary underline underline-offset-2">Open family demographics</Link>
           </div>
         </section>
 
@@ -296,13 +278,6 @@ export function SettingsPage() {
         {loadingPrefs ? <div className="text-sm text-text-muted">Loading settings…</div> : null}
       </div>
 
-      <HouseholdMembersModal
-        open={familyModalOpen}
-        members={members}
-        saving={savingMembers}
-        onClose={() => !savingMembers && setFamilyModalOpen(false)}
-        onSave={handleSaveMembers}
-      />
     </div>
   )
 }
