@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { useHousehold } from '../hooks/useHousehold'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
+import { HouseholdMembersModal } from '../components/planner/HouseholdMembersModal'
 
 const DEFAULT_PREFERENCES = {
   weekly_meal_reminders: true,
@@ -37,12 +38,14 @@ function ToggleRow({ label, checked, onChange }) {
 }
 
 export function SettingsPage() {
-  const { household, saveHousehold } = useHousehold()
+  const { household, members, saveHousehold, saveMembers, repairMembers } = useHousehold()
   const { user, signOut } = useAuth()
   const [name, setName] = useState('')
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES)
   const [loadingPrefs, setLoadingPrefs] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [familyModalOpen, setFamilyModalOpen] = useState(false)
+  const [savingMembers, setSavingMembers] = useState(false)
 
   useEffect(() => {
     setName(household?.name || household?.household_name || '')
@@ -138,12 +141,38 @@ export function SettingsPage() {
     }
   }
 
+  const handleSaveMembers = async (nextMembers) => {
+    setSavingMembers(true)
+    try {
+      await saveMembers(nextMembers)
+      toast.success('Family demographics saved')
+      setFamilyModalOpen(false)
+    } catch (error) {
+      toast.error(error?.message || 'Could not save family demographics')
+    } finally {
+      setSavingMembers(false)
+    }
+  }
+
+  const handleRepairMembers = async () => {
+    setSavingMembers(true)
+    try {
+      await repairMembers()
+      toast.success('Default family members restored')
+      setFamilyModalOpen(true)
+    } catch (error) {
+      toast.error(error?.message || 'Could not restore family members')
+    } finally {
+      setSavingMembers(false)
+    }
+  }
+
   return (
     <div className="px-3 pb-24 pt-2 md:px-0">
       <div className="mx-auto max-w-2xl space-y-4">
         <div>
           <h1 className="font-display text-2xl text-text-primary">Settings</h1>
-          <p className="mt-1 text-sm text-text-secondary">Manage your profile, reminders, and app defaults.</p>
+          <p className="mt-1 text-sm text-text-secondary">Manage your profile, reminders, household members, and app defaults.</p>
         </div>
 
         <section className="card p-5">
@@ -174,6 +203,39 @@ export function SettingsPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="card p-5">
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h2 className="font-display text-xl text-text-primary">Family demographics</h2>
+              <p className="mt-1 text-sm text-text-secondary">Edit household members, ages, dietary restrictions, and food preferences right from Settings.</p>
+            </div>
+            <button type="button" onClick={() => setFamilyModalOpen(true)} className="btn-secondary text-sm">
+              Edit family
+            </button>
+          </div>
+          <div className="space-y-3 text-sm">
+            <div className="flex items-center justify-between rounded-2xl border border-divider bg-surface px-4 py-3">
+              <span className="text-text-secondary">Members</span>
+              <span className="font-medium text-text-primary">{members.length || household?.total_people || 0}</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {members.length > 0 ? members.slice(0, 4).map((member, index) => (
+                <span key={member.id || `${member.name || member.label}-${index}`} className="rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-600">
+                  {member.name || member.label || `Member ${index + 1}`}
+                </span>
+              )) : (
+                <span className="text-text-muted">No family members configured yet.</span>
+              )}
+            </div>
+            {!members.length && household?.id ? (
+              <button type="button" onClick={handleRepairMembers} disabled={savingMembers} className="text-sm font-medium text-primary-600 disabled:opacity-50">
+                {savingMembers ? 'Restoring members…' : 'Restore default family members'}
+              </button>
+            ) : null}
+            <Link to="/household" className="inline-block text-sm font-medium text-text-primary underline underline-offset-2">Open full family demographics page</Link>
           </div>
         </section>
 
@@ -233,6 +295,14 @@ export function SettingsPage() {
 
         {loadingPrefs ? <div className="text-sm text-text-muted">Loading settings…</div> : null}
       </div>
+
+      <HouseholdMembersModal
+        open={familyModalOpen}
+        members={members}
+        saving={savingMembers}
+        onClose={() => !savingMembers && setFamilyModalOpen(false)}
+        onSave={handleSaveMembers}
+      />
     </div>
   )
 }
