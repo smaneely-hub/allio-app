@@ -3,6 +3,33 @@ import { normalizeIngredientName, parseIngredient } from './shoppingListUtils'
 
 // Module-level cache: prevents multiple concurrent callers from racing the same userId.
 const ensureDefaultInFlight = new Map()
+const transientFetchErrorRegex = /Failed to fetch|Load failed|NetworkError|Unexpected redirect/i
+
+function isTransientFetchLikeError(error) {
+  const combined = [error?.message, error?.details, error?.hint, error?.cause?.message]
+    .filter(Boolean)
+    .join(' ')
+  return transientFetchErrorRegex.test(combined)
+}
+
+async function withTransientRetry(label, operation, attempts = 3) {
+  let lastError = null
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await operation()
+    } catch (error) {
+      lastError = error
+      if (!isTransientFetchLikeError(error) || attempt === attempts - 1) {
+        throw error
+      }
+      console.warn(`[shoppingLists] transient failure in ${label}, retrying`, { attempt: attempt + 1, error })
+      await new Promise((resolve) => setTimeout(resolve, 150 * (attempt + 1)))
+    }
+  }
+
+  throw lastError
+}
 
 export async function ensureDefaultShoppingList(userId) {
   if (!userId) return null
@@ -21,14 +48,14 @@ export async function ensureDefaultShoppingList(userId) {
 async function _ensureDefaultShoppingListInner(userId) {
   console.log('[ensureDefault] enter', { userId })
 
-  const { data: existing, error: existingError } = await supabase
+  const { data: existing, error: existingError } = await withTransientRetry('shopping_lists existing default select', () => supabase
     .from('shopping_lists')
     .select('*')
     .eq('user_id', userId)
     .eq('is_default', true)
     .order('created_at', { ascending: true })
     .limit(1)
-    .maybeSingle()
+    .maybeSingle())
   if (existingError) {
     console.error('[ensureDefault] existing select failed', existingError)
     throw existingError
@@ -39,13 +66,13 @@ async function _ensureDefaultShoppingListInner(userId) {
   }
 
   console.log('[ensureDefault] no default found, checking for any list')
-  const { data: firstList, error: firstListError } = await supabase
+  const { data: firstList, error: firstListError } = await withTransientRetry('shopping_lists first list select', () => supabase
     .from('shopping_lists')
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: true })
     .limit(1)
-    .maybeSingle()
+    .maybeSingle())
   if (firstListError) {
     console.error('[ensureDefault] firstList select failed', firstListError)
     throw firstListError
@@ -53,12 +80,12 @@ async function _ensureDefaultShoppingListInner(userId) {
   if (firstList?.id) {
     if (firstList.is_default) return firstList
     console.log('[ensureDefault] found non-default list, will UPDATE to default:', firstList.id)
-    const { data: updated, error: updateError } = await supabase
+    const { data: updated, error: updateError } = await withTransientRetry('shopping_lists update default', () => supabase
       .from('shopping_lists')
       .update({ is_default: true })
       .eq('id', firstList.id)
       .select('*')
-      .single()
+      .single())
     if (updateError) {
       console.warn('[ensureDefault] update failed, attempting recovery', updateError)
       if (updateError.code === '23505') {
@@ -70,11 +97,11 @@ async function _ensureDefaultShoppingListInner(userId) {
   }
 
   console.log('[ensureDefault] no list, inserting')
-  const { data: created, error: createError } = await supabase
+  const { data: created, error: createError } = await withTransientRetry('shopping_lists insert default', () => supabase
     .from('shopping_lists')
     .insert({ user_id: userId, name: 'My Shopping List', is_default: true })
     .select('*')
-    .single()
+    .single())
   if (createError) {
     console.warn('[ensureDefault] insert failed, attempting recovery', createError)
     if (createError.code === '23505') {
@@ -87,12 +114,12 @@ async function _ensureDefaultShoppingListInner(userId) {
 
 async function _recoverDefaultList(userId) {
   for (let attempt = 0; attempt < 3; attempt++) {
-    const { data: winner, error: winnerError } = await supabase
+    const { data: winner, error: winnerError } = await withTransientRetry('shopping_lists recover winner select', () => supabase
       .from('shopping_lists')
       .select('*')
       .eq('user_id', userId)
       .eq('is_default', true)
-      .maybeSingle()
+      .maybeSingle())
     if (winnerError) {
       console.error('[recoverDefault] winner read failed', winnerError)
       throw winnerError
@@ -102,13 +129,13 @@ async function _recoverDefaultList(userId) {
       return winner
     }
 
-    const { data: anyList, error: anyListError } = await supabase
+    const { data: anyList, error: anyListError } = await withTransientRetry('shopping_lists recover any list select', () => supabase
       .from('shopping_lists')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: true })
       .limit(1)
-      .maybeSingle()
+      .maybeSingle())
     if (anyListError) {
       console.error('[recoverDefault] anyList read failed', anyListError)
       throw anyListError
@@ -131,11 +158,11 @@ export async function getDefaultShoppingList(userId) {
 export async function getShoppingListItems(listId) {
   if (!listId) return []
 
-  const { data, error } = await supabase
+  const { data, error } = await withTransientRetry('shopping_list_items select', () => supabase
     .from('shopping_list_items')
     .select('*')
     .eq('list_id', listId)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: true }))
 
   if (error) throw error
   return data || []
@@ -220,21 +247,21 @@ export async function addItemsToShoppingList({ userId, listId = null, items = []
     const existing = uncheckedMap.get(key)
 
     if (existing) {
-      const { error } = await supabase
+      const { error } = await withTransientRetry('shopping_list_items update merge', () => supabase
         .from('shopping_list_items')
         .update({
           quantity: mergeQuantities(existing.quantity, rawItem.quantity),
           category: rawItem.category || existing.category,
           source: existing.source || source,
         })
-        .eq('id', existing.id)
+        .eq('id', existing.id))
 
       if (error) throw error
       uncheckedMap.delete(key)
       continue
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await withTransientRetry('shopping_list_items insert', () => supabase
       .from('shopping_list_items')
       .insert({
         list_id: targetList.id,
@@ -246,7 +273,7 @@ export async function addItemsToShoppingList({ userId, listId = null, items = []
         source: rawItem.source || source,
       })
       .select('*')
-      .single()
+      .single())
 
     if (error) throw error
     uncheckedMap.set(key, data)
