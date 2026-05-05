@@ -138,24 +138,54 @@ export function useMealPlan(scheduleId) {
   const saveCustomMealSource = useCallback(async ({ existingMealId = null, meal_source, source_recipe_id = null, place_name = null, source_note = null, dayKey, mealSlot, recipe = null, title = null }) => {
     if (!mealPlan?.draft_plan) throw new Error('No meal plan available to update.')
 
-    const sourceLabel = title || (meal_source === 'eat_out' ? 'Eat Out' : meal_source === 'takeout' ? 'Takeout' : meal_source === 'delivery' ? 'Delivery' : recipe?.title || 'Meal')
+    let catalogRecipe = null
+    if (meal_source === 'catalog' && source_recipe_id) {
+      const { data, error: recipeError } = await supabase
+        .from('recipes')
+        .select('id, title, description, cuisine, meal_type, prep_time_minutes, cook_time_minutes, total_time_minutes, servings, ingredients_json, instructions_json, ingredient_groups_json, instruction_groups_json, tips_json, substitutions_json, nutrition_json, dietary_flags_json, allergen_flags_json, equipment_json, image_url, source_url, source_name')
+        .eq('id', source_recipe_id)
+        .maybeSingle()
+
+      if (recipeError || !data) {
+        console.error('[useMealPlan.saveCustomMealSource] catalog recipe fetch failed', {
+          recipeId: source_recipe_id,
+          userId: user?.id,
+          error: recipeError,
+        })
+        toast.error("Couldn't load this recipe — try another")
+        return null
+      }
+
+      catalogRecipe = data
+    }
+
+    const sourceLabel = title || (meal_source === 'eat_out' ? 'Eat Out' : meal_source === 'takeout' ? 'Takeout' : meal_source === 'delivery' ? 'Delivery' : recipe?.title || catalogRecipe?.title || 'Meal')
     const baseMeal = {
       id: existingMealId || `${dayKey}-${mealSlot}-${Date.now()}`,
       day: dayKey,
       meal: mealSlot,
-      name: meal_source === 'catalog' ? (recipe?.title || 'Saved recipe') : (place_name || sourceLabel),
-      title: meal_source === 'catalog' ? (recipe?.title || 'Saved recipe') : (place_name || sourceLabel),
-      image_url: recipe?.image_url || null,
-      cuisine: recipe?.cuisine || null,
-      servings: 1,
-      ingredients: [],
-      instructions: [],
-      ingredientGroups: [],
-      instructionGroups: [],
-      nutrition: {},
-      prep_time_minutes: 0,
-      cook_time_minutes: 0,
-      total_time_minutes: 0,
+      name: meal_source === 'catalog' ? (catalogRecipe?.title || recipe?.title || 'Saved recipe') : (place_name || sourceLabel),
+      title: meal_source === 'catalog' ? (catalogRecipe?.title || recipe?.title || 'Saved recipe') : (place_name || sourceLabel),
+      description: catalogRecipe?.description || null,
+      image_url: catalogRecipe?.image_url || recipe?.image_url || null,
+      cuisine: catalogRecipe?.cuisine || recipe?.cuisine || null,
+      meal_type: catalogRecipe?.meal_type || null,
+      servings: catalogRecipe?.servings || 1,
+      ingredients: meal_source === 'catalog' ? (catalogRecipe?.ingredients_json || []) : [],
+      instructions: meal_source === 'catalog' ? (catalogRecipe?.instructions_json || []) : [],
+      ingredientGroups: meal_source === 'catalog' ? (catalogRecipe?.ingredient_groups_json || []) : [],
+      instructionGroups: meal_source === 'catalog' ? (catalogRecipe?.instruction_groups_json || []) : [],
+      nutrition: meal_source === 'catalog' ? (catalogRecipe?.nutrition_json || {}) : {},
+      dietary_flags_json: meal_source === 'catalog' ? (catalogRecipe?.dietary_flags_json || []) : [],
+      allergen_flags_json: meal_source === 'catalog' ? (catalogRecipe?.allergen_flags_json || []) : [],
+      equipment_json: meal_source === 'catalog' ? (catalogRecipe?.equipment_json || []) : [],
+      tips_json: meal_source === 'catalog' ? (catalogRecipe?.tips_json || []) : [],
+      substitutions_json: meal_source === 'catalog' ? (catalogRecipe?.substitutions_json || []) : [],
+      source_url: meal_source === 'catalog' ? (catalogRecipe?.source_url || null) : null,
+      source_name: meal_source === 'catalog' ? (catalogRecipe?.source_name || null) : null,
+      prep_time_minutes: meal_source === 'catalog' ? (catalogRecipe?.prep_time_minutes || 0) : 0,
+      cook_time_minutes: meal_source === 'catalog' ? (catalogRecipe?.cook_time_minutes || 0) : 0,
+      total_time_minutes: meal_source === 'catalog' ? (catalogRecipe?.total_time_minutes || 0) : 0,
       meal_source,
       source_recipe_id: meal_source === 'catalog' ? source_recipe_id : null,
       place_name: ['eat_out', 'takeout', 'delivery'].includes(meal_source) ? place_name : null,
@@ -168,7 +198,7 @@ export function useMealPlan(scheduleId) {
       : [...currentMeals.filter((meal) => !(meal.day === dayKey && meal.meal === mealSlot && !meal.id)), applySourceDefaults(baseMeal)]
 
     return persistPlan({ ...mealPlan.draft_plan, meals: nextMeals })
-  }, [mealPlan, persistPlan])
+  }, [mealPlan, persistPlan, user?.id])
 
   const generateMealPlan = useCallback(async (overrideScheduleId = null) => {
     const activeScheduleId = overrideScheduleId ?? scheduleId
