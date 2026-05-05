@@ -10,6 +10,7 @@ import { MealPlanWorkspace } from '../components/plan/MealPlanWorkspace'
 import { PlannerActionSheet } from '../components/plan/PlannerActionSheet'
 import { DayActionsMenu } from '../components/planner/DayActionsMenu'
 import { AddMealModal } from '../components/planner/AddMealModal'
+import { HouseholdMembersModal } from '../components/planner/HouseholdMembersModal'
 import { aggregateShoppingList } from '../lib/aggregateShoppingList'
 import { addDays, DAY_ORDER } from '../lib/planner'
 import { normalizeMealRecord } from '../lib/mealSchema'
@@ -30,9 +31,52 @@ const CATEGORY_EMOJI = {
 
 const PLANNER_VIEW_MODE_KEY = 'planner.viewMode'
 
+function MemberSummary({ members, onOpen }) {
+  return (
+    <div className="mt-4 rounded-[28px] border border-surface-muted bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="text-sm font-medium text-ink-secondary">Planning for</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {members.map((member, index) => (
+              <span key={member.id || `${member.name || member.label}-${index}`} className="rounded-full bg-warm-100 px-3 py-1 text-sm font-medium text-ink-primary">
+                {member.name || member.label || `Member ${index + 1}`}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={onOpen} className="rounded-full border border-surface-muted bg-white px-4 py-2 text-sm font-medium text-ink-primary transition-colors duration-150 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 cursor-pointer">
+            + Add member
+          </button>
+          <button type="button" onClick={onOpen} className="text-sm font-medium text-ink-primary underline underline-offset-2 transition-colors duration-150 hover:text-stone-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 rounded-md cursor-pointer">
+            Manage
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MemberEmptyState({ onOpen }) {
+  return (
+    <div className="mt-4 rounded-[28px] border border-primary-100 bg-primary-50/70 p-5 shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="font-display text-xl text-ink-primary">Add at least one member to generate meals.</div>
+          <div className="mt-1 text-sm text-ink-secondary">Create your first household member so Allio can build meals for real people, not guesses.</div>
+        </div>
+        <button type="button" onClick={onOpen} className="btn-primary shrink-0 transition-colors duration-150 hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2">
+          Add a household member
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function PlannerPage() {
   useDocumentTitle('Weekly Plan | Allio')
-  const { household, members, loading: householdLoading } = useHousehold()
+  const { household, members, loading: householdLoading, saveMembers, reloadHousehold } = useHousehold()
   const { schedule, slots, loading: scheduleLoading, saveSchedule, loadSchedule } = useSchedule()
   const { isPremium, canGeneratePlan, trackUsage } = useSubscription()
   const { mealPlan, generating, generateMealPlan, saveCustomMealSource, clearMealPlan, loadMealPlan } = useMealPlan(schedule?.id)
@@ -47,6 +91,8 @@ export function PlannerPage() {
   const [dayActionTarget, setDayActionTarget] = useState(null)
   const [mealActionTarget, setMealActionTarget] = useState(null)
   const [addMealTarget, setAddMealTarget] = useState(null)
+  const [showMembersModal, setShowMembersModal] = useState(false)
+  const [savingMembers, setSavingMembers] = useState(false)
 
   useEffect(() => {
     localStorage.setItem(PLANNER_VIEW_MODE_KEY, viewMode)
@@ -152,6 +198,20 @@ export function PlannerPage() {
     toast('Coming soon')
   }
 
+  const handleSaveMembers = async (nextMembers) => {
+    setSavingMembers(true)
+    try {
+      await saveMembers(nextMembers)
+      await reloadHousehold()
+      toast.success(nextMembers.length ? 'Household members updated.' : 'All household members removed.')
+    } catch (err) {
+      toast.error(err?.message || 'Unable to save household members.')
+      throw err
+    } finally {
+      setSavingMembers(false)
+    }
+  }
+
   const handleGenerate = async () => {
     if (!members.length) return toast.error('Add household members first.')
     if (!household?.id) return toast.error('Household not loaded yet.')
@@ -189,9 +249,13 @@ export function PlannerPage() {
           <h1 className="font-display text-xl text-ink-primary">Planner</h1>
           <div className="flex gap-2">
             <button type="button" onClick={handleClearPlan} disabled={saving || generating || (!mealPlan && activeSlots.length === 0)} className="rounded-full border border-surface-muted bg-surface-card px-4 py-2 text-sm text-ink-secondary transition-colors duration-150 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer">Start Fresh</button>
-            <button type="button" onClick={handleGenerate} disabled={saving || generating} className="btn-primary text-sm transition-colors duration-150 hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">{saving || generating ? 'Generating…' : 'Generate Plan'}</button>
+            <button type="button" onClick={handleGenerate} disabled={saving || generating || members.length === 0} className="btn-primary text-sm transition-colors duration-150 hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed">{saving || generating ? 'Generating…' : 'Generate Plan'}</button>
           </div>
         </div>
+
+        {members.length === 0 ? <MemberEmptyState onOpen={() => setShowMembersModal(true)} /> : <MemberSummary members={members} onOpen={() => setShowMembersModal(true)} />}
+
+        {members.length === 0 ? <div className="mt-3 text-sm text-ink-secondary">Meal generation stays disabled until you add at least one household member.</div> : null}
 
         {loading ? <ScheduleSkeleton /> : (
           <MealPlanWorkspace
@@ -247,6 +311,14 @@ export function PlannerPage() {
             setAddMealTarget(null)
             toast.success('Meal updated.')
           }}
+        />
+
+        <HouseholdMembersModal
+          open={showMembersModal}
+          members={members}
+          saving={savingMembers}
+          onClose={() => setShowMembersModal(false)}
+          onSave={handleSaveMembers}
         />
 
         <div className="card mt-4">
