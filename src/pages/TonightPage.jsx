@@ -747,12 +747,18 @@ export function TonightPage() {
           label: member.name || member.label,
           role: member.role,
           age: member.age,
+          sex: member.sex || member.gender || '',
+          height_inches: member.height_inches ?? null,
+          weight_lbs: member.weight_lbs ?? null,
+          activity_level: member.activity_level || '',
+          goal: member.goal || 'maintain',
           dietary_restrictions: member.dietary_restrictions || [],
           food_preferences: member.food_preferences || [],
+          allergies: member.allergies || [],
         } : null
       }).filter(Boolean)
 
-      const aggregatedRestrictions = [...new Set(selectedMemberData.flatMap((m) => m.dietary_restrictions || []))]
+      const aggregatedRestrictions = [...new Set(selectedMemberData.flatMap((m) => [...(m.dietary_restrictions || []), ...(m.allergies || [])]))]
       const aggregatedPreferences = [...new Set(selectedMemberData.flatMap((m) => m.food_preferences || []))]
 
       const finalDietFocus = dietaryFocus || (aggregatedRestrictions.length > 0 ? aggregatedRestrictions[0] : '')
@@ -767,7 +773,7 @@ export function TonightPage() {
       if (selectedMemberData.length > 0) {
         logServingsCalculation(selectedMemberData, calculatedServings)
       }
-      console.log('[TonightPage] Selected members for servings:', selectedMemberData.map(m => ({ id: m.id, age: m.age, bucket: getDemographicBucket(m.age) })))
+      console.log('[TonightPage] Selected members for servings:', selectedMemberData.map(m => ({ id: m.id, age: m.age, sex: m.sex, bucket: getDemographicBucket(m.age) })))
       console.log('[TonightPage] Calculated servings:', calculatedServings)
 
       // V1: No leftovers planning enabled yet - placeholder for future use
@@ -935,12 +941,18 @@ export function TonightPage() {
           label: member.name || member.label,
           role: member.role,
           age: member.age,
+          sex: member.sex || member.gender || '',
+          height_inches: member.height_inches ?? null,
+          weight_lbs: member.weight_lbs ?? null,
+          activity_level: member.activity_level || '',
+          goal: member.goal || 'maintain',
           dietary_restrictions: member.dietary_restrictions || [],
           food_preferences: member.food_preferences || [],
+          allergies: member.allergies || [],
         } : null
       }).filter(Boolean)
 
-      const aggregatedRestrictions = [...new Set(selectedMemberData.flatMap((m) => m.dietary_restrictions || []))]
+      const aggregatedRestrictions = [...new Set(selectedMemberData.flatMap((m) => [...(m.dietary_restrictions || []), ...(m.allergies || [])]))]
       const aggregatedPreferences = [...new Set(selectedMemberData.flatMap((m) => m.food_preferences || []))]
 
       const finalDietFocus = dietaryFocus || (aggregatedRestrictions.length > 0 ? aggregatedRestrictions[0] : '')
@@ -955,7 +967,7 @@ export function TonightPage() {
       if (selectedMemberData.length > 0) {
         logServingsCalculation(selectedMemberData, calculatedServings)
       }
-      console.log('[TonightPage] Swap - selected members:', selectedMemberData.map(m => ({ id: m.id, age: m.age, bucket: getDemographicBucket(m.age) })))
+      console.log('[TonightPage] Swap - selected members:', selectedMemberData.map(m => ({ id: m.id, age: m.age, sex: m.sex, bucket: getDemographicBucket(m.age) })))
       console.log('[TonightPage] Swap - calculated servings:', calculatedServings)
 
       // V1: No leftovers planning enabled yet - placeholder for future use

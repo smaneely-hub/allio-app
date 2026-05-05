@@ -3,6 +3,28 @@ import toast from 'react-hot-toast'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useHousehold } from '../hooks/useHousehold'
 
+const ACTIVITY_LEVELS = [
+  { value: 'sedentary', label: 'Sedentary' },
+  { value: 'light', label: 'Lightly active' },
+  { value: 'moderate', label: 'Moderately active' },
+  { value: 'high', label: 'Very active' },
+]
+
+const GOALS = [
+  { value: 'lose', label: 'Lose weight' },
+  { value: 'maintain', label: 'Maintain weight' },
+  { value: 'gain', label: 'Gain weight' },
+]
+
+const SEX_OPTIONS = [
+  { value: 'female', label: 'Female' },
+  { value: 'male', label: 'Male' },
+  { value: 'other', label: 'Other / prefer not to say' },
+]
+
+const DIETARY_OPTIONS = ['vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'halal', 'kosher']
+const ALLERGY_OPTIONS = ['peanut', 'tree nut', 'egg', 'dairy', 'soy', 'shellfish', 'sesame']
+
 function ChevronIcon({ open }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`h-5 w-5 transition-transform ${open ? 'rotate-180' : ''}`}>
@@ -11,26 +33,43 @@ function ChevronIcon({ open }) {
   )
 }
 
-function toText(value) {
-  if (Array.isArray(value)) return value.join(', ')
-  return value || ''
+function ChipGroup({ options, values, onToggle }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((option) => {
+        const active = values.includes(option)
+        return (
+          <button
+            key={option}
+            type="button"
+            onClick={() => onToggle(option)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${active ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-divider bg-white text-text-secondary hover:border-primary-200 hover:bg-primary-50'}`}
+          >
+            {option}
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
-function normalizeMember(member, fallbackLabel) {
+function normalizeMember(form, fallbackLabel) {
+  const dietary = Array.isArray(form.dietary_restrictions) ? form.dietary_restrictions : []
+  const allergies = Array.isArray(form.allergies) ? form.allergies : []
   return {
-    ...member,
-    name: String(member.name || '').trim(),
-    label: String(member.name || member.label || fallbackLabel).trim(),
-    age: member.age === '' ? '' : (member.age == null ? '' : Number(member.age)),
-    dietary_restrictions: String(member.dietary_restrictions || '')
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter(Boolean),
-    food_preferences: String(member.food_preferences || '')
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter(Boolean),
-    restrictions: '',
+    name: String(form.name || '').trim(),
+    label: String(form.name || form.label || fallbackLabel).trim(),
+    age: form.age === '' ? '' : Number(form.age),
+    sex: form.sex || '',
+    gender: form.sex || form.gender || '',
+    height_inches: form.height_inches === '' ? null : Number(form.height_inches),
+    weight_lbs: form.weight_lbs === '' ? null : Number(form.weight_lbs),
+    activity_level: form.activity_level || '',
+    goal: form.goal || 'maintain',
+    dietary_restrictions: dietary,
+    allergies,
+    food_preferences: allergies,
+    restrictions: [...dietary, ...allergies].join(', '),
     preferences: '',
     health_considerations: [],
   }
@@ -40,39 +79,62 @@ function MemberCard({ member, index, open, onToggle, onSave, saving }) {
   const [form, setForm] = useState({
     name: member.name || member.label || '',
     age: member.age ?? '',
-    dietary_restrictions: toText(member.dietary_restrictions),
-    food_preferences: toText(member.food_preferences),
+    sex: member.sex || member.gender || '',
+    height_inches: member.height_inches ?? '',
+    weight_lbs: member.weight_lbs ?? '',
+    activity_level: member.activity_level || 'moderate',
+    goal: member.goal || 'maintain',
+    dietary_restrictions: Array.isArray(member.dietary_restrictions) ? member.dietary_restrictions : [],
+    allergies: Array.isArray(member.allergies) ? member.allergies : (Array.isArray(member.food_preferences) ? member.food_preferences : []),
   })
 
   useEffect(() => {
     setForm({
       name: member.name || member.label || '',
       age: member.age ?? '',
-      dietary_restrictions: toText(member.dietary_restrictions),
-      food_preferences: toText(member.food_preferences),
+      sex: member.sex || member.gender || '',
+      height_inches: member.height_inches ?? '',
+      weight_lbs: member.weight_lbs ?? '',
+      activity_level: member.activity_level || 'moderate',
+      goal: member.goal || 'maintain',
+      dietary_restrictions: Array.isArray(member.dietary_restrictions) ? member.dietary_restrictions : [],
+      allergies: Array.isArray(member.allergies) ? member.allergies : (Array.isArray(member.food_preferences) ? member.food_preferences : []),
     })
   }, [member])
+
+  const toggleArrayValue = (field, value) => {
+    setForm((current) => {
+      const existing = current[field] || []
+      return {
+        ...current,
+        [field]: existing.includes(value)
+          ? existing.filter((entry) => entry !== value)
+          : [...existing, value],
+      }
+    })
+  }
 
   const handleSubmit = async (event) => {
     event.preventDefault()
     await onSave(member.id, normalizeMember(form, `Member ${index + 1}`))
   }
 
+  const intakeSummary = [
+    member.age != null && member.age !== '' ? `Age ${member.age}` : null,
+    member.sex ? member.sex : null,
+    member.height_inches ? `${member.height_inches}"` : null,
+    member.weight_lbs ? `${member.weight_lbs} lb` : null,
+  ].filter(Boolean).join(' • ')
+
   return (
     <div className="overflow-hidden rounded-2xl border border-divider bg-white">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
-      >
+      <button type="button" onClick={onToggle} className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left">
         <div className="min-w-0 flex-1">
           <div className="text-base font-medium text-text-primary">{member.name || member.label || `Member ${index + 1}`}</div>
-          <div className="mt-1 text-sm text-text-secondary">
-            {member.age != null && member.age !== '' ? `Age ${member.age}` : 'Age not provided'}
+          <div className="mt-1 text-sm text-text-secondary">{intakeSummary || 'Demographic details not provided yet'}</div>
+          <div className="mt-1 text-sm text-text-muted">
+            {[member.activity_level, member.goal, ...(member.dietary_restrictions || [])].filter(Boolean).slice(0, 3).join(' • ') || 'No planning modifiers yet'}
           </div>
-          {Array.isArray(member.food_preferences) && member.food_preferences.length > 0 ? (
-            <div className="mt-1 text-sm text-text-muted">Preferences: {member.food_preferences.join(', ')}</div>
-          ) : null}
         </div>
         <div className="shrink-0 text-text-muted">
           <ChevronIcon open={open} />
@@ -81,53 +143,55 @@ function MemberCard({ member, index, open, onToggle, onSave, saving }) {
 
       {open ? (
         <form onSubmit={handleSubmit} className="border-t border-divider px-5 py-5">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="xl:col-span-2">
               <label className="mb-1 block text-sm font-medium text-text-primary">Name</label>
-              <input
-                className="input w-full"
-                value={form.name}
-                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
-                placeholder="Name"
-              />
+              <input className="input w-full" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Name" />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-text-primary">Age</label>
-              <input
-                type="number"
-                min="0"
-                max="120"
-                className="input w-full"
-                value={form.age}
-                onChange={(event) => setForm((current) => ({ ...current, age: event.target.value }))}
-                placeholder="Age"
-              />
+              <input type="number" min="0" max="120" className="input w-full" value={form.age} onChange={(event) => setForm((current) => ({ ...current, age: event.target.value }))} placeholder="Age" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-text-primary">Sex</label>
+              <select className="input w-full" value={form.sex} onChange={(event) => setForm((current) => ({ ...current, sex: event.target.value }))}>
+                <option value="">Select</option>
+                {SEX_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-text-primary">Height (inches)</label>
+              <input type="number" min="20" max="96" className="input w-full" value={form.height_inches} onChange={(event) => setForm((current) => ({ ...current, height_inches: event.target.value }))} placeholder="e.g. 68" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-text-primary">Weight (lb)</label>
+              <input type="number" min="10" max="700" className="input w-full" value={form.weight_lbs} onChange={(event) => setForm((current) => ({ ...current, weight_lbs: event.target.value }))} placeholder="e.g. 165" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-text-primary">Activity level</label>
+              <select className="input w-full" value={form.activity_level} onChange={(event) => setForm((current) => ({ ...current, activity_level: event.target.value }))}>
+                {ACTIVITY_LEVELS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-text-primary">Goal</label>
+              <select className="input w-full" value={form.goal} onChange={(event) => setForm((current) => ({ ...current, goal: event.target.value }))}>
+                {GOALS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
             </div>
           </div>
 
-          <div className="mt-4">
-            <label className="mb-1 block text-sm font-medium text-text-primary">Dietary restrictions</label>
-            <textarea
-              rows={3}
-              className="input min-h-[88px] w-full"
-              value={form.dietary_restrictions}
-              onChange={(event) => setForm((current) => ({ ...current, dietary_restrictions: event.target.value }))}
-              placeholder="Comma-separated, like dairy-free, nut allergy"
-            />
+          <div className="mt-5">
+            <label className="mb-2 block text-sm font-medium text-text-primary">Dietary restrictions</label>
+            <ChipGroup options={DIETARY_OPTIONS} values={form.dietary_restrictions} onToggle={(value) => toggleArrayValue('dietary_restrictions', value)} />
           </div>
 
-          <div className="mt-4">
-            <label className="mb-1 block text-sm font-medium text-text-primary">Food preferences</label>
-            <textarea
-              rows={3}
-              className="input min-h-[88px] w-full"
-              value={form.food_preferences}
-              onChange={(event) => setForm((current) => ({ ...current, food_preferences: event.target.value }))}
-              placeholder="Comma-separated, like adventurous, loves spicy food"
-            />
+          <div className="mt-5">
+            <label className="mb-2 block text-sm font-medium text-text-primary">Allergies</label>
+            <ChipGroup options={ALLERGY_OPTIONS} values={form.allergies} onToggle={(value) => toggleArrayValue('allergies', value)} />
           </div>
 
-          <div className="mt-4 flex justify-end">
+          <div className="mt-5 flex justify-end">
             <button type="submit" disabled={saving} className="btn-primary text-sm disabled:opacity-50">
               {saving ? 'Saving…' : 'Save'}
             </button>
@@ -180,7 +244,7 @@ export function HouseholdPage() {
   }
 
   const memberCountLabel = useMemo(() => {
-    if (members.length > 0) return `${members.length} member${members.length === 1 ? '' : 's'} currently configured`
+    if (members.length > 0) return `${members.length} household member${members.length === 1 ? '' : 's'}`
     return 'No members configured yet'
   }, [members.length])
 
@@ -191,7 +255,7 @@ export function HouseholdPage() {
           <div className="mb-2 h-1 w-12 rounded-full bg-gradient-to-r from-primary-400 via-teal-400 to-purple-400" />
           <h1 className="font-display text-2xl text-text-primary md:text-3xl">Family demographics</h1>
           <p className="mt-1 text-sm text-text-secondary">
-            Manage household members, ages, dietary restrictions, and food preferences in one place.
+            Capture calorie-aware planning inputs per person. Household size stays derived from how many members you have.
           </p>
         </div>
 
@@ -206,6 +270,10 @@ export function HouseholdPage() {
                 {savingMembers ? 'Restoring…' : 'Restore default members'}
               </button>
             ) : null}
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-divider bg-surface px-4 py-3 text-sm text-text-secondary">
+            Household size: <span className="font-medium text-text-primary">{members.length || household?.total_people || 0}</span>
           </div>
 
           <div className="mt-4 space-y-3">

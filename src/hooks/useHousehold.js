@@ -202,11 +202,17 @@ export function useHousehold() {
           name: member.name || member.label || '',
           age: toIntOrNull(member.age),  // Never send "" to database
           role: roleFromAge(member.age),
-          gender: member.gender || '',
+          gender: member.gender || member.sex || '',
+          sex: member.sex || member.gender || '',
+          height_inches: toIntOrNull(member.height_inches),
+          weight_lbs: toIntOrNull(member.weight_lbs),
+          activity_level: member.activity_level || '',
+          goal: member.goal || 'maintain',
           restrictions: member.restrictions || '',
           preferences: member.preferences || '',
           dietary_restrictions: member.dietary_restrictions || [],
           food_preferences: member.food_preferences || [],
+          allergies: member.allergies || [],
           health_considerations: member.health_considerations || [],
         }))
 
@@ -290,6 +296,13 @@ export function useHousehold() {
         age: null,
         role: index === 0 ? 'adult' : 'child',
         gender: null,
+        sex: '',
+        height_inches: null,
+        weight_lbs: null,
+        activity_level: 'moderate',
+        goal: 'maintain',
+        dietary_restrictions: [],
+        allergies: [],
         restrictions: [],
         preferences: [],
       }))
