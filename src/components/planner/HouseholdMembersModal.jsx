@@ -186,7 +186,7 @@ export function HouseholdMembersModal({ open, members = [], saving = false, onCl
                   value={form.name}
                   onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
                   placeholder="e.g. Test Parent"
-                  className="input w-full"
+                  className="input w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2"
                 />
               </div>
 
@@ -199,7 +199,7 @@ export function HouseholdMembersModal({ open, members = [], saving = false, onCl
                   value={form.age}
                   onChange={(event) => setForm((current) => ({ ...current, age: event.target.value }))}
                   placeholder="e.g. 35"
-                  className="input w-full"
+                  className="input w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2"
                 />
               </div>
 
@@ -210,7 +210,7 @@ export function HouseholdMembersModal({ open, members = [], saving = false, onCl
                   value={form.dietary_restrictions}
                   onChange={(event) => setForm((current) => ({ ...current, dietary_restrictions: event.target.value }))}
                   placeholder="Comma-separated, like dairy-free, nut allergy"
-                  className="input min-h-[88px] w-full"
+                  className="input min-h-[88px] w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2"
                 />
               </div>
 
@@ -221,12 +221,12 @@ export function HouseholdMembersModal({ open, members = [], saving = false, onCl
                   value={form.food_preferences}
                   onChange={(event) => setForm((current) => ({ ...current, food_preferences: event.target.value }))}
                   placeholder="Comma-separated, like loves pasta, prefers mild food"
-                  className="input min-h-[88px] w-full"
+                  className="input min-h-[88px] w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2"
                 />
               </div>
 
               <div className="flex items-center gap-3 pt-2">
-                <button type="submit" disabled={saving || !form.name.trim()} className="btn-primary transition-colors duration-150 hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                <button type="submit" disabled={saving || !form.name.trim()} className="btn-primary cursor-pointer transition-colors duration-150 hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                   {saving ? 'Saving…' : editingId ? 'Save changes' : 'Add member'}
                 </button>
                 <button type="button" onClick={startAdd} disabled={saving} className="rounded-full border border-surface-muted px-4 py-2 text-sm text-ink-secondary transition-colors duration-150 hover:bg-stone-50 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer">
