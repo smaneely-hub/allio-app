@@ -133,8 +133,7 @@ export function DashboardPage() {
           </div>
         </section>
 
-        <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <StatCard to="/dashboard" emoji="🏠" title="Home" subtitle="Your household overview" />
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard to="/tonight" emoji="🍲" title="Tonight" subtitle="Pick or refine dinner" />
           <StatCard to="/planner" emoji="🗓️" title="Planner" subtitle={schedule ? `${slots.length} slots this week` : 'Set up your week'} />
           <StatCard to="/recipes" emoji="📚" title="Recipes" subtitle={recipes.length ? `${recipes.length} saved recipes` : 'Build your catalog'} />
