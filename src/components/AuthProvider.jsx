@@ -35,6 +35,16 @@ export function AuthProvider({ children }) {
         if (!mounted) return
         setUser(data.session?.user ?? null)
         prevUserRef.current = data.session?.user ?? null
+        if (data.session?.user?.id) {
+          ensureDefaultShoppingList(data.session.user.id).catch((error) => {
+            const combined = [error?.message, error?.details, error?.hint].filter(Boolean).join(' ')
+            if (/Failed to fetch|Load failed|NetworkError|AbortError/i.test(combined)) {
+              console.warn('[AuthProvider] ensureDefaultShoppingList transient error during initial load:', error)
+              return
+            }
+            console.error('[AuthProvider] ensureDefaultShoppingList error during initial load:', error)
+          })
+        }
       } catch {
         if (!mounted) return
         setUser(null)
@@ -63,6 +73,11 @@ export function AuthProvider({ children }) {
       setUser(session?.user ?? null)
       if (session?.user?.id) {
         ensureDefaultShoppingList(session.user.id).catch((error) => {
+          const combined = [error?.message, error?.details, error?.hint].filter(Boolean).join(' ')
+          if (/Failed to fetch|Load failed|NetworkError|AbortError/i.test(combined)) {
+            console.warn('[AuthProvider] ensureDefaultShoppingList transient error:', error)
+            return
+          }
           console.error('[AuthProvider] ensureDefaultShoppingList error:', error)
         })
       }
