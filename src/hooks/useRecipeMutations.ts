@@ -59,6 +59,7 @@ export async function updateCategories(recipeId: string, categories: string[]): 
 export async function listUserRecipes(opts: {
   userId?: string
   cuisine?: string
+  mealType?: string
   minRating?: number
   category?: string
   favoritesOnly?: boolean
@@ -73,6 +74,7 @@ export async function listUserRecipes(opts: {
   if (opts.userId) query = query.eq('user_id', opts.userId)
 
   if (opts.cuisine) query = query.eq('cuisine', opts.cuisine)
+  if (opts.mealType) query = query.eq('meal_type', opts.mealType)
   if (opts.minRating) query = query.gte('rating', opts.minRating)
   if (opts.category) query = query.contains('category', [opts.category])
   if (opts.favoritesOnly) query = query.eq('is_favorite', true)

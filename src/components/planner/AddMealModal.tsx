@@ -25,6 +25,11 @@ type Props = {
   }) => Promise<void>
 }
 
+// Gates the unfinished per-day AI generate flow. The top-level planner generate button stays enabled elsewhere.
+const SHOW_GENERATE_DAY = false
+// Gates the unfinished recipe import flow until there is real import UI and persistence.
+const SHOW_IMPORT = false
+
 function SparklesIcon(props: any) {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3Z" strokeLinecap="round" strokeLinejoin="round" /></svg>
 }
@@ -58,58 +63,159 @@ const sourceMeta = {
 
 export function AddMealModal({ open, onClose, dayKey, mealSlot, existingMealId, canGenerate = true, onGenerate, onSaveMeal }: Props) {
   const [showCatalog, setShowCatalog] = useState(false)
+  const [diningSource, setDiningSource] = useState<'eat_out' | 'takeout' | 'delivery' | null>(null)
+  const [placeName, setPlaceName] = useState('')
+  const [sourceNote, setSourceNote] = useState('')
+  const [savingDiningOut, setSavingDiningOut] = useState(false)
 
   const subtitle = useMemo(() => `${dayKey.toUpperCase()} · ${mealSlot}`, [dayKey, mealSlot])
-  const strategyHint = canGenerate ? 'Choose a meal strategy for this slot.' : 'Who is eating is not set for this slot yet. You can still choose catalog, import, eat out, takeout, or delivery.'
+  const strategyHint = canGenerate ? 'Choose a meal strategy for this slot.' : 'Who is eating is not set for this slot yet. You can still choose catalog, eat out, takeout, or delivery.'
 
   if (!open) return null
 
-  const rows: MealSource[] = ['generated', 'catalog', 'import', 'eat_out', 'takeout', 'delivery']
+  const rows: MealSource[] = [
+    ...(SHOW_GENERATE_DAY ? ['generated' as const] : []),
+    'catalog',
+    ...(SHOW_IMPORT ? ['import' as const] : []),
+    'eat_out',
+    'takeout',
+    'delivery',
+  ]
+
+  const resetDiningFlow = () => {
+    setDiningSource(null)
+    setPlaceName('')
+    setSourceNote('')
+    setSavingDiningOut(false)
+  }
 
   return (
     <>
-      <div className="fixed inset-0 z-[60] bg-black/40" onClick={onClose}>
+      <div className="fixed inset-0 z-[60] bg-black/40" onClick={() => { resetDiningFlow(); onClose() }}>
         <div className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-surface-card p-4 shadow-2xl sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
           <div className="text-lg font-semibold text-ink-primary">Add meal</div>
           <div className="mt-1 text-sm text-ink-secondary">{subtitle}</div>
           <div className="mt-2 rounded-xl bg-surface-muted px-3 py-2 text-sm text-ink-secondary">{strategyHint}</div>
-          <div className="mt-4 overflow-hidden rounded-xl bg-surface-card shadow-card">
-            {rows.map((source, index) => {
-              const meta = sourceMeta[source]
-              const Icon = meta.icon
-              const disabled = source === 'generated' && !canGenerate
-              return (
+
+          {!diningSource ? (
+            <>
+              <div className="mt-4 overflow-hidden rounded-xl bg-surface-card shadow-card">
+                <div className="border-b border-surface-muted px-4 py-3">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-tertiary">Primary action</div>
+                </div>
+                {rows.filter((source) => source === 'catalog').map((source) => {
+                  const meta = sourceMeta[source]
+                  const Icon = meta.icon
+                  return (
+                    <button
+                      key={source}
+                      type="button"
+                      onClick={() => setShowCatalog(true)}
+                      className="group flex min-h-14 w-full cursor-pointer items-center gap-3 bg-surface-card p-4 text-left transition-colors duration-150 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2"
+                    >
+                      <Icon className="h-5 w-5 text-accent-blue transition-colors duration-150 group-hover:text-primary-500" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-ink-primary transition-colors duration-150 group-hover:text-stone-900">{meta.label}</div>
+                        <div className="text-sm text-ink-secondary">{meta.sublabel}</div>
+                      </div>
+                      <ChevronRightIcon className="h-4 w-4 text-ink-tertiary transition-colors duration-150 group-hover:text-ink-primary" />
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="mt-4 overflow-hidden rounded-xl bg-surface-card shadow-card">
+                <div className="border-b border-surface-muted px-4 py-3">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-tertiary">Dining out</div>
+                </div>
+                {rows.filter((source) => ['eat_out', 'takeout', 'delivery'].includes(source)).map((source, index) => {
+                  const meta = sourceMeta[source]
+                  const Icon = meta.icon
+                  return (
+                    <button
+                      key={source}
+                      type="button"
+                      onClick={() => setDiningSource(source as 'eat_out' | 'takeout' | 'delivery')}
+                      className={`group flex min-h-14 w-full cursor-pointer items-center gap-3 bg-surface-card p-4 text-left transition-colors duration-150 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 ${index > 0 ? 'border-t border-surface-muted' : ''}`}
+                    >
+                      <Icon className="h-5 w-5 text-accent-blue transition-colors duration-150 group-hover:text-primary-500" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-ink-primary transition-colors duration-150 group-hover:text-stone-900">{meta.label}</div>
+                        <div className="text-sm text-ink-secondary">{meta.sublabel}</div>
+                      </div>
+                      <ChevronRightIcon className="h-4 w-4 text-ink-tertiary transition-colors duration-150 group-hover:text-ink-primary" />
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          ) : (
+            <div className="mt-4 rounded-2xl border border-surface-muted bg-white p-4 shadow-card">
+              <div className="text-sm font-semibold text-ink-primary">{sourceMeta[diningSource].label}</div>
+              <div className="mt-1 text-sm text-ink-secondary">Add an optional place and note, then save when you’re ready.</div>
+
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-ink-primary">Where?</label>
+                  <input
+                    type="text"
+                    value={placeName}
+                    onChange={(event) => setPlaceName(event.target.value)}
+                    placeholder="e.g. Joe’s Pizza"
+                    className="input w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-ink-primary">Note</label>
+                  <input
+                    type="text"
+                    value={sourceNote}
+                    onChange={(event) => setSourceNote(event.target.value)}
+                    placeholder="e.g. Birthday dinner"
+                    className="input w-full"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-5 flex items-center gap-3">
                 <button
-                  key={source}
                   type="button"
-                  disabled={disabled}
+                  disabled={savingDiningOut}
                   onClick={async () => {
-                    if (source === 'generated') {
-                      if (!canGenerate) return
-                      onGenerate()
+                    setSavingDiningOut(true)
+                    try {
+                      await onSaveMeal({
+                        existingMealId,
+                        meal_source: diningSource,
+                        source_recipe_id: null,
+                        place_name: placeName.trim() || null,
+                        source_note: sourceNote.trim() || null,
+                        title: sourceMeta[diningSource].label,
+                        mealSlot,
+                        dayKey,
+                      })
+                      resetDiningFlow()
                       onClose()
-                    } else if (source === 'catalog') {
-                      setShowCatalog(true)
-                    } else if (source === 'import') {
-                      await onSaveMeal({ existingMealId, meal_source: 'catalog', source_recipe_id: null, place_name: null, source_note: 'import_requested', title: 'Import', mealSlot, dayKey })
-                      onClose()
-                    } else {
-                      await onSaveMeal({ existingMealId, meal_source: source, source_recipe_id: null, place_name: null, source_note: null, title: sourceMeta[source].label, mealSlot, dayKey })
-                      onClose()
+                    } finally {
+                      setSavingDiningOut(false)
                     }
                   }}
-                  className={`group flex min-h-14 w-full items-center gap-3 bg-surface-card p-4 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 ${index > 0 ? 'border-t border-surface-muted' : ''} ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-stone-50'}`}
+                  className="btn-primary cursor-pointer transition-colors duration-150 hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Icon className="h-5 w-5 text-accent-blue transition-colors duration-150 group-hover:text-primary-500" />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-ink-primary transition-colors duration-150 group-hover:text-stone-900">{meta.label}</div>
-                    <div className="text-sm text-ink-secondary">{disabled ? 'Select household members first' : meta.sublabel}</div>
-                  </div>
-                  <ChevronRightIcon className="h-4 w-4 text-ink-tertiary transition-colors duration-150 group-hover:text-ink-primary" />
+                  {savingDiningOut ? 'Saving…' : 'Save'}
                 </button>
-              )
-            })}
-          </div>
+                <button
+                  type="button"
+                  disabled={savingDiningOut}
+                  onClick={resetDiningFlow}
+                  className="rounded-full border border-surface-muted px-4 py-2 text-sm text-ink-secondary transition-colors duration-150 hover:bg-stone-50 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -122,7 +228,6 @@ export function AddMealModal({ open, onClose, dayKey, mealSlot, existingMealId, 
           onClose()
         }}
       />
-
     </>
   )
 }
