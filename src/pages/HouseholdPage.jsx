@@ -148,12 +148,8 @@ export function HouseholdPage() {
   useEffect(() => {
     if (!members.length) {
       setOpenMemberId(null)
-      return
     }
-    if (!openMemberId) {
-      setOpenMemberId(members[0].id || `member-0`)
-    }
-  }, [members, openMemberId])
+  }, [members.length])
 
   const handleSaveMember = async (memberId, nextMember) => {
     setSavingMembers(true)
