@@ -2,6 +2,16 @@ import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { Logo } from './Logo'
 
+function HomeIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
+      <path d="M3 10.5 12 3l9 7.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 9.5V21h14V9.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9 21v-6h6v6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 function CalendarDaysIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
@@ -41,6 +51,7 @@ function SettingsIcon(props) {
 }
 
 const desktopLinks = [
+  { to: '/dashboard', label: 'Home', icon: HomeIcon, aliases: ['/dashboard'] },
   { to: '/planner', label: 'Planner', icon: CalendarDaysIcon, aliases: ['/planner'] },
   { to: '/recipes', label: 'Recipes', icon: BookIcon, aliases: ['/recipes', '/search', '/find'] },
   { to: '/groceries', label: 'Groceries', icon: ShoppingCartIcon, aliases: ['/groceries'] },
@@ -48,7 +59,7 @@ const desktopLinks = [
 ]
 
 const mobileLinks = [
-  { to: '/planner', label: 'Planner', icon: CalendarDaysIcon, aliases: ['/planner'] },
+  { to: '/dashboard', label: 'Home', icon: HomeIcon, aliases: ['/dashboard'] },
   { to: '/recipes', label: 'Recipes', icon: BookIcon, aliases: ['/recipes', '/search', '/find'] },
   { to: '/groceries', label: 'Groceries', icon: ShoppingCartIcon, aliases: ['/groceries'] },
   { to: '/settings', label: 'Settings', icon: SettingsIcon, aliases: ['/profile'] },
@@ -67,7 +78,7 @@ export function NavBar() {
   return (
     <>
       <header className="hidden bg-white shadow-sm md:block">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
           <Logo size="md" />
           {user ? (
             <div className="flex items-center gap-6">
