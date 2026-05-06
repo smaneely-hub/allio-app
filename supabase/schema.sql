@@ -12,18 +12,19 @@ ALTER TABLE IF EXISTS meal_plans ENABLE ROW LEVEL SECURITY;
 CREATE TABLE IF NOT EXISTS households (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  household_name TEXT,
+  name TEXT,
   planning_scope TEXT DEFAULT 'entire household',
   meal_sharing TEXT DEFAULT 'mostly shared',
   budget_sensitivity TEXT DEFAULT 'moderate',
   diet_focus TEXT DEFAULT 'balanced',
   total_people INTEGER DEFAULT 2,
-  low_prep_nights_needed INTEGER DEFAULT 1,
-  repeat_meal_tolerance TEXT DEFAULT 'moderate',
+  low_prep_nights INTEGER DEFAULT 1,
+  repeat_tolerance TEXT DEFAULT 'moderate',
   leftovers_for_lunch TEXT DEFAULT 'sometimes',
   adventurousness TEXT DEFAULT 'mixed',
   staples_on_hand TEXT DEFAULT 'olive oil, salt, pepper, garlic, rice, pasta',
   planning_priorities TEXT[] DEFAULT ARRAY['healthy eating', 'reduce grocery chaos'],
+  cooking_comfort TEXT DEFAULT 'comfortable',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id)
@@ -35,12 +36,21 @@ CREATE TABLE IF NOT EXISTS household_members (
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   household_id UUID REFERENCES households(id) ON DELETE CASCADE NOT NULL,
   name TEXT,
-  age TEXT,
+  label TEXT,
+  age INTEGER,
   role TEXT DEFAULT 'adult',
   gender TEXT,
+  sex TEXT,
+  height_inches INTEGER,
+  weight_lbs INTEGER,
+  activity_level TEXT DEFAULT 'moderate',
+  goal TEXT DEFAULT 'maintain',
   restrictions TEXT,
   preferences TEXT,
-  label TEXT,
+  dietary_restrictions TEXT[] DEFAULT ARRAY[]::TEXT[],
+  food_preferences TEXT[] DEFAULT ARRAY[]::TEXT[],
+  allergies TEXT[] DEFAULT ARRAY[]::TEXT[],
+  health_considerations TEXT[] DEFAULT ARRAY[]::TEXT[],
   sort_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -49,24 +59,30 @@ CREATE TABLE IF NOT EXISTS household_members (
 CREATE TABLE IF NOT EXISTS weekly_schedules (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  household_id UUID REFERENCES households(id) ON DELETE SET NULL,
   week_start_date DATE NOT NULL,
+  shopping_day TEXT DEFAULT 'Sunday',
+  week_notes TEXT DEFAULT '',
+  status TEXT DEFAULT 'draft',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, week_start_date)
 );
 
 -- Schedule slots table
+-- Note: uses 'day' and 'meal' (not day_of_week / meal_type)
 CREATE TABLE IF NOT EXISTS schedule_slots (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   schedule_id UUID REFERENCES weekly_schedules(id) ON DELETE CASCADE NOT NULL,
-  day_of_week TEXT NOT NULL,
-  meal_type TEXT NOT NULL,
+  day TEXT NOT NULL,
+  meal TEXT NOT NULL,
   attendees TEXT[],
   effort_level TEXT DEFAULT 'medium',
   planning_notes TEXT,
   is_leftover BOOLEAN DEFAULT FALSE,
   leftover_source TEXT,
+  sort_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -74,7 +90,9 @@ CREATE TABLE IF NOT EXISTS schedule_slots (
 CREATE TABLE IF NOT EXISTS meal_plans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  household_id UUID REFERENCES households(id) ON DELETE SET NULL,
   schedule_id UUID REFERENCES weekly_schedules(id) ON DELETE SET NULL,
+  week_of DATE,
   status TEXT DEFAULT 'draft',
   plan JSONB,
   draft_plan JSONB,

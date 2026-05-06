@@ -194,13 +194,14 @@ export function useHousehold() {
         }
 
 
-        // Prepare members with household_id set to effectiveHouseholdId
+        // Prepare members, preserving existing IDs to avoid data loss
         const preparedMembers = memberList.map((member, index) => ({
+          ...(member.id ? { id: member.id } : {}),
           user_id: user.id,
           household_id: effectiveHouseholdId,
           label: member.name || member.label || `Member ${index + 1}`,
           name: member.name || member.label || '',
-          age: toIntOrNull(member.age),  // Never send "" to database
+          age: toIntOrNull(member.age),
           role: roleFromAge(member.age),
           gender: member.gender || member.sex || '',
           sex: member.sex || member.gender || '',
@@ -216,28 +217,48 @@ export function useHousehold() {
           health_considerations: member.health_considerations || [],
         }))
 
-
-        // FIXED: Delete ALL existing members first, then insert the new list
-        // This ensures we don't have orphan members or sync issues
-        const { error: deleteAllError } = await supabase
+        // Non-destructive save: delete only members removed from the list,
+        // update existing members in-place, insert truly new ones.
+        const { data: existingRows } = await supabase
           .from('household_members')
-          .delete()
+          .select('id')
           .eq('household_id', effectiveHouseholdId)
-        
-        if (deleteAllError) {
-          console.error('[useHousehold.saveMembers] ERROR deleting old members:', deleteAllError)
-          throw deleteAllError
+        const existingIds = (existingRows || []).map((r) => r.id)
+        const incomingIds = preparedMembers.filter((m) => m.id).map((m) => m.id)
+        const toDeleteIds = existingIds.filter((id) => !incomingIds.includes(id))
+
+        if (toDeleteIds.length > 0) {
+          const { error: deleteError } = await supabase
+            .from('household_members')
+            .delete()
+            .in('id', toDeleteIds)
+          if (deleteError) {
+            console.error('[useHousehold.saveMembers] ERROR deleting removed members:', deleteError)
+            throw deleteError
+          }
         }
-        
 
-        // Now insert the new members
-        const { error: insertError } = await supabase
-          .from('household_members')
-          .insert(preparedMembers)
+        for (const member of preparedMembers.filter((m) => m.id)) {
+          const { id, ...payload } = member
+          const { error: updateError } = await supabase
+            .from('household_members')
+            .update(payload)
+            .eq('id', id)
+          if (updateError) {
+            console.error('[useHousehold.saveMembers] ERROR updating member:', updateError)
+            throw updateError
+          }
+        }
 
-        if (insertError) {
-          console.error('[useHousehold.saveMembers] ERROR inserting members:', insertError)
-          throw insertError
+        const newMembers = preparedMembers.filter((m) => !m.id)
+        if (newMembers.length > 0) {
+          const { error: insertError } = await supabase
+            .from('household_members')
+            .insert(newMembers)
+          if (insertError) {
+            console.error('[useHousehold.saveMembers] ERROR inserting members:', insertError)
+            throw insertError
+          }
         }
 
         

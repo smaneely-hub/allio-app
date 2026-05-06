@@ -84,7 +84,7 @@ export function PlannerPage() {
   const { household, members, loading: householdLoading, saveMembers, reloadHousehold } = useHousehold()
   const { schedule, slots, loading: scheduleLoading, saveSchedule, loadSchedule } = useSchedule()
   const { isPremium, canGeneratePlan, trackUsage } = useSubscription()
-  const { mealPlan, generating, generateMealPlan, saveCustomMealSource, clearMealPlan, loadMealPlan } = useMealPlan(schedule?.id)
+  const { mealPlan, generating, generatePlan, persistPlan, clearPlan, loadMealPlan } = useMealPlan(schedule?.id)
 
   const [shoppingDay, setShoppingDay] = useState('Sunday')
   const [weekNotes, setWeekNotes] = useState('')
@@ -169,14 +169,15 @@ export function PlannerPage() {
   }
 
   const handleClearPlan = async () => {
+    if (!window.confirm("Clear your current plan and start fresh? This cannot be undone.")) return
     setSaving(true)
     try {
-      await clearMealPlan()
+      await clearPlan()
       setSlotState({})
       setShoppingItems([])
-      toast.success('Plan cleared. Start fresh whenever you’re ready.')
+      toast.success("Plan cleared. Start fresh whenever you’re ready.")
     } catch (err) {
-      toast.error(err?.message || 'Unable to clear plan.')
+      toast.error(err?.message || "Unable to clear plan.")
     } finally {
       setSaving(false)
     }
@@ -231,7 +232,13 @@ export function PlannerPage() {
       const savedSchedule = await saveSchedule({ householdId: household.id, shoppingDay, weekNotes, slots: activeSlots, validMemberIds: memberOptions.map((member) => member.id) })
       if (!savedSchedule?.id) throw new Error('Schedule save did not return an id.')
       await loadSchedule()
-      const savedPlan = await generateMealPlan(savedSchedule.id)
+      const savedPlan = await generatePlan({
+        household,
+        members,
+        slots: activeSlots,
+        schedule: savedSchedule,
+        lockedMeals: planMeals.filter((m) => m.locked),
+      })
       await trackUsage('plan_generate', { schedule_id: savedSchedule.id })
       const generatedMeals = savedPlan?.draft_plan?.meals || savedPlan?.plan?.meals || []
       const items = aggregateShoppingList({ meals: generatedMeals }, household?.staples_on_hand || '')
@@ -311,8 +318,28 @@ export function PlannerPage() {
           canGenerate={Boolean(slotState[`${addMealTarget?.day?.key || 'mon'}-${addMealTarget?.mealSlot || 'dinner'}`]?.attendees?.length)}
           onGenerate={() => addMealTarget?.day && handleGenerateDay(addMealTarget.day)}
           onSaveMeal={async (input) => {
-            await saveCustomMealSource(input)
-            await loadMealPlan()
+            if (!mealPlan?.id) {
+              toast.error('Generate a plan first, then you can add custom meals.')
+              return
+            }
+            const mealTitle = input.recipe?.title || input.title || 'Custom meal'
+            const currentMeals = mealPlan?.draft_plan?.meals || []
+            const newMeal = {
+              id: input.existingMealId || crypto.randomUUID(),
+              day: input.dayKey,
+              meal: input.mealSlot,
+              name: mealTitle,
+              source: input.meal_source,
+              source_type: input.meal_source,
+              source_recipe_id: input.source_recipe_id || null,
+              place_name: input.place_name || null,
+              source_note: input.source_note || null,
+            }
+            const nextMeals = input.existingMealId
+              ? currentMeals.map((m) => m.id === input.existingMealId ? newMeal : m)
+              : [...currentMeals, newMeal]
+            const nextPlan = { ...(mealPlan?.draft_plan || { meals: [] }), meals: nextMeals }
+            await persistPlan(nextPlan)
             setAddMealTarget(null)
             toast.success('Meal updated.')
           }}

@@ -58,6 +58,7 @@ export function useMealPlan(scheduleId) {
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState(null)
   const [swappingMealId, setSwappingMealId] = useState(null)
+  const [recentSwappedMealNames, setRecentSwappedMealNames] = useState([])
 
   const loadMealPlan = useCallback(async () => {
     if (!user || !scheduleId) {
@@ -130,6 +131,8 @@ export function useMealPlan(scheduleId) {
 
   const generatePlan = useCallback(async ({ household, members, slots, schedule, lockedMeals = [] }) => {
     if (!user || !household?.id) throw new Error('Missing planning context')
+    const effectiveScheduleId = schedule?.id || scheduleId
+    if (!effectiveScheduleId) throw new Error('Missing schedule ID')
 
     setGenerating(true)
     setError(null)
@@ -187,7 +190,7 @@ export function useMealPlan(scheduleId) {
           ...(mealPlan?.id ? { id: mealPlan.id } : {}),
           user_id: user.id,
           household_id: household.id,
-          schedule_id: scheduleId,
+          schedule_id: effectiveScheduleId,
           week_of: new Date().toISOString().split('T')[0],
           status: mealPlan?.status || 'draft',
           plan: mergedPlan,
@@ -218,6 +221,7 @@ export function useMealPlan(scheduleId) {
 
     try {
       const { data: household } = await supabase.from('households').select('*').eq('user_id', user.id).limit(1).single()
+      if (!household) throw new Error('No household found')
       const { data: members } = await supabase.from('household_members').select('*').eq('user_id', user.id).eq('household_id', household.id)
       const { data: slots } = await supabase.from('schedule_slots').select('*').eq('user_id', user.id).eq('schedule_id', scheduleId)
       const { data: schedule } = await supabase.from('weekly_schedules').select('week_notes').eq('id', scheduleId).maybeSingle()
@@ -263,6 +267,9 @@ export function useMealPlan(scheduleId) {
       const nextPlan = {
         ...mealPlan.draft_plan,
         meals: mealPlan.draft_plan.meals.map((meal) => meal.id === mealToReplace.id ? applySourceDefaults(normalizeMealRecord({ ...replacement, id: meal.id, locked: false, user_note: meal.user_note, swapped: true, original_name: meal.original_name || meal.name }, { day: meal.day, meal: meal.meal })) : applySourceDefaults(meal)),
+      }
+      if (mealToReplace.name) {
+        setRecentSwappedMealNames((prev) => [...prev.slice(-9), mealToReplace.name])
       }
       return persistPlan(nextPlan)
     } catch (err) {

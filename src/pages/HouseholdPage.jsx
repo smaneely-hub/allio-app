@@ -68,7 +68,7 @@ function normalizeMember(form, fallbackLabel) {
     goal: form.goal || 'maintain',
     dietary_restrictions: dietary,
     allergies,
-    food_preferences: allergies,
+    food_preferences: [],
     restrictions: [...dietary, ...allergies].join(', '),
     preferences: '',
     health_considerations: [],
