@@ -318,10 +318,41 @@ export function PlannerPage() {
           canGenerate={Boolean(slotState[`${addMealTarget?.day?.key || 'mon'}-${addMealTarget?.mealSlot || 'dinner'}`]?.attendees?.length)}
           onGenerate={() => addMealTarget?.day && handleGenerateDay(addMealTarget.day)}
           onSaveMeal={async (input) => {
-            if (!mealPlan?.id) {
-              toast.error('Generate a plan first, then you can add custom meals.')
+            if (!household?.id) {
+              toast.error('Household not loaded yet.')
               return
             }
+
+            const slotKey = `${input.dayKey}-${input.mealSlot}`
+            const existingSlot = slotState[slotKey]
+            const fallbackAttendees = memberOptions.slice(0, 1).map((member) => member.id)
+            const ensuredSlot = {
+              day_of_week: input.dayKey,
+              meal_type: input.mealSlot,
+              active: true,
+              attendees: existingSlot?.attendees?.length ? existingSlot.attendees : fallbackAttendees,
+              is_leftover: existingSlot?.is_leftover || false,
+              leftover_source: existingSlot?.leftover_source || '',
+              effort_level: existingSlot?.effort_level || 'medium',
+              planning_notes: existingSlot?.planning_notes || '',
+            }
+
+            const nextSlotState = {
+              ...slotState,
+              [slotKey]: ensuredSlot,
+            }
+
+            const nextActiveSlots = Object.values(nextSlotState).filter((slot) => slot.active && slot.attendees?.length > 0)
+            const activeSchedule = schedule?.id
+              ? schedule
+              : await saveSchedule({
+                  householdId: household.id,
+                  shoppingDay,
+                  weekNotes,
+                  slots: nextActiveSlots,
+                  validMemberIds: memberOptions.map((member) => member.id),
+                })
+
             const mealTitle = input.recipe?.title || input.title || 'Custom meal'
             const currentMeals = mealPlan?.draft_plan?.meals || []
             const newMeal = {
@@ -339,7 +370,22 @@ export function PlannerPage() {
               ? currentMeals.map((m) => m.id === input.existingMealId ? newMeal : m)
               : [...currentMeals, newMeal]
             const nextPlan = { ...(mealPlan?.draft_plan || { meals: [] }), meals: nextMeals }
-            await persistPlan(nextPlan)
+
+            if (mealPlan?.id) {
+              await persistPlan(nextPlan)
+            } else {
+              await generatePlan({
+                household,
+                members,
+                slots: nextActiveSlots,
+                schedule: activeSchedule,
+                lockedMeals: nextMeals,
+              })
+            }
+
+            setSlotState(nextSlotState)
+            await loadSchedule()
+            await loadMealPlan()
             setAddMealTarget(null)
             toast.success('Meal updated.')
           }}
