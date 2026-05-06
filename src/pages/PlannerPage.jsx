@@ -84,7 +84,7 @@ export function PlannerPage() {
   const { household, members, loading: householdLoading, saveMembers, reloadHousehold } = useHousehold()
   const { schedule, slots, loading: scheduleLoading, saveSchedule, loadSchedule } = useSchedule()
   const { isPremium, canGeneratePlan, trackUsage } = useSubscription()
-  const { mealPlan, generating, generatePlan, persistPlan, clearPlan, loadMealPlan } = useMealPlan(schedule?.id)
+  const { mealPlan, generating, generatePlan, createPlan, persistPlan, clearPlan, loadMealPlan } = useMealPlan(schedule?.id)
 
   const [shoppingDay, setShoppingDay] = useState('Sunday')
   const [weekNotes, setWeekNotes] = useState('')
@@ -374,12 +374,10 @@ export function PlannerPage() {
             if (mealPlan?.id) {
               await persistPlan(nextPlan)
             } else {
-              await generatePlan({
+              await createPlan({
                 household,
-                members,
-                slots: nextActiveSlots,
                 schedule: activeSchedule,
-                lockedMeals: nextMeals,
+                meals: nextMeals,
               })
             }
 

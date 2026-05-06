@@ -300,6 +300,39 @@ export function useMealPlan(scheduleId) {
     return items
   }, [user?.id])
 
+  const createPlan = useCallback(async ({ household, schedule, meals = [] }) => {
+    if (!user || !household?.id) throw new Error('Missing planning context')
+    const effectiveScheduleId = schedule?.id || scheduleId
+    if (!effectiveScheduleId) throw new Error('Missing schedule ID')
+
+    const normalizedPlan = withMealDefaults({ meals: meals.map(applySourceDefaults) })
+    const { data: savedPlan, error: saveError } = await supabase
+      .from('meal_plans')
+      .upsert({
+        ...(mealPlan?.id ? { id: mealPlan.id } : {}),
+        user_id: user.id,
+        household_id: household.id,
+        schedule_id: effectiveScheduleId,
+        week_of: new Date().toISOString().split('T')[0],
+        status: mealPlan?.status || 'draft',
+        plan: normalizedPlan,
+        draft_plan: normalizedPlan,
+        updated_at: new Date().toISOString(),
+      })
+      .select('*')
+      .single()
+
+    if (saveError) throw saveError
+
+    const normalizedSaved = {
+      ...savedPlan,
+      draft_plan: withMealDefaults(savedPlan.draft_plan || savedPlan.plan || {}),
+      plan: withMealDefaults(savedPlan.plan || savedPlan.draft_plan || {}),
+    }
+    setMealPlan(normalizedSaved)
+    return normalizedSaved
+  }, [mealPlan, scheduleId, user])
+
   return {
     mealPlan,
     loading,
@@ -308,6 +341,7 @@ export function useMealPlan(scheduleId) {
     swappingMealId,
     loadMealPlan,
     generatePlan,
+    createPlan,
     persistPlan,
     toggleMealLock,
     saveMealNote,
