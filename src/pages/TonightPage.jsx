@@ -1399,6 +1399,11 @@ export function TonightPage() {
           <p className="text-sm text-primary-700">
             <span className="font-semibold">How it works:</span> Pick who you're cooking for, choose effort level, and tap generate. Swap anytime if you want something different.
           </p>
+          {members.length > 1 ? (
+            <p className="mt-2 text-xs text-primary-700/90">
+              Tip: use <span className="font-semibold">All</span> to cook for the whole household. Tonight&apos;s Meal uses the selected family members for servings, restrictions, and planning context.
+            </p>
+          ) : null}
         </div>
       )}
 
@@ -1453,10 +1458,15 @@ export function TonightPage() {
                 <button type="button" onClick={clearMembers} className="text-primary-600 hover:underline">Clear</button>
               </div>
             </div>
+            <div className="mb-2 text-xs text-text-muted">
+              {selectedMembers.length > 0
+                ? `${selectedMembers.length} family member${selectedMembers.length === 1 ? '' : 's'} selected. Generation will size servings and apply restrictions for this group.`
+                : 'No family members selected yet. Pick at least one person, or use All for the whole household.'}
+            </div>
             <div className="flex flex-wrap gap-2">
               {members.map((member) => {
                 const isSelected = selectedMembers.includes(member.id)
-                const hasRestrictions = member.dietary_restrictions?.length > 0 || member.food_preferences?.length > 0
+                const hasRestrictions = member.dietary_restrictions?.length > 0 || member.food_preferences?.length > 0 || member.allergies?.length > 0
                 return (
                   <button
                     key={member.id}
@@ -1467,6 +1477,7 @@ export function TonightPage() {
                         ? 'bg-primary-100 text-primary-700 border border-primary-300'
                         : 'bg-white text-text-secondary border border-divider hover:border-primary-300'
                     }`}
+                    title={hasRestrictions ? 'Includes dietary restrictions, preferences, or allergies' : ''}
                   >
                     {member.name || member.label || 'Member'}
                     {hasRestrictions && <span className="ml-1 text-xs">*</span>}

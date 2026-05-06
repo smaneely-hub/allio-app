@@ -310,6 +310,7 @@ export function HouseholdPage() {
   const { household, members, loading, saveMembers, repairMembers } = useHousehold()
   const [savingMembers, setSavingMembers] = useState(false)
   const [openMemberId, setOpenMemberId] = useState(null)
+  const [showAddMemberForm, setShowAddMemberForm] = useState(false)
 
   useEffect(() => {
     if (!members.length) {
@@ -349,6 +350,20 @@ export function HouseholdPage() {
     setSavingMembers(true)
     try {
       await saveMembers([nextMember])
+      setShowAddMemberForm(false)
+      toast.success('Family member added')
+    } catch (error) {
+      toast.error(error?.message || 'Could not add family member')
+    } finally {
+      setSavingMembers(false)
+    }
+  }
+
+  const handleAddMember = async (nextMember) => {
+    setSavingMembers(true)
+    try {
+      await saveMembers([...members, nextMember])
+      setShowAddMemberForm(false)
       toast.success('Family member added')
     } catch (error) {
       toast.error(error?.message || 'Could not add family member')
@@ -379,11 +394,18 @@ export function HouseholdPage() {
               <h2 className="font-display text-xl text-text-primary">Household members</h2>
               <p className="mt-1 text-sm text-text-secondary">{memberCountLabel}</p>
             </div>
-            {!members.length && household?.id ? (
-              <button type="button" onClick={handleRepair} disabled={savingMembers} className="btn-secondary text-sm disabled:opacity-50">
-                {savingMembers ? 'Restoring…' : 'Restore default members'}
-              </button>
-            ) : null}
+            <div className="flex flex-wrap gap-2">
+              {members.length > 0 ? (
+                <button type="button" onClick={() => setShowAddMemberForm((current) => !current)} disabled={savingMembers} className="btn-secondary text-sm disabled:opacity-50">
+                  {showAddMemberForm ? 'Cancel' : 'Add family member'}
+                </button>
+              ) : null}
+              {!members.length && household?.id ? (
+                <button type="button" onClick={handleRepair} disabled={savingMembers} className="btn-secondary text-sm disabled:opacity-50">
+                  {savingMembers ? 'Restoring…' : 'Restore default members'}
+                </button>
+              ) : null}
+            </div>
           </div>
 
           <div className="mt-4 rounded-2xl border border-divider bg-surface px-4 py-3 text-sm text-text-secondary">
@@ -394,20 +416,31 @@ export function HouseholdPage() {
             {loading ? (
               <div className="rounded-2xl border border-divider bg-surface px-4 py-4 text-sm text-text-muted">Loading family demographics…</div>
             ) : members.length > 0 ? (
-              members.map((member, index) => {
-                const memberKey = member.id || `member-${index}`
-                return (
-                  <MemberCard
-                    key={memberKey}
-                    member={member}
-                    index={index}
-                    open={openMemberId === memberKey}
+              <>
+                {showAddMemberForm ? (
+                  <MemberForm
+                    title="Add another household member"
+                    submitLabel="Add member"
+                    initialMember={EmptyMemberForm()}
+                    onSubmit={handleAddMember}
                     saving={savingMembers}
-                    onToggle={() => setOpenMemberId((current) => current === memberKey ? null : memberKey)}
-                    onSave={handleSaveMember}
                   />
-                )
-              })
+                ) : null}
+                {members.map((member, index) => {
+                  const memberKey = member.id || `member-${index}`
+                  return (
+                    <MemberCard
+                      key={memberKey}
+                      member={member}
+                      index={index}
+                      open={openMemberId === memberKey}
+                      saving={savingMembers}
+                      onToggle={() => setOpenMemberId((current) => current === memberKey ? null : memberKey)}
+                      onSave={handleSaveMember}
+                    />
+                  )
+                })}
+              </>
             ) : (
               <div className="space-y-3">
                 <div className="rounded-2xl border border-dashed border-divider p-4 text-sm text-text-muted">
