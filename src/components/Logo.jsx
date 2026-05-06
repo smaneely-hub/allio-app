@@ -5,9 +5,9 @@ export function Logo({ className = '', size = 'md' }) {
   const [imageError, setImageError] = useState(false)
 
   const sizeClasses = {
-    sm: 'h-9',
-    md: 'h-11',
-    lg: 'h-16',
+    sm: 'h-10',
+    md: 'h-12',
+    lg: 'h-18',
   }
 
   const textClasses = {
