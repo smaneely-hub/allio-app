@@ -75,6 +75,108 @@ function normalizeMember(form, fallbackLabel) {
   }
 }
 
+function EmptyMemberForm() {
+  return {
+    name: '',
+    age: '',
+    sex: '',
+    height_inches: '',
+    weight_lbs: '',
+    activity_level: 'moderate',
+    goal: 'maintain',
+    dietary_restrictions: [],
+    allergies: [],
+  }
+}
+
+function MemberForm({ title, submitLabel, initialMember, onSubmit, saving }) {
+  const [form, setForm] = useState(() => ({ ...EmptyMemberForm(), ...initialMember }))
+
+  useEffect(() => {
+    setForm({ ...EmptyMemberForm(), ...initialMember })
+  }, [initialMember])
+
+  const toggleArrayValue = (field, value) => {
+    setForm((current) => {
+      const existing = current[field] || []
+      return {
+        ...current,
+        [field]: existing.includes(value)
+          ? existing.filter((entry) => entry !== value)
+          : [...existing, value],
+      }
+    })
+  }
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    await onSubmit(normalizeMember(form, 'Member 1'))
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="rounded-2xl border border-divider bg-white px-5 py-5">
+      <div className="mb-4">
+        <h3 className="text-base font-medium text-text-primary">{title}</h3>
+        <p className="mt-1 text-sm text-text-secondary">Add at least one household member to unlock meal planning.</p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="xl:col-span-2">
+          <label className="mb-1 block text-sm font-medium text-text-primary">Name</label>
+          <input className="input w-full" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Name" />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-text-primary">Age</label>
+          <input type="number" min="0" max="120" className="input w-full" value={form.age} onChange={(event) => setForm((current) => ({ ...current, age: event.target.value }))} placeholder="Age" />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-text-primary">Sex</label>
+          <select className="input w-full" value={form.sex} onChange={(event) => setForm((current) => ({ ...current, sex: event.target.value }))}>
+            <option value="">Select</option>
+            {SEX_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-text-primary">Height (inches)</label>
+          <input type="number" min="20" max="96" className="input w-full" value={form.height_inches} onChange={(event) => setForm((current) => ({ ...current, height_inches: event.target.value }))} placeholder="e.g. 68" />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-text-primary">Weight (lb)</label>
+          <input type="number" min="10" max="700" className="input w-full" value={form.weight_lbs} onChange={(event) => setForm((current) => ({ ...current, weight_lbs: event.target.value }))} placeholder="e.g. 165" />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-text-primary">Activity level</label>
+          <select className="input w-full" value={form.activity_level} onChange={(event) => setForm((current) => ({ ...current, activity_level: event.target.value }))}>
+            {ACTIVITY_LEVELS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-text-primary">Goal</label>
+          <select className="input w-full" value={form.goal} onChange={(event) => setForm((current) => ({ ...current, goal: event.target.value }))}>
+            {GOALS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <label className="mb-2 block text-sm font-medium text-text-primary">Dietary restrictions</label>
+        <ChipGroup options={DIETARY_OPTIONS} values={form.dietary_restrictions} onToggle={(value) => toggleArrayValue('dietary_restrictions', value)} />
+      </div>
+
+      <div className="mt-5">
+        <label className="mb-2 block text-sm font-medium text-text-primary">Allergies</label>
+        <ChipGroup options={ALLERGY_OPTIONS} values={form.allergies} onToggle={(value) => toggleArrayValue('allergies', value)} />
+      </div>
+
+      <div className="mt-5 flex justify-end">
+        <button type="submit" disabled={saving || !String(form.name || '').trim()} className="btn-primary text-sm disabled:opacity-50">
+          {saving ? 'Saving…' : submitLabel}
+        </button>
+      </div>
+    </form>
+  )
+}
+
 function MemberCard({ member, index, open, onToggle, onSave, saving }) {
   const [form, setForm] = useState({
     name: member.name || member.label || '',
@@ -243,6 +345,18 @@ export function HouseholdPage() {
     }
   }
 
+  const handleAddFirstMember = async (nextMember) => {
+    setSavingMembers(true)
+    try {
+      await saveMembers([nextMember])
+      toast.success('Family member added')
+    } catch (error) {
+      toast.error(error?.message || 'Could not add family member')
+    } finally {
+      setSavingMembers(false)
+    }
+  }
+
   const memberCountLabel = useMemo(() => {
     if (members.length > 0) return `${members.length} household member${members.length === 1 ? '' : 's'}`
     return 'No members configured yet'
@@ -295,8 +409,17 @@ export function HouseholdPage() {
                 )
               })
             ) : (
-              <div className="rounded-2xl border border-dashed border-divider p-4 text-sm text-text-muted">
-                No family demographics are set up yet. Add your household members to improve meal sizing and planning.
+              <div className="space-y-3">
+                <div className="rounded-2xl border border-dashed border-divider p-4 text-sm text-text-muted">
+                  No family demographics are set up yet. Add your household members to improve meal sizing and planning.
+                </div>
+                <MemberForm
+                  title="Add your first household member"
+                  submitLabel="Add member"
+                  initialMember={EmptyMemberForm()}
+                  onSubmit={handleAddFirstMember}
+                  saving={savingMembers}
+                />
               </div>
             )}
           </div>
