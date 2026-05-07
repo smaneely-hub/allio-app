@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { SwapModal } from '../SwapModal'
 import { useSubscription } from '../../hooks/useSubscription'
 import { UpgradePrompt } from '../UpgradePrompt'
@@ -31,6 +32,35 @@ const nonCookingMeta = {
   delivery: { label: 'Delivery', icon: TruckIcon },
 }
 
+function normalizeSteps(meal, recipe) {
+  const raw = meal?.instructions ?? meal?.directions ?? meal?.steps ?? meal?.method ?? []
+
+  if (typeof raw === 'string') {
+    return raw.split(/\r?\n+/).map((s) => s.trim()).filter(Boolean)
+  }
+
+  if (Array.isArray(raw) && raw.length > 0) {
+    return raw.map((step) => {
+      if (typeof step === 'string') return step.trim()
+      return String(step?.text ?? step?.instruction ?? step?.step ?? '').trim()
+    }).filter(Boolean)
+  }
+
+  // Fall back to instructionGroups
+  if (Array.isArray(recipe?.instructionGroups)) {
+    return recipe.instructionGroups.flatMap((group) =>
+      (group?.steps || []).map((step) => step?.text || '').filter(Boolean)
+    )
+  }
+
+  return []
+}
+
+function formatIngredientLabel(ing) {
+  if (typeof ing === 'string') return ing
+  return [ing?.amount ?? ing?.quantity ?? '', ing?.unit ?? '', ing?.item ?? ing?.name ?? ''].filter(Boolean).join(' ').trim() || 'Ingredient'
+}
+
 export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsClick }) {
   const { isPremium } = useSubscription()
   const [cookingMode, setCookingMode] = useState(false)
@@ -56,7 +86,8 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
     imagePrompt: meal.imagePrompt,
   }), [meal])
 
-  const totalSteps = meal.instructions?.length || recipe.instructionGroups.flatMap((group) => group.steps).length || 0
+  const allSteps = useMemo(() => normalizeSteps(meal, recipe), [meal, recipe])
+  const totalSteps = allSteps.length
 
   const startCooking = () => {
     if (!isPremium) {
@@ -67,41 +98,8 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
     setCookingMode(true)
   }
 
-  const nextStep = () => {
-    if (currentStep < totalSteps - 1) setCurrentStep(currentStep + 1)
-  }
-
-  const prevStep = () => {
-    if (currentStep > 0) setCurrentStep(currentStep - 1)
-  }
-
   const exitCooking = () => {
     setCookingMode(false)
-  }
-
-  if (cookingMode) {
-    return (
-      <div className="fixed inset-0 z-50 flex flex-col bg-text-primary">
-        <div className="flex items-center justify-between bg-text-primary p-4">
-          <button onClick={exitCooking} className="cursor-pointer rounded-md font-medium text-white transition-colors duration-150 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 focus-visible:ring-offset-text-primary">← Exit</button>
-          <div className="text-sm text-white">Step {currentStep + 1} of {totalSteps}</div>
-          <div className="w-16"></div>
-        </div>
-        <div className="h-1 bg-text-secondary"><div className="h-full bg-primary-400 transition-all" style={{ width: `${((currentStep + 1) / totalSteps) * 100}%` }} /></div>
-        <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">
-          <div className="mb-6 text-6xl">👨‍🍳</div>
-          <div className="text-2xl font-medium leading-relaxed text-white md:text-3xl">{meal.instructions?.[currentStep]}</div>
-        </div>
-        <div className="bg-text-primary p-4">
-          <div className="mb-2 text-xs uppercase tracking-wide text-text-muted">Ingredients</div>
-          <div className="flex flex-wrap gap-2">{(meal.ingredients || []).slice(0, 6).map((ing, i) => <span key={i} className="rounded-full bg-text-secondary px-3 py-1 text-sm text-white/80">{ing}</span>)}</div>
-        </div>
-        <div className="flex gap-4 bg-text-primary p-4">
-          <button onClick={prevStep} disabled={currentStep === 0} className={`flex-1 rounded-xl py-4 text-lg font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 focus-visible:ring-offset-text-primary ${currentStep === 0 ? 'cursor-not-allowed bg-text-secondary text-text-muted opacity-50' : 'cursor-pointer bg-text-secondary text-white hover:bg-white/15'}`}>← Previous</button>
-          <button onClick={nextStep} disabled={currentStep === totalSteps - 1} className={`flex-1 rounded-xl py-4 text-lg font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 focus-visible:ring-offset-text-primary ${currentStep === totalSteps - 1 ? 'cursor-not-allowed bg-text-secondary text-text-muted opacity-50' : 'cursor-pointer bg-primary-400 text-white hover:bg-primary-500'}`}>{currentStep === totalSteps - 1 ? 'All done!' : 'Next step →'}</button>
-        </div>
-      </div>
-    )
   }
 
   if (meal.swap_pending) {
@@ -116,6 +114,98 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
     )
   }
 
+  const mealTitle = meal.title || meal.name || 'Meal'
+  const prepTime = meal.prep_time_minutes || recipe.prepTime || 0
+  const cookTime = meal.cook_time_minutes || recipe.cookTime || 0
+
+  // Cooking mode renders into a portal so it escapes any stacking context in the planner workspace
+  const cookingOverlay = cookingMode ? createPortal(
+    <div className="fixed inset-0 z-[200] flex flex-col bg-text-primary">
+      {/* Header */}
+      <div className="flex items-center justify-between bg-text-primary px-4 pt-4 pb-2">
+        <button
+          type="button"
+          onClick={exitCooking}
+          style={{ touchAction: 'manipulation' }}
+          className="cursor-pointer rounded-md font-medium text-white transition-colors duration-150 hover:text-stone-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 focus-visible:ring-offset-text-primary"
+        >
+          ← Exit
+        </button>
+        <div className="text-sm text-white">
+          Step {currentStep + 1} of {totalSteps || 1}
+        </div>
+        <div className="w-16" />
+      </div>
+
+      {/* Timer pills */}
+      {(prepTime > 0 || cookTime > 0) ? (
+        <div className="flex justify-center gap-3 px-4 pb-2">
+          {prepTime > 0 ? <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/70">Prep {prepTime} min</span> : null}
+          {cookTime > 0 ? <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/70">Cook {cookTime} min</span> : null}
+        </div>
+      ) : null}
+
+      {/* Progress bar */}
+      <div className="h-1 bg-text-secondary">
+        <div
+          className="h-full bg-primary-400 transition-all duration-300"
+          style={{ width: totalSteps > 0 ? `${((currentStep + 1) / totalSteps) * 100}%` : '0%' }}
+        />
+      </div>
+
+      {/* Step content */}
+      <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">
+        <div className="mb-6 text-6xl">👨‍🍳</div>
+        <div className="text-2xl font-medium leading-relaxed text-white md:text-3xl">
+          {allSteps[currentStep] || 'No instructions available'}
+        </div>
+      </div>
+
+      {/* Ingredient chips */}
+      <div className="bg-text-primary px-4 pb-2">
+        <div className="mb-2 text-xs uppercase tracking-wide text-text-muted">Ingredients</div>
+        <div className="flex flex-wrap gap-2">
+          {(meal.ingredients || []).slice(0, 6).map((ing, i) => (
+            <span key={i} className="rounded-full bg-text-secondary px-3 py-1 text-sm text-white/80">
+              {formatIngredientLabel(ing)}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <div className="flex gap-4 bg-text-primary p-4">
+        <button
+          type="button"
+          onClick={() => setCurrentStep((s) => Math.max(0, s - 1))}
+          disabled={currentStep === 0}
+          style={{ touchAction: 'manipulation' }}
+          className={`flex-1 rounded-xl py-4 text-lg font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 focus-visible:ring-offset-text-primary ${
+            currentStep === 0
+              ? 'cursor-not-allowed bg-text-secondary text-text-muted opacity-50'
+              : 'cursor-pointer bg-text-secondary text-white hover:bg-white/15'
+          }`}
+        >
+          ← Previous
+        </button>
+        <button
+          type="button"
+          onClick={() => setCurrentStep((s) => Math.min(totalSteps - 1, s + 1))}
+          disabled={currentStep >= totalSteps - 1}
+          style={{ touchAction: 'manipulation' }}
+          className={`flex-1 rounded-xl py-4 text-lg font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 focus-visible:ring-offset-text-primary ${
+            currentStep >= totalSteps - 1
+              ? 'cursor-not-allowed bg-text-secondary text-text-muted opacity-50'
+              : 'cursor-pointer bg-primary-400 text-white hover:bg-primary-500'
+          }`}
+        >
+          {currentStep >= totalSteps - 1 ? 'All done! ✓' : 'Next step →'}
+        </button>
+      </div>
+    </div>,
+    document.body
+  ) : null
+
   if (['eat_out', 'takeout', 'delivery'].includes(mealSource)) {
     const meta = nonCookingMeta[mealSource]
     const Icon = meta.icon
@@ -123,6 +213,7 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
     const subtitle = meal.source_note ? `${meta.label} · ${meal.source_note}` : meta.label
     return (
       <>
+        {cookingOverlay}
         <div className="card flex items-center gap-3 p-3">
           <button type="button" onClick={() => { setShowDetail(true); onOpenMeal?.(meal) }} className="group flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-surface-muted text-ink-secondary transition duration-150 hover:bg-stone-100 hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2">
             <Icon className="h-6 w-6 transition-colors duration-150 group-hover:text-ink-primary" />
@@ -141,12 +232,12 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
   }
 
   const servings = meal.servings || recipe.servings || 1
-  const mealTitle = meal.title || meal.name || 'Meal'
   const mealImage = meal.image_url || recipe.imageUrl || null
   const calories = meal.calories || meal.nutrition?.calories || '—'
 
   return (
     <>
+      {cookingOverlay}
       <div className="card flex items-center gap-3 p-3">
         <button type="button" onClick={() => { setShowDetail(true); onOpenMeal?.(meal) }} className="h-16 w-16 shrink-0 cursor-pointer overflow-hidden rounded-xl bg-surface-muted transition duration-150 hover:bg-stone-100 hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label={`Open ${mealTitle}`}>
           {mealImage ? <img src={mealImage} alt={mealTitle} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-surface-muted" />}
