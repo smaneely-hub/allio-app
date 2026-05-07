@@ -245,7 +245,7 @@ export function PlannerPage() {
     }
   }
 
-  const handleGenerateSlot = async (dayKey, mealType) => {
+  const handleGenerateSlot = async (dayKey, mealType, overrides = {}) => {
     if (!members.length) return toast.error('Add household members first.')
     if (!household?.id) return toast.error('Household not loaded yet.')
 
@@ -257,9 +257,13 @@ export function PlannerPage() {
       day_of_week: dayKey,
       meal_type: mealType,
       active: true,
-      attendees: existingSlot?.attendees?.length ? existingSlot.attendees : fallbackAttendees,
-      effort_level: existingSlot?.effort_level || 'medium',
-      planning_notes: existingSlot?.planning_notes || '',
+      attendees: overrides.attendees?.length
+        ? overrides.attendees
+        : (existingSlot?.attendees?.length ? existingSlot.attendees : fallbackAttendees),
+      effort_level: overrides.effort || existingSlot?.effort_level || 'medium',
+      planning_notes: overrides.planningNotes !== undefined
+        ? overrides.planningNotes
+        : (existingSlot?.planning_notes || ''),
       is_leftover: existingSlot?.is_leftover || false,
       leftover_source: existingSlot?.leftover_source || '',
     }
@@ -422,11 +426,14 @@ export function PlannerPage() {
           mealPlanId={mealPlan?.id || ''}
           existingMealId={addMealTarget?.existingMealId || null}
           canGenerate={members.length > 0}
-          onGenerate={async () => {
+          members={members}
+          defaultEffort={addMealTarget ? (slotState[`${addMealTarget.day?.key}-${addMealTarget.mealSlot}`]?.effort_level || 'medium') : 'medium'}
+          defaultAttendees={addMealTarget ? (slotState[`${addMealTarget.day?.key}-${addMealTarget.mealSlot}`]?.attendees || []) : []}
+          onGenerate={async ({ effort, attendees, planningNotes }) => {
             const target = addMealTarget
             setAddMealTarget(null)
             if (target?.day?.key && target?.mealSlot) {
-              await handleGenerateSlot(target.day.key, target.mealSlot)
+              await handleGenerateSlot(target.day.key, target.mealSlot, { effort, attendees, planningNotes })
             }
           }}
           onSaveMeal={async (input) => {
