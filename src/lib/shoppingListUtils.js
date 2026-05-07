@@ -106,14 +106,24 @@ export function parseIngredient(rawIngredient) {
     }
   }
 
+  const cleanedName = String(name || '')
+    .replace(/^[-•*]\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  const normalizedName = normalizeIngredientName(cleanedName)
+  if (!cleanedName || cleanedName.length < 2) return null
+  if (/^(ingredient|ingredients|item|items|see recipe|to serve|optional)$/i.test(cleanedName)) return null
+  if (/^[^A-Za-z]+$/.test(cleanedName)) return null
+
   return {
     source,
-    name,
-    normalizedName: normalizeIngredientName(name),
+    name: cleanedName,
+    normalizedName,
     quantity,
     quantityText: formatQuantity(quantity),
     unit,
-    category: categorizeIngredient(name),
+    category: categorizeIngredient(cleanedName),
   }
 }
 
