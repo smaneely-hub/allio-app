@@ -72,6 +72,7 @@ const mobileLinks = [
   { to: '/dashboard', label: 'Home', icon: HomeIcon, aliases: ['/dashboard'] },
   { to: '/tonight', label: 'Generate', icon: SparklesIcon, aliases: ['/tonight', '/cook', '/cooking'] },
   { to: '/planner', label: 'Planner', icon: CalendarDaysIcon, aliases: ['/planner'] },
+  { to: '/recipes', label: 'Recipes', icon: BookIcon, aliases: ['/recipes', '/search', '/find'] },
   { to: '/groceries', label: 'Groceries', icon: ShoppingCartIcon, aliases: ['/groceries'] },
   { to: '/settings', label: 'Settings', icon: SettingsIcon, aliases: ['/profile'] },
 ]
