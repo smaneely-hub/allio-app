@@ -130,6 +130,54 @@ export function useShoppingList(userId, listId = null) {
     }
   }, [shoppingList?.id, userId])
 
+  const updateItem = useCallback(async (itemId, updates) => {
+    const currentItem = items.find((item) => item.id === itemId)
+    if (!currentItem) return null
+
+    const nextName = String(updates?.name ?? currentItem.name ?? '').trim()
+    if (!nextName) throw new Error('Item name is required')
+
+    const payload = {
+      name: nextName,
+      quantity: String(updates?.quantity ?? currentItem.quantity ?? '').trim() || null,
+      category: updates?.category || currentItem.category || 'other',
+      checked: typeof updates?.checked === 'boolean' ? updates.checked : currentItem.checked,
+      source: updates?.source || currentItem.source || 'manual',
+    }
+
+    const { data, error: updateError } = await supabase
+      .from('shopping_list_items')
+      .update(payload)
+      .eq('id', itemId)
+      .select('*')
+      .single()
+
+    if (updateError) {
+      toast.error(updateError.message)
+      throw updateError
+    }
+
+    const nextItems = items.map((item) => item.id === itemId ? data : item)
+    setItems(nextItems)
+    return data
+  }, [items])
+
+  const deleteItem = useCallback(async (itemId) => {
+    const { error: deleteError } = await supabase
+      .from('shopping_list_items')
+      .delete()
+      .eq('id', itemId)
+
+    if (deleteError) {
+      toast.error(deleteError.message)
+      throw deleteError
+    }
+
+    const nextItems = items.filter((item) => item.id !== itemId)
+    setItems(nextItems)
+    return nextItems
+  }, [items])
+
   const groupedItems = useMemo(() => groupItemsByCategory(items || []), [items])
 
   return {
@@ -142,5 +190,7 @@ export function useShoppingList(userId, listId = null) {
     toggleItem,
     clearChecked,
     addItem,
+    updateItem,
+    deleteItem,
   }
 }

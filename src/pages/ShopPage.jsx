@@ -27,9 +27,12 @@ export function ShopPage() {
   useDocumentTitle('Shopping List | Allio')
   const { user } = useAuth()
   const { isPremium, trackUsage } = useSubscription()
-  const { shoppingList, items, loading, toggleItem, clearChecked, addItem } = useShoppingList(user?.id)
+  const { shoppingList, items, loading, toggleItem, clearChecked, addItem, updateItem, deleteItem } = useShoppingList(user?.id)
   const [newItemName, setNewItemName] = useState('')
   const [newItemQuantity, setNewItemQuantity] = useState('')
+  const [editingItemId, setEditingItemId] = useState(null)
+  const [editingName, setEditingName] = useState('')
+  const [editingQuantity, setEditingQuantity] = useState('')
   const displayGroups = useMemo(() => {
     return CATEGORY_ORDER.reduce((acc, category) => {
       const grouped = (items || [])
@@ -88,6 +91,34 @@ export function ShopPage() {
     setNewItemName('')
     setNewItemQuantity('')
     toast.success('Item added')
+  }
+
+  const startEditingItem = (item) => {
+    setEditingItemId(item.id)
+    setEditingName(item.name || '')
+    setEditingQuantity(item.quantity || '')
+  }
+
+  const cancelEditingItem = () => {
+    setEditingItemId(null)
+    setEditingName('')
+    setEditingQuantity('')
+  }
+
+  const saveEditingItem = async (item) => {
+    await updateItem(item.id, {
+      name: editingName,
+      quantity: editingQuantity,
+      category: categorizeIngredient(editingName || item.name || ''),
+    })
+    cancelEditingItem()
+    toast.success('Item updated')
+  }
+
+  const handleDeleteItem = async (item) => {
+    await deleteItem(item.id)
+    if (editingItemId === item.id) cancelEditingItem()
+    toast.success(`${item.name} removed`)
   }
 
   const handleShare = async () => {
@@ -263,36 +294,81 @@ export function ShopPage() {
             {isOpen && (
               <div className={`mt-1 rounded-xl ${colors.bg}`}>
                 {items.map((item) => {
+                    const isEditing = editingItemId === item.id
                     return (
-                      <button
+                      <div
                         key={item.__itemKey}
-                        type="button"
-                        onClick={() => toggleItem(item.__itemKey)}
-                        className={`w-full flex items-center gap-3 p-3 text-left border-b border-white/50 last:border-0 transition-all duration-150 ${
+                        className={`w-full border-b border-white/50 last:border-0 transition-all duration-150 ${
                           item.checked ? 'opacity-60' : 'opacity-100'
                         }`}
                       >
-                        <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-150 ${
-                          item.checked ? 'bg-green-500 border-green-500 scale-90' : 'border-warm-300'
-                        }`}>
-                          {item.checked && <span className="text-white text-xs">✓</span>}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className={`text-base font-semibold ${item.checked ? 'line-through text-text-muted' : 'text-text-primary'}`}>
-                            {item.name}
+                        <div className="flex items-center gap-3 p-3">
+                          <button
+                            type="button"
+                            onClick={() => toggleItem(item.__itemKey)}
+                            className={`w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-150 ${
+                              item.checked ? 'bg-green-500 border-green-500 scale-90' : 'border-warm-300'
+                            }`}
+                          >
+                            {item.checked && <span className="text-white text-xs">✓</span>}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            {isEditing ? (
+                              <div className="space-y-2">
+                                <input
+                                  value={editingName}
+                                  onChange={(e) => setEditingName(e.target.value)}
+                                  className="input w-full"
+                                  placeholder="Item name"
+                                />
+                                <input
+                                  value={editingQuantity}
+                                  onChange={(e) => setEditingQuantity(e.target.value)}
+                                  className="input w-full"
+                                  placeholder="Qty"
+                                />
+                              </div>
+                            ) : (
+                              <>
+                                <div className={`text-base font-semibold ${item.checked ? 'line-through text-text-muted' : 'text-text-primary'}`}>
+                                  {item.name}
+                                </div>
+                                {item.used_in?.length > 0 && (
+                                  <div className="text-xs text-text-muted capitalize">
+                                    {item.used_in.map((usage) => usage.replace('_', ' ')).join(', ')}
+                                  </div>
+                                )}
+                              </>
+                            )}
                           </div>
-                          {item.used_in?.length > 0 && (
-                            <div className="text-xs text-text-muted capitalize">
-                              {item.used_in.map((usage) => usage.replace('_', ' ')).join(', ')}
+                          {!isEditing && (item.quantity || '').trim() ? (
+                            <div className="text-sm text-warm-500 bg-warm-100 rounded-full px-2 flex-shrink-0">
+                              {item.quantity}
                             </div>
+                          ) : null}
+                        </div>
+                        <div className="flex gap-2 px-3 pb-3">
+                          {isEditing ? (
+                            <>
+                              <button type="button" onClick={() => saveEditingItem(item)} className="rounded-full bg-primary-500 px-3 py-1.5 text-sm font-medium text-white">
+                                Save
+                              </button>
+                              <button type="button" onClick={cancelEditingItem} className="rounded-full border border-divider bg-white px-3 py-1.5 text-sm font-medium text-text-secondary">
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button type="button" onClick={() => startEditingItem(item)} className="rounded-full border border-divider bg-white px-3 py-1.5 text-sm font-medium text-text-secondary">
+                                Edit
+                              </button>
+                              <button type="button" onClick={() => handleDeleteItem(item)} className="rounded-full border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-600">
+                                Delete
+                              </button>
+                            </>
                           )}
                         </div>
-                        {(item.quantity || '').trim() ? (
-                          <div className="text-sm text-warm-500 bg-warm-100 rounded-full px-2 flex-shrink-0">
-                            {item.quantity}
-                          </div>
-                        ) : null}
-                      </button>
+                      </div>
                     )
                   })}
               </div>
