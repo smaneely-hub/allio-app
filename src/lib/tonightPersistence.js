@@ -1,5 +1,7 @@
 import { addItemsToShoppingList, buildShoppingItemRows, ensureDefaultShoppingList, getShoppingListItems } from './shoppingLists'
 
+const PLANNER_SOURCES = new Set(['planner', 'tonight'])
+
 export function buildShoppingItemsFromMeal(meal, staplesOnHand = '') {
   return buildShoppingItemRows(meal, staplesOnHand, 'tonight')
 }
@@ -8,7 +10,7 @@ export async function upsertShoppingListForDate({ userId, householdId, weekOf, i
   const list = await ensureDefaultShoppingList(userId)
   const existingItems = await getShoppingListItems(list?.id)
 
-  const plannerKeepers = (existingItems || []).filter((item) => item.source !== 'planner')
+  const plannerKeepers = (existingItems || []).filter((item) => !PLANNER_SOURCES.has(String(item.source || '').trim().toLowerCase()))
   const nextPlannerItems = (items || []).map((item) => ({
     name: item.name,
     quantity: item.quantity,
@@ -19,7 +21,9 @@ export async function upsertShoppingListForDate({ userId, householdId, weekOf, i
 
   if (list?.id) {
     const { supabase } = await import('./supabase')
-    const existingPlannerIds = (existingItems || []).filter((item) => item.source === 'planner').map((item) => item.id)
+    const existingPlannerIds = (existingItems || [])
+      .filter((item) => PLANNER_SOURCES.has(String(item.source || '').trim().toLowerCase()))
+      .map((item) => item.id)
     if (existingPlannerIds.length > 0) {
       const { error } = await supabase
         .from('shopping_list_items')

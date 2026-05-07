@@ -188,8 +188,9 @@ export function PlannerPage() {
     const target = new Date(dayDate)
     const dayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][target.getDay()]
 
+    let nextMeals = mealPlan?.draft_plan?.meals || []
     if (mealPlan?.draft_plan?.meals?.length) {
-      const nextMeals = mealPlan.draft_plan.meals.filter((m) => m.day !== dayKey)
+      nextMeals = mealPlan.draft_plan.meals.filter((m) => m.day !== dayKey)
       const nextPlan = { ...mealPlan.draft_plan, meals: nextMeals }
       try {
         await persistPlan(nextPlan)
@@ -197,6 +198,22 @@ export function PlannerPage() {
         toast.error('Could not clear day.')
         return
       }
+    }
+
+    try {
+      const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '')
+      setShoppingItems(items)
+      if (household?.id) {
+        await upsertShoppingListForDate({
+          userId: household.user_id,
+          householdId: household.id,
+          weekOf: new Date().toISOString().split('T')[0],
+          items,
+        })
+      }
+    } catch {
+      toast.error('Day cleared, but shopping list could not be updated.')
+      return
     }
 
     setSlotState((current) => Object.fromEntries(Object.entries(current).map(([key, value]) => (
@@ -210,6 +227,14 @@ export function PlannerPage() {
     setSaving(true)
     try {
       await clearPlan()
+      if (household?.id) {
+        await upsertShoppingListForDate({
+          userId: household.user_id,
+          householdId: household.id,
+          weekOf: new Date().toISOString().split('T')[0],
+          items: [],
+        })
+      }
       setSlotState({})
       setShoppingItems([])
       toast.success("Plan cleared. Start fresh whenever you're ready.")
