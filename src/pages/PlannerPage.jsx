@@ -16,6 +16,7 @@ import { addDays, DAY_ORDER } from '../lib/planner'
 import { normalizeMealRecord } from '../lib/mealSchema'
 import { upsertShoppingListForDate } from '../lib/tonightPersistence'
 import { groupByCategory } from '../utils/groceryCategories'
+import { supabase } from '../lib/supabase'
 
 const days = DAY_ORDER
 const CATEGORY_EMOJI = {
@@ -419,6 +420,22 @@ export function PlannerPage() {
                 })
 
             const mealTitle = input.recipe?.title || input.title || 'Custom meal'
+
+            // For catalog meals, fetch full recipe so ingredients/instructions/image are embedded
+            let catalogRecipe = null
+            if (input.meal_source === 'catalog' && input.source_recipe_id) {
+              try {
+                const { data } = await supabase
+                  .from('recipes')
+                  .select('image_url, servings, prep_time_minutes, cook_time_minutes, total_time_minutes, ingredient_groups_json, instruction_groups_json, ingredients_json, instructions_json, nutrition_json')
+                  .eq('id', input.source_recipe_id)
+                  .maybeSingle()
+                catalogRecipe = data || null
+              } catch {
+                // Non-fatal: meal saves without embedded recipe data
+              }
+            }
+
             const currentMeals = mealPlan?.draft_plan?.meals || []
             const newMeal = {
               id: input.existingMealId || crypto.randomUUID(),
@@ -430,6 +447,18 @@ export function PlannerPage() {
               source_recipe_id: input.source_recipe_id || null,
               place_name: input.place_name || null,
               source_note: input.source_note || null,
+              image_url: catalogRecipe?.image_url || input.recipe?.image_url || null,
+              ...(catalogRecipe ? {
+                servings: catalogRecipe.servings || null,
+                prep_time_minutes: catalogRecipe.prep_time_minutes || null,
+                cook_time_minutes: catalogRecipe.cook_time_minutes || null,
+                total_time_minutes: catalogRecipe.total_time_minutes || null,
+                ingredientGroups: catalogRecipe.ingredient_groups_json || null,
+                instructionGroups: catalogRecipe.instruction_groups_json || null,
+                ingredients: catalogRecipe.ingredients_json || null,
+                instructions: catalogRecipe.instructions_json || null,
+                nutrition: catalogRecipe.nutrition_json || null,
+              } : {}),
             }
             const nextMeals = input.existingMealId
               ? currentMeals.map((m) => m.id === input.existingMealId ? newMeal : m)

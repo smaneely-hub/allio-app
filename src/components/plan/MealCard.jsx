@@ -135,7 +135,7 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
             <MoreVerticalIcon className="h-5 w-5" />
           </button>
         </div>
-        <MealDetailModal meal={meal} isOpen={showDetail} onClose={() => setShowDetail(false)} />
+        <MealDetailModal meal={meal} isOpen={showDetail} onClose={() => setShowDetail(false)} onStartCooking={() => { setShowDetail(false); startCooking() }} />
       </>
     )
   }
@@ -159,7 +159,7 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
           <MoreVerticalIcon className="h-5 w-5" />
         </button>
       </div>
-      <MealDetailModal meal={meal} isOpen={showDetail} onClose={() => setShowDetail(false)} />
+      <MealDetailModal meal={meal} isOpen={showDetail} onClose={() => setShowDetail(false)} onStartCooking={() => { setShowDetail(false); startCooking() }} />
       <SwapModal isOpen={showSwapModal} onClose={() => !swapping && setShowSwapModal(false)} onSwap={async (suggestion) => { try { setSwapping(true); await onSwap(meal, suggestion || ''); setShowSwapModal(false) } finally { setSwapping(false) } }} mealName={meal.name} loading={swapping} />
       <UpgradePrompt feature="cooking_mode" onClose={() => setShowUpgradePrompt(false)} />
     </>
