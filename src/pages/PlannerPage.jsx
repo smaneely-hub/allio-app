@@ -278,6 +278,17 @@ export function PlannerPage() {
       setSaving(true)
       try {
         await swapMeal(meal, '')
+        const refreshedMeals = (mealPlan?.draft_plan?.meals || mealPlan?.plan?.meals || []).map((entry) => normalizeMealRecord(entry))
+        const items = aggregateShoppingList({ meals: refreshedMeals }, household?.staples_on_hand || '')
+        setShoppingItems(items)
+        if (household?.id) {
+          await upsertShoppingListForDate({
+            userId: household.user_id,
+            householdId: household.id,
+            weekOf: new Date().toISOString().split('T')[0],
+            items,
+          })
+        }
         toast.success('Meal regenerated.')
       } catch {
         // swapMeal shows its own toast on error
@@ -294,6 +305,16 @@ export function PlannerPage() {
       setSaving(true)
       try {
         await persistPlan(nextPlan)
+        const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '')
+        setShoppingItems(items)
+        if (household?.id) {
+          await upsertShoppingListForDate({
+            userId: household.user_id,
+            householdId: household.id,
+            weekOf: new Date().toISOString().split('T')[0],
+            items,
+          })
+        }
         toast.success('Meal removed.')
       } catch {
         toast.error('Could not remove meal.')
@@ -474,6 +495,15 @@ export function PlannerPage() {
                 meals: nextMeals,
               })
             }
+
+            const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '')
+            setShoppingItems(items)
+            await upsertShoppingListForDate({
+              userId: household.user_id,
+              householdId: household.id,
+              weekOf: new Date().toISOString().split('T')[0],
+              items,
+            })
 
             setSlotState(nextSlotState)
             await loadSchedule()

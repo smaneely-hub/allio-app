@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { addDays, buildPlannerDays, MEAL_SLOTS, DAY_SHORT } from '../../lib/planner'
+import { addDays, buildPlannerDays, getStartOfWeek, MEAL_SLOTS, DAY_SHORT } from '../../lib/planner'
 import { MealCard } from './MealCard'
 
 function ChevronLeftIcon(props) {
