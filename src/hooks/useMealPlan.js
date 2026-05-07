@@ -283,6 +283,99 @@ export function useMealPlan(scheduleId) {
     }
   }, [mealPlan, persistPlan, scheduleId, user])
 
+  const generateSlot = useCallback(async ({ household, members, slot, schedule }) => {
+    if (!user || !household?.id) throw new Error('Missing planning context')
+    const effectiveScheduleId = schedule?.id || scheduleId
+    if (!effectiveScheduleId) throw new Error('Missing schedule ID')
+
+    setGenerating(true)
+    setError(null)
+
+    try {
+      const normalizedSlot = {
+        day: (typeof slot.day_of_week === 'string' ? slot.day_of_week : slot.day || '').trim().slice(0, 3).toLowerCase() || 'mon',
+        meal: (typeof slot.meal_type === 'string' ? slot.meal_type : slot.meal || '').trim().toLowerCase().replace(/\s+/g, '_') || 'dinner',
+        attendees: Array.isArray(slot.attendees) ? slot.attendees : [],
+        effort_level: slot.effort_level || 'medium',
+        planning_notes: slot.planning_notes || '',
+        is_leftover: slot.is_leftover || false,
+        leftover_source: slot.leftover_source || '',
+      }
+
+      const payload = {
+        household: {
+          total_people: household.total_people,
+          diet_focus: household.diet_focus,
+          budget_sensitivity: household.budget_sensitivity,
+          adventurousness: household.adventurousness,
+          staples_on_hand: household.staples_on_hand,
+          planning_priorities: household.planning_priorities,
+          cooking_comfort: household.cooking_comfort,
+        },
+        members: mapMembersForPlanning(members),
+        slots: [normalizedSlot],
+        week_notes: schedule?.week_notes || '',
+        locked_meals: [],
+      }
+
+      let { data: generated, error: functionError } = await invokeGeneratePlan(payload, { timeoutMs: 45000 })
+      if (functionError) {
+        if (String(functionError.message || '').includes('non-2xx') || String(functionError.context || '').includes('401') || functionError.status === 401) {
+          toast.error('Your session expired. Please log in again.')
+          throw new Error('Session expired')
+        }
+        throw new Error(functionError.message || 'generate-plan failed')
+      }
+
+      const generatedPlan = withMealDefaults(generated.plan, payload.slots)
+      const newMeal = generatedPlan.meals.find((m) => m.day === normalizedSlot.day && m.meal === normalizedSlot.meal) || generatedPlan.meals[0]
+      if (!newMeal) throw new Error('No meal returned for slot')
+
+      const currentMeals = mealPlan?.draft_plan?.meals || []
+      const slotKey = `${normalizedSlot.day}-${normalizedSlot.meal}`
+      const nextMeals = [
+        ...currentMeals.filter((m) => `${m.day}-${m.meal}` !== slotKey),
+        applySourceDefaults({ ...newMeal, id: newMeal.id || crypto.randomUUID() }),
+      ]
+      const nextPlan = withMealDefaults({ ...(mealPlan?.draft_plan || { meals: [] }), meals: nextMeals })
+
+      if (mealPlan?.id) {
+        return await persistPlan(nextPlan)
+      }
+
+      const { data: savedPlan, error: saveError } = await supabase
+        .from('meal_plans')
+        .upsert({
+          user_id: user.id,
+          household_id: household.id,
+          schedule_id: effectiveScheduleId,
+          week_of: new Date().toISOString().split('T')[0],
+          status: 'draft',
+          plan: nextPlan,
+          draft_plan: nextPlan,
+          updated_at: new Date().toISOString(),
+        })
+        .select('*')
+        .single()
+
+      if (saveError) throw saveError
+
+      const normalizedSaved = {
+        ...savedPlan,
+        draft_plan: withMealDefaults(savedPlan.draft_plan || savedPlan.plan || {}),
+        plan: withMealDefaults(savedPlan.plan || savedPlan.draft_plan || {}),
+      }
+      setMealPlan(normalizedSaved)
+      return normalizedSaved
+    } catch (err) {
+      setError(err)
+      toast.error('Could not generate meal for this slot.')
+      throw err
+    } finally {
+      setGenerating(false)
+    }
+  }, [mealPlan, persistPlan, scheduleId, user])
+
   const clearPlan = useCallback(async () => {
     if (!mealPlan?.id) return
     await supabase.from('meal_plans').delete().eq('id', mealPlan.id)
@@ -341,6 +434,7 @@ export function useMealPlan(scheduleId) {
     swappingMealId,
     loadMealPlan,
     generatePlan,
+    generateSlot,
     createPlan,
     persistPlan,
     toggleMealLock,

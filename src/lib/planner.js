@@ -216,12 +216,15 @@ export function normalizeMeal(meal = {}, weekStart = getStartOfWeek()) {
   }
 }
 
-export function buildPlannerWeek({ weekStart = new Date(), meals = [], dayNotes = {} } = {}) {
-  const windowStart = new Date(weekStart)
+export function buildPlannerDays({ start = new Date(), count = 7, meals = [], dayNotes = {} } = {}) {
+  const windowStart = new Date(start)
   windowStart.setHours(0, 0, 0, 0)
-  const normalizedMeals = meals.map((meal) => normalizeMeal(meal, windowStart))
+  // Normalize meals against the Monday of the week containing windowStart so
+  // day-of-week keys ('mon', 'wed', etc.) map to the correct calendar dates.
+  const weekStart = getStartOfWeek(windowStart)
+  const normalizedMeals = meals.map((meal) => normalizeMeal(meal, weekStart))
 
-  return Array.from({ length: 7 }, (_, index) => {
+  return Array.from({ length: count }, (_, index) => {
     const date = addDays(windowStart, index)
     const dayName = normalizeDayName(date.toLocaleDateString('en-US', { weekday: 'long' }))
     const short = DAY_SHORT[dayName]
@@ -236,7 +239,6 @@ export function buildPlannerWeek({ weekStart = new Date(), meals = [], dayNotes 
       }
     })
 
-    const plannedMealSlots = mealGroups.filter((group) => group.meals.length > 0).length
     const totalCalories = mealsForDay.reduce((sum, meal) => sum + getMealCalories(meal), 0)
     const nutrition = mealsForDay.reduce(
       (acc, meal) => ({
@@ -260,11 +262,15 @@ export function buildPlannerWeek({ weekStart = new Date(), meals = [], dayNotes 
       meals: mealsForDay,
       totalCalories,
       nutrition,
-      plannedMealSlots,
+      plannedMealSlots: mealGroups.filter((group) => group.meals.length > 0).length,
       totalMealSlots: MEAL_SLOTS.length,
       isPlanned: mealsForDay.length > 0,
     }
   })
+}
+
+export function buildPlannerWeek({ weekStart = new Date(), meals = [], dayNotes = {} } = {}) {
+  return buildPlannerDays({ start: getStartOfWeek(weekStart), count: 7, meals, dayNotes })
 }
 
 export { DAY_ORDER, DAY_SHORT }
