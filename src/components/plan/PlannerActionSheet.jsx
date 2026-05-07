@@ -2,8 +2,8 @@ export function PlannerActionSheet({ title, subtitle, actions = [], isOpen, onCl
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40" onClick={onClose}>
-      <div className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 bg-black/40 p-4" onClick={onClose}>
+      <div className="absolute bottom-4 left-1/2 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-3xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-stone-200" />
         <div className="mb-4">
           <div className="text-lg font-semibold text-text-primary">{title}</div>

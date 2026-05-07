@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { addDays, buildPlannerDays, getStartOfWeek, MEAL_SLOTS, DAY_SHORT } from '../../lib/planner'
+import { addDays, buildPlannerDays, MEAL_SLOTS, DAY_SHORT } from '../../lib/planner'
 import { MealCard } from './MealCard'
 
 function ChevronLeftIcon(props) {
@@ -290,13 +290,16 @@ function formatWeekRange(days) {
   return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
 }
 
-function formatRelativeWeekLabel(weekStart) {
-  const todayStart = getStartOfWeek(new Date())
-  const diff = Math.round((getStartOfWeek(weekStart).getTime() - todayStart.getTime()) / (1000 * 60 * 60 * 24))
-  if (diff === 0) return 'This Week'
-  if (diff === 7) return 'Next Week'
-  if (diff === -7) return 'Last Week'
-  return `Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+function formatRelativeRangeLabel(rangeStart) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const start = new Date(rangeStart)
+  start.setHours(0, 0, 0, 0)
+  const diff = Math.round((start.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+  if (diff === 0) return 'Next 7 Days'
+  if (diff === 1) return 'Tomorrow Onward'
+  if (diff === -1) return 'Started Yesterday'
+  return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} onward`
 }
 
 function getViewHeader(viewMode, plannerDays, windowStart) {
@@ -308,7 +311,7 @@ function getViewHeader(viewMode, plannerDays, windowStart) {
   }
   if (viewMode === 'week') {
     return {
-      primary: formatRelativeWeekLabel(windowStart),
+      primary: formatRelativeRangeLabel(windowStart),
       secondary: formatWeekRange(plannerDays),
     }
   }
@@ -355,8 +358,8 @@ export function MealPlanWorkspace({
   const windowStart = useMemo(() => {
     const next = new Date(selectedDate)
     next.setHours(0, 0, 0, 0)
-    return viewMode === 'week' ? getStartOfWeek(next) : next
-  }, [selectedDate, viewMode])
+    return next
+  }, [selectedDate])
 
   const dayCount = viewMode === 'day' ? 1 : viewMode === '3day' ? 3 : viewMode === 'week' ? 7 : 0
   const plannerDays = useMemo(
@@ -368,16 +371,16 @@ export function MealPlanWorkspace({
   const [animateKey, setAnimateKey] = useState(0)
 
   useEffect(() => {
-    if (viewMode !== 'week') return
-    const todayString = new Date().toDateString()
     setExpandedDays((current) => {
       const next = {}
-      plannerDays.forEach((day) => {
-        next[day.key] = day.date.toDateString() === todayString
+      plannerDays.forEach((day, index) => {
+        next[day.key] = Object.prototype.hasOwnProperty.call(current, day.key)
+          ? current[day.key]
+          : index === 0
       })
-      return Object.keys(current).length > 0 ? { ...next, ...current } : next
+      return next
     })
-  }, [plannerDays, viewMode])
+  }, [plannerDays])
 
   useEffect(() => {
     setAnimateKey((current) => current + 1)
@@ -440,7 +443,7 @@ export function MealPlanWorkspace({
               meals={meals}
               onSelectDay={onSelectMonthDay || (() => {})}
             />
-          ) : viewMode === 'week' ? (
+          ) : (
             plannerDays.map((day) => (
               <DaySection
                 key={day.key}
@@ -448,22 +451,6 @@ export function MealPlanWorkspace({
                 collapsible
                 expanded={Boolean(expandedDays[day.key])}
                 onToggle={() => setExpandedDays((current) => ({ ...current, [day.key]: !current[day.key] }))}
-                onOpenMeal={onOpenMeal}
-                onOpenDayActions={onOpenDayActions}
-                onOpenMealActions={onOpenMealActions}
-                onOpenAddMeal={onOpenAddMeal}
-                onGenerateSlot={onGenerateSlot}
-                generating={generating}
-              />
-            ))
-          ) : (
-            plannerDays.map((day) => (
-              <DaySection
-                key={day.key}
-                day={day}
-                collapsible={false}
-                expanded
-                onToggle={() => {}}
                 onOpenMeal={onOpenMeal}
                 onOpenDayActions={onOpenDayActions}
                 onOpenMealActions={onOpenMealActions}
