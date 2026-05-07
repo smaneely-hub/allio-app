@@ -70,7 +70,7 @@ const desktopLinks = [
 
 const mobileLinks = [
   { to: '/dashboard', label: 'Home', icon: HomeIcon, aliases: ['/dashboard'] },
-  { to: '/tonight', label: 'Meal', icon: SparklesIcon, aliases: ['/tonight', '/cook', '/cooking'] },
+  { to: '/tonight', label: 'Generate', icon: SparklesIcon, aliases: ['/tonight', '/cook', '/cooking'] },
   { to: '/planner', label: 'Planner', icon: CalendarDaysIcon, aliases: ['/planner'] },
   { to: '/groceries', label: 'Groceries', icon: ShoppingCartIcon, aliases: ['/groceries'] },
   { to: '/settings', label: 'Settings', icon: SettingsIcon, aliases: ['/profile'] },
