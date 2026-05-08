@@ -61,7 +61,7 @@ function SettingsIcon(props) {
 
 const desktopLinks = [
   { to: '/dashboard', label: 'Home', icon: HomeIcon, aliases: ['/dashboard'] },
-  { to: '/tonight', label: 'Generate Meal', icon: SparklesIcon, aliases: ['/tonight', '/cook', '/cooking'] },
+  { to: '/tonight', label: 'Quick Meal', icon: SparklesIcon, aliases: ['/tonight', '/cook', '/cooking'] },
   { to: '/planner', label: 'Planner', icon: CalendarDaysIcon, aliases: ['/planner'] },
   { to: '/recipes', label: 'Recipes', icon: BookIcon, aliases: ['/recipes', '/search', '/find'] },
   { to: '/groceries', label: 'Groceries', icon: ShoppingCartIcon, aliases: ['/groceries'] },
@@ -70,7 +70,7 @@ const desktopLinks = [
 
 const mobileLinks = [
   { to: '/dashboard', label: 'Home', icon: HomeIcon, aliases: ['/dashboard'] },
-  { to: '/tonight', label: 'Generate', icon: SparklesIcon, aliases: ['/tonight', '/cook', '/cooking'] },
+  { to: '/tonight', label: 'Quick Meal', icon: SparklesIcon, aliases: ['/tonight', '/cook', '/cooking'] },
   { to: '/planner', label: 'Planner', icon: CalendarDaysIcon, aliases: ['/planner'] },
   { to: '/recipes', label: 'Recipes', icon: BookIcon, aliases: ['/recipes', '/search', '/find'] },
   { to: '/groceries', label: 'Groceries', icon: ShoppingCartIcon, aliases: ['/groceries'] },
