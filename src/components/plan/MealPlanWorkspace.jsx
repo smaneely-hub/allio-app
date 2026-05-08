@@ -369,8 +369,9 @@ export function MealPlanWorkspace({
     setExpandedDays((current) => {
       const next = {}
       plannerDays.forEach((day, index) => {
-        next[day.key] = Object.prototype.hasOwnProperty.call(current, day.key)
-          ? current[day.key]
+        const stateKey = `${day.key}-${day.date.toISOString().slice(0, 10)}`
+        next[stateKey] = Object.prototype.hasOwnProperty.call(current, stateKey)
+          ? current[stateKey]
           : index === 0
       })
       return next
@@ -441,11 +442,14 @@ export function MealPlanWorkspace({
           ) : (
             plannerDays.map((day) => (
               <DaySection
-                key={day.key}
+                key={`${day.key}-${day.date.toISOString().slice(0, 10)}`}
                 day={day}
                 collapsible
-                expanded={Boolean(expandedDays[day.key])}
-                onToggle={() => setExpandedDays((current) => ({ ...current, [day.key]: !current[day.key] }))}
+                expanded={Boolean(expandedDays[`${day.key}-${day.date.toISOString().slice(0, 10)}`])}
+                onToggle={() => {
+                  const stateKey = `${day.key}-${day.date.toISOString().slice(0, 10)}`
+                  setExpandedDays((current) => ({ ...current, [stateKey]: !current[stateKey] }))
+                }}
                 onOpenMeal={onOpenMeal}
                 onOpenDayActions={onOpenDayActions}
                 onOpenMealActions={onOpenMealActions}

@@ -5,6 +5,7 @@ import { aggregateShoppingList } from '../lib/aggregateShoppingList'
 import { normalizeMealPlan } from '../lib/mealSchema'
 import { invokePlannerFunction } from '../lib/plannerFunction'
 import { upsertShoppingListForDate } from '../lib/tonightPersistence'
+import { calculateServings } from './useServings'
 import { useAuth } from './useAuth'
 
 async function invokeGeneratePlan(payload, { timeoutMs = 45000 } = {}) {
@@ -49,6 +50,76 @@ function mapMembersForPlanning(members = []) {
     allergies: member.allergies || [],
     health_considerations: member.health_considerations || [],
   }))
+}
+
+async function loadPlannerPreferenceSignals(userId) {
+  if (!userId) {
+    return { likedMeals: [], dislikedMeals: [], favoriteMeals: [], refinementNotes: [], strongAvoidSignals: [] }
+  }
+
+  let signalsResult = { data: [], error: null }
+  try {
+    const result = await supabase
+      .from('meal_signals')
+      .select('meal_name, signal_type, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(30)
+    if (result.error && (result.error.code === 'PGRST205' || String(result.error.message || '').includes('meal_signals'))) {
+      signalsResult = { data: [], error: null }
+    } else {
+      signalsResult = result
+    }
+  } catch {
+    // non-fatal
+  }
+
+  const [favoritesResult, feedbackResult] = await Promise.all([
+    supabase.from('saved_meals').select('recipe_name, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(10),
+    supabase.from('meal_member_feedback').select('rating, note, created_at, meal_instances(recipe_name, user_id)').order('created_at', { ascending: false }).limit(30),
+  ])
+
+  const signals = (signalsResult.data || []).filter(Boolean)
+  const favoriteMeals = (favoritesResult.data || []).map((e) => e.recipe_name).filter(Boolean)
+  const feedbackRows = (feedbackResult.data || []).filter((e) => e?.meal_instances?.user_id === userId)
+
+  const likedMeals = [
+    ...signals.filter((e) => ['rated_positive', 'refined_to'].includes(e.signal_type)).map((e) => e.meal_name),
+    ...feedbackRows.filter((e) => ['loved_it', 'liked_it'].includes(e.rating)).map((e) => e.meal_instances?.recipe_name),
+  ].filter(Boolean)
+
+  const dislikedMeals = [
+    ...signals.filter((e) => ['rated_negative', 'swapped_away', 'refined_from'].includes(e.signal_type)).map((e) => e.meal_name),
+    ...feedbackRows.filter((e) => ['did_not_like', 'did_not_eat'].includes(e.rating)).map((e) => e.meal_instances?.recipe_name),
+  ].filter(Boolean)
+
+  const refinementNotes = feedbackRows.map((e) => e.note).filter((note) => typeof note === 'string' && note.trim()).slice(0, 8)
+  const strongAvoidSignals = Array.from(new Set(dislikedMeals)).slice(0, 6)
+
+  return {
+    likedMeals: Array.from(new Set(likedMeals)).slice(0, 8),
+    dislikedMeals: Array.from(new Set(dislikedMeals)).slice(0, 8),
+    favoriteMeals: Array.from(new Set(favoriteMeals)).slice(0, 8),
+    refinementNotes,
+    strongAvoidSignals,
+  }
+}
+
+async function loadRecentPlanMealNames(userId) {
+  if (!userId) return []
+  try {
+    const { data } = await supabase
+      .from('meal_plans')
+      .select('plan')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .order('updated_at', { ascending: false })
+      .limit(10)
+    if (!data) return []
+    return data.flatMap((p) => p.plan?.meals?.map((m) => m.name) || []).filter(Boolean).slice(0, 10)
+  } catch {
+    return []
+  }
 }
 
 export function useMealPlan(scheduleId) {
@@ -226,6 +297,17 @@ export function useMealPlan(scheduleId) {
       const { data: slots } = await supabase.from('schedule_slots').select('*').eq('user_id', user.id).eq('schedule_id', scheduleId)
       const { data: schedule } = await supabase.from('weekly_schedules').select('week_notes').eq('id', scheduleId).maybeSingle()
 
+      const [preferenceSignals, recentMealNamesFromDB] = await Promise.all([
+        loadPlannerPreferenceSignals(user.id),
+        loadRecentPlanMealNames(user.id),
+      ])
+
+      const preferenceHints = [
+        ...preferenceSignals.favoriteMeals.map((name) => `favorite: ${name}`),
+        ...preferenceSignals.likedMeals.map((name) => `liked: ${name}`),
+        ...preferenceSignals.refinementNotes.map((note) => `feedback note: ${note}`),
+      ].slice(0, 10)
+
       const payload = {
         household: {
           total_people: household.total_people,
@@ -246,9 +328,15 @@ export function useMealPlan(scheduleId) {
           is_leftover: slot?.is_leftover,
           leftover_source: slot?.leftover_source,
         })).filter((slot) => slot.day && slot.meal),
-        week_notes: schedule?.week_notes || '',
+        week_notes: [schedule?.week_notes, ...preferenceHints].filter(Boolean).join('; '),
         existing_plan: mealPlan.draft_plan,
-        recent_meal_names: recentSwappedMealNames,
+        recent_meal_names: [...new Set([...recentMealNamesFromDB, ...recentSwappedMealNames, ...preferenceSignals.strongAvoidSignals])],
+        preference_signals: {
+          favorites: preferenceSignals.favoriteMeals,
+          liked_meals: preferenceSignals.likedMeals,
+          disliked_meals: preferenceSignals.dislikedMeals,
+          refinement_notes: preferenceSignals.refinementNotes,
+        },
         replace_slot: { day: mealToReplace.day, meal: mealToReplace.meal, suggestion, reason: suggestion ? `user wants: ${suggestion}` : 'user requested swap', current_meal_name: mealToReplace.name || '' },
       }
 
@@ -271,7 +359,19 @@ export function useMealPlan(scheduleId) {
       if (mealToReplace.name) {
         setRecentSwappedMealNames((prev) => [...prev.slice(-9), mealToReplace.name])
       }
-      return persistPlan(nextPlan)
+      const persisted = await persistPlan(nextPlan)
+      try {
+        await supabase.from('meal_signals').insert({
+          user_id: user.id,
+          meal_name: mealToReplace.name,
+          recipe_id: mealToReplace.recipe_id || null,
+          signal_type: 'swapped_away',
+          created_at: new Date().toISOString(),
+        })
+      } catch {
+        // non-fatal
+      }
+      return persisted
     } catch (err) {
       if (optimisticPlan) {
         setMealPlan((current) => current ? { ...current, draft_plan: { ...mealPlan.draft_plan, meals: mealPlan.draft_plan.meals.map((meal) => ({ ...meal, swap_pending: false })) }, plan: { ...mealPlan.draft_plan, meals: mealPlan.draft_plan.meals.map((meal) => ({ ...meal, swap_pending: false })) } } : current)
@@ -302,10 +402,42 @@ export function useMealPlan(scheduleId) {
         leftover_source: slot.leftover_source || '',
       }
 
+      // Load preference signals and recent meal history in parallel
+      const [preferenceSignals, recentMealNames] = await Promise.all([
+        loadPlannerPreferenceSignals(user.id),
+        loadRecentPlanMealNames(user.id),
+      ])
+
+      // Demographic-based servings from attendee members
+      const attendeeMembers = normalizedSlot.attendees.length > 0
+        ? members.filter((m) => normalizedSlot.attendees.includes(m.id))
+        : members
+      const calculatedServings = calculateServings(attendeeMembers) || household.total_people || 1
+
+      // Aggregate dietary restrictions from attendees for effective diet focus
+      const aggregatedRestrictions = [...new Set(attendeeMembers.flatMap((m) => [
+        ...(m.dietary_restrictions || []),
+        ...(m.allergies || []),
+      ]))]
+      const effectiveDietFocus = slot.dietary_focus || household.diet_focus || (aggregatedRestrictions.length > 0 ? aggregatedRestrictions[0] : '')
+
+      // Weave dietary focus into planning notes so the model sees it at slot level too
+      const effectivePlanningNotes = [
+        normalizedSlot.planning_notes,
+        effectiveDietFocus ? `diet: ${effectiveDietFocus}` : '',
+      ].filter(Boolean).join('; ')
+
+      const preferenceHints = [
+        ...preferenceSignals.favoriteMeals.map((name) => `favorite: ${name}`),
+        ...preferenceSignals.likedMeals.map((name) => `liked: ${name}`),
+        ...preferenceSignals.refinementNotes.map((note) => `feedback note: ${note}`),
+      ].slice(0, 10)
+
       const payload = {
         household: {
-          total_people: household.total_people,
-          diet_focus: household.diet_focus,
+          total_people: calculatedServings,
+          servings: calculatedServings,
+          diet_focus: effectiveDietFocus,
           budget_sensitivity: household.budget_sensitivity,
           adventurousness: household.adventurousness,
           staples_on_hand: household.staples_on_hand,
@@ -313,9 +445,16 @@ export function useMealPlan(scheduleId) {
           cooking_comfort: household.cooking_comfort,
         },
         members: mapMembersForPlanning(members),
-        slots: [normalizedSlot],
-        week_notes: schedule?.week_notes || '',
+        slots: [{ ...normalizedSlot, planning_notes: effectivePlanningNotes }],
+        week_notes: [schedule?.week_notes, ...preferenceHints].filter(Boolean).join('; '),
         locked_meals: [],
+        recent_meal_names: [...new Set([...recentMealNames, ...preferenceSignals.strongAvoidSignals])],
+        preference_signals: {
+          favorites: preferenceSignals.favoriteMeals,
+          liked_meals: preferenceSignals.likedMeals,
+          disliked_meals: preferenceSignals.dislikedMeals,
+          refinement_notes: preferenceSignals.refinementNotes,
+        },
       }
 
       let { data: generated, error: functionError } = await invokeGeneratePlan(payload, { timeoutMs: 45000 })

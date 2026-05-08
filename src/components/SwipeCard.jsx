@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { normalizeRecipe } from '../lib/recipeSchema'
-import { formatIngredientAmount } from '../utils/formatFractions'
-import { InstructionText } from './TimerChip'
+import { MealDetailBody } from './MealDetailBody'
 
 function formatNutrition(nutrition) {
   if (!nutrition) return []
@@ -225,64 +224,7 @@ export function SwipeCard({ meal, image, onAccept, onReject }) {
             ) : null}
           </div>
 
-          {recipe.ingredientGroups?.length > 0 ? (
-            <section className="space-y-4">
-              <h3 className="font-display text-2xl text-text-primary">Ingredients</h3>
-              <div className="space-y-5">
-                {recipe.ingredientGroups.map((group, groupIndex) => (
-                  <div key={`${group.label || 'ingredients'}-${groupIndex}`}>
-                    {group.label ? <div className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-text-muted">{group.label}</div> : null}
-                    <ul className="space-y-3">
-                      {group.ingredients.map((ingredient, index) => (
-                        <li key={`${groupIndex}-${index}-${ingredient.item}`} className="rounded-2xl bg-warm-50 px-4 py-3 text-sm leading-6 text-text-primary">
-                          <strong>{[formatIngredientAmount(ingredient.amount), ingredient.unit].filter(Boolean).join(' ')}</strong>
-                          {(ingredient.amount || ingredient.unit) ? ' ' : ''}
-                          {ingredient.item}
-                          {ingredient.note ? <span className="text-text-secondary"> ({ingredient.note})</span> : null}
-                          {ingredient.optional ? <span className="text-text-muted"> (optional)</span> : null}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          {recipe.instructionGroups?.length > 0 ? (
-            <section className="space-y-4">
-              <h3 className="font-display text-2xl text-text-primary">Instructions</h3>
-              <div className="space-y-6">
-                {(() => {
-                  let stepCounter = 0
-                  return recipe.instructionGroups.map((group, groupIndex) => (
-                    <div key={`${group.label || 'instructions'}-${groupIndex}`}>
-                      {group.label ? <div className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-text-muted">{group.label}</div> : null}
-                      <ol className="space-y-4">
-                        {group.steps.map((step, index) => {
-                          stepCounter += 1
-                          return (
-                            <li key={`${groupIndex}-${index}-${step.text}`} className="flex gap-4 rounded-2xl bg-white">
-                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-warm-100 text-sm font-semibold text-text-primary">{stepCounter}</div>
-                              <div className="min-w-0 flex-1 pb-1">
-                                <p className="break-words text-[15px] leading-7 text-text-primary [overflow-wrap:anywhere]"><InstructionText text={step.text} contextKey={`swipe-${meal.id || meal.name}-${groupIndex}-${index}`} /></p>
-                                {step.tip ? (
-                                  <div className="mt-2 rounded-2xl bg-[#f4efe6] px-4 py-3 text-sm leading-6 text-text-secondary">
-                                    <div className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Tip</div>
-                                    {step.tip}
-                                  </div>
-                                ) : null}
-                              </div>
-                            </li>
-                          )
-                        })}
-                      </ol>
-                    </div>
-                  ))
-                })()}
-              </div>
-            </section>
-          ) : null}
+          <MealDetailBody meal={meal} contextKeyPrefix={`swipe-${meal.id || meal.name}`} />
         </div>
       </div>
 

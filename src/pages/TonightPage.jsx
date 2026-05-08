@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import { SwipeDeck } from '../components/SwipeDeck'
 import toast from 'react-hot-toast'
@@ -9,9 +10,10 @@ import { normalizeMealRecord } from '../lib/mealSchema'
 import { getLocalDateString } from '../lib/date'
 import { invokePlannerFunction, refineMeal } from '../lib/plannerFunction'
 import { buildShoppingItemsFromMeal, upsertShoppingListForDate } from '../lib/tonightPersistence'
-import { addItemsToShoppingList, ensureDefaultShoppingList, getShoppingListItems } from '../lib/shoppingLists'
+import { addItemsToShoppingList, ensureDefaultShoppingList } from '../lib/shoppingLists'
 import { calculateServings, logServingsCalculation, getDemographicBucket } from '../hooks/useServings'
-import { CATEGORY_LABELS, CATEGORY_ORDER, groupItemsByCategory, parseIngredient } from '../lib/shoppingListUtils'
+import { CookingMode } from '../components/CookingMode'
+import { MealDetailBody } from '../components/MealDetailBody'
 
 const FALLBACK_TIME_LIMITS = {
   low: 30,
@@ -427,12 +429,8 @@ export function TonightPage() {
     strongAvoidSignals: [],
   })
   const [cookingMode, setCookingMode] = useState(false)
-  const [currentStepIndex, setCurrentStepIndex] = useState(0)
-  const [ingredientChecks, setIngredientChecks] = useState({})
-  const [shoppingListItems, setShoppingListItems] = useState([])
 
   const activeMeal = mealQueue[0] || meal
-  const renderInstructions = activeMeal?.instructions || activeMeal?.steps || activeMeal?.directions || activeMeal?.method || []
 
   async function mergeMealIntoShoppingList(targetMeal, successMessage = 'Added to shopping list ✓') {
     if (!user?.id || !targetMeal) return null
@@ -447,7 +445,6 @@ export function TonightPage() {
       source: 'tonight',
     })
 
-    setShoppingListItems(mergedItems)
     toast.success(successMessage)
     return mergedItems
   }
@@ -471,47 +468,6 @@ export function TonightPage() {
     return reasons.slice(0, 4)
   }, [activeMeal, selectedMembers.length, staplesOnHand])
 
-  const shoppingPrepItems = useMemo(() => {
-    const parsed = (shoppingListItems.length > 0 ? shoppingListItems : (activeMeal?.ingredients || []))
-      .map((ingredient, index) => {
-        if (ingredient?.id && ingredient?.name) {
-          return {
-            id: ingredient.id,
-            name: ingredient.name,
-            quantity: ingredient.quantity,
-            unit: ingredient.unit || '',
-            category: ingredient.category,
-          }
-        }
-
-        const parsedIngredient = parseIngredient(ingredient)
-        return parsedIngredient ? {
-          id: `${parsedIngredient.normalizedName}-${parsedIngredient.unit}-${index}`,
-          name: parsedIngredient.name,
-          quantity: parsedIngredient.quantity,
-          unit: parsedIngredient.unit,
-          category: parsedIngredient.category,
-        } : null
-      })
-      .filter(Boolean)
-
-    return groupItemsByCategory(parsed)
-  }, [activeMeal, shoppingListItems])
-
-  const cookingProgress = useMemo(() => {
-    const totalSteps = Math.max((meal?.instructions || []).length, 1)
-    const checkedIngredients = Object.values(ingredientChecks).filter(Boolean).length
-    const prepTotal = Object.values(shoppingPrepItems).flat().length
-    const currentStepNumber = Math.min(currentStepIndex + 1, totalSteps)
-
-    return {
-      totalSteps,
-      currentStepNumber,
-      percent: Math.round((currentStepNumber / totalSteps) * 100),
-      checkedIngredients,
-      prepTotal,
-    }
-  }, [meal, ingredientChecks, shoppingPrepItems, currentStepIndex])
 
   // Load last saved meal on mount and build recent history
   useEffect(() => {
@@ -519,11 +475,6 @@ export function TonightPage() {
     initialDataLoadedRef.current = true
 
     const today = getLocalDateString()
-
-    ensureDefaultShoppingList(user.id)
-      .then((list) => getShoppingListItems(list?.id))
-      .then((rows) => setShoppingListItems(rows || []))
-      .catch((error) => console.error('[TonightPage] load shopping list items error:', error))
 
     // Load today's meal
     supabase
@@ -641,8 +592,6 @@ export function TonightPage() {
 
   useEffect(() => {
     setCookingMode(false)
-    setCurrentStepIndex(0)
-    setIngredientChecks({})
   }, [meal?.name])
 
   const refreshPreferenceSignals = async () => {
@@ -1628,14 +1577,10 @@ export function TonightPage() {
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => setCookingMode((prev) => !prev)}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                cookingMode
-                  ? 'bg-primary-500 text-white'
-                  : 'border border-divider bg-white text-text-primary'
-              }`}
+              onClick={() => setCookingMode(true)}
+              className="rounded-full border border-divider bg-white px-4 py-2 text-sm font-semibold text-text-primary transition hover:bg-warm-50"
             >
-              {cookingMode ? 'Exit cooking mode' : 'Start cooking mode'}
+              Start cooking mode
             </button>
             <Link
               to="/groceries"
@@ -1645,185 +1590,18 @@ export function TonightPage() {
             </Link>
           </div>
 
-          {cookingMode ? (
-            <div className="mb-4 rounded-2xl border border-primary-200 bg-primary-50 p-4">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-primary-700">Cooking mode</p>
-                  <h3 className="text-base font-semibold text-text-primary">
-                    Step {cookingProgress.currentStepNumber} of {cookingProgress.totalSteps}
-                  </h3>
-                </div>
-                <div className="text-sm text-primary-700">
-                  {cookingProgress.checkedIngredients} checked
-                </div>
-              </div>
+          {cookingMode ? createPortal(
+            <div className="fixed inset-0 z-[200] overflow-y-auto bg-white px-4 pb-24 pt-0">
+              <CookingMode meal={activeMeal} onExit={() => setCookingMode(false)} />
+            </div>,
+            document.body
+          ) : null}
 
-              <div className="mb-4">
-                <div className="mb-2 flex items-center justify-between text-xs font-medium uppercase tracking-wide text-primary-700">
-                  <span>Cooking progress</span>
-                  <span>{cookingProgress.percent}%</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-white/80">
-                  <div className="h-full rounded-full bg-primary-500 transition-all duration-300" style={{ width: `${cookingProgress.percent}%` }} />
-                </div>
-              </div>
-
-              <div className="mb-4 grid gap-3 md:grid-cols-3">
-                <div className="rounded-xl bg-white p-3 shadow-sm">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">Prep time</div>
-                  <div className="mt-1 text-sm font-semibold text-text-primary">{activeMeal.prep_time_minutes || 0} min</div>
-                </div>
-                <div className="rounded-xl bg-white p-3 shadow-sm">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">Cook time</div>
-                  <div className="mt-1 text-sm font-semibold text-text-primary">{activeMeal.cook_time_minutes || 0} min</div>
-                </div>
-                <div className="rounded-xl bg-white p-3 shadow-sm">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">Prep checklist</div>
-                  <div className="mt-1 text-sm font-semibold text-text-primary">{cookingProgress.checkedIngredients}/{cookingProgress.prepTotal || 0}</div>
-                </div>
-              </div>
-
-              <div className="mb-4 rounded-xl bg-white p-4 shadow-sm">
-                {Array.isArray(renderInstructions) && renderInstructions.length > 0 ? (
-                  <>
-                    <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">Current step</div>
-                    <p className="mt-2 text-lg font-medium leading-7 text-text-primary">{renderInstructions[currentStepIndex] || renderInstructions[0]}</p>
-                  </>
-                ) : (
-                  <p className="text-sm text-text-secondary">No instructions returned</p>
-                )}
-              </div>
-
-              {CATEGORY_ORDER.filter((category) => shoppingPrepItems[category]?.length).length > 0 && (
-                <div className="mb-4 space-y-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-text-muted">Prep checklist</div>
-                  {CATEGORY_ORDER.filter((category) => shoppingPrepItems[category]?.length).map((category) => (
-                    <div key={category} className="rounded-xl bg-white p-3 shadow-sm">
-                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">{CATEGORY_LABELS[category] || 'Other'}</div>
-                      <div className="space-y-2">
-                        {shoppingPrepItems[category].map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => setIngredientChecks((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
-                            className="flex w-full items-center gap-3 text-left"
-                          >
-                            <div className={`flex h-5 w-5 items-center justify-center rounded border ${ingredientChecks[item.id] ? 'border-green-500 bg-green-500 text-white' : 'border-divider bg-white text-transparent'}`}>
-                              ✓
-                            </div>
-                            <div className="flex-1 text-sm text-text-primary">
-                              {item.name}
-                            </div>
-                            <div className="text-xs text-text-muted">
-                              {item.quantity} {item.unit}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setCurrentStepIndex((prev) => Math.max(prev - 1, 0))}
-                  disabled={currentStepIndex === 0}
-                  className="flex-1 rounded-full border border-divider bg-white px-4 py-2 text-sm font-semibold text-text-primary disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCurrentStepIndex((prev) => Math.min(prev + 1, Math.max((renderInstructions || []).length - 1, 0)))}
-                  disabled={currentStepIndex >= Math.max((renderInstructions || []).length - 1, 0)}
-                  className="flex-1 rounded-full bg-primary-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                >
-                  Next step
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="mb-4">
-                <h3 className="mb-2 text-sm font-semibold text-text-primary">Ingredients</h3>
-                <ul className="space-y-1 text-sm text-text-secondary">
-                  {(activeMeal.ingredients || []).length > 0 ? (
-                    activeMeal.ingredients.map((ing, i) => {
-                      const label = typeof ing === 'string'
-                        ? ing
-                        : [ing?.amount ?? ing?.quantity ?? '', ing?.unit ?? '', ing?.item ?? ing?.name ?? ing?.ingredient ?? ''].filter(Boolean).join(' ').trim()
-                      return <li key={i}>{label || 'Ingredient'}</li>
-                    })
-                  ) : (
-                    <li>No ingredients listed</li>
-                  )}
-                </ul>
-              </div>
-
-              <div className="mb-4">
-                <h3 className="mb-2 text-sm font-semibold text-text-primary">Instructions</h3>
-                <ol className="space-y-3 text-sm leading-7 text-text-secondary">
-                  {Array.isArray(renderInstructions) && renderInstructions.length > 0 ? (
-                    renderInstructions.map((step, i) => (
-                      <li key={i} className="flex gap-3">
-                        <span className="min-w-5 font-semibold text-text-primary">{i + 1}.</span>
-                        <span>{typeof step === 'string' ? step : ''}</span>
-                      </li>
-                    ))
-                  ) : (
-                    <li className="text-text-muted">No instructions returned</li>
-                  )}
-                </ol>
-              </div>
-            </>
-          )}
-
-          {Array.isArray(activeMeal.visual_cues) && activeMeal.visual_cues.length > 0 && (
-            <div className="mb-4 rounded-xl bg-yellow-50 p-3">
-              <h4 className="mb-1 text-xs font-semibold text-yellow-800">👀 Look for</h4>
-              <ul className="space-y-1 text-sm text-yellow-700">
-                {activeMeal.visual_cues.map((cue, i) => (
-                  <li key={i}>• {cue}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {Array.isArray(activeMeal.tips) && activeMeal.tips.length > 0 && (
-            <div className="mb-4 rounded-xl bg-blue-50 p-3">
-              <h4 className="mb-1 text-xs font-semibold text-blue-800">💡 Tips</h4>
-              <ul className="space-y-1 text-sm text-blue-700">
-                {activeMeal.tips.map((tip, i) => (
-                  <li key={i}>• {tip}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {Array.isArray(activeMeal.common_mistakes) && activeMeal.common_mistakes.length > 0 && (
-            <div className="mb-4 rounded-xl bg-red-50 p-3">
-              <h4 className="mb-1 text-xs font-semibold text-red-800">⚠️ Avoid</h4>
-              <ul className="space-y-1 text-sm text-red-700">
-                {activeMeal.common_mistakes.map((mistake, i) => (
-                  <li key={i}>• {mistake}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {Array.isArray(activeMeal.easy_swaps) && activeMeal.easy_swaps.length > 0 && (
-            <div className="mb-4 rounded-xl bg-green-50 p-3">
-              <h4 className="mb-1 text-xs font-semibold text-green-800">🔄 Easy swaps</h4>
-              <ul className="space-y-1 text-sm text-green-700">
-                {activeMeal.easy_swaps.map((swap, i) => (
-                  <li key={i}>• {swap}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <MealDetailBody
+            meal={activeMeal}
+            contextKeyPrefix={`tonight-${activeMeal?.id || activeMeal?.name}`}
+            onStartCooking={() => setCookingMode(true)}
+          />
 
           {/* Phase 4: Show refinement changes */}
           {refinementChanges.length > 0 && (

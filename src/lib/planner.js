@@ -219,10 +219,24 @@ export function normalizeMeal(meal = {}, weekStart = getStartOfWeek()) {
 export function buildPlannerDays({ start = new Date(), count = 7, meals = [], dayNotes = {} } = {}) {
   const windowStart = new Date(start)
   windowStart.setHours(0, 0, 0, 0)
-  // Normalize meals against the Monday of the week containing windowStart so
-  // day-of-week keys ('mon', 'wed', etc.) map to the correct calendar dates.
-  const weekStart = getStartOfWeek(windowStart)
-  const normalizedMeals = meals.map((meal) => normalizeMeal(meal, weekStart))
+
+  // Planner is today-first. Anchor the visible window to the requested start
+  // date so Day / 3 Days / Week all roll forward from that exact day.
+  const normalizedMeals = meals.map((meal, index) => {
+    const mealDay = normalizeDayName(meal.day)
+    const mealDate = meal.date ? new Date(meal.date) : null
+
+    if (mealDate && !Number.isNaN(mealDate.getTime())) {
+      mealDate.setHours(0, 0, 0, 0)
+      const visibleDayName = normalizeDayName(mealDate.toLocaleDateString('en-US', { weekday: 'long' }))
+      return normalizeMeal({ ...meal, day: DAY_SHORT[visibleDayName] }, windowStart)
+    }
+
+    const fallbackIndex = DAY_ORDER.indexOf(mealDay)
+    const fallbackDate = addDays(windowStart, Math.max(fallbackIndex, 0))
+    const visibleDayName = normalizeDayName(fallbackDate.toLocaleDateString('en-US', { weekday: 'long' }))
+    return normalizeMeal({ ...meal, day: DAY_SHORT[visibleDayName] }, windowStart)
+  })
 
   return Array.from({ length: count }, (_, index) => {
     const date = addDays(windowStart, index)

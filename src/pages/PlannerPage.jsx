@@ -8,13 +8,16 @@ import { useSubscription } from '../hooks/useSubscription'
 import { ScheduleSkeleton, EmptyState } from '../components/LoadingStates'
 import { MealPlanWorkspace } from '../components/plan/MealPlanWorkspace'
 import { PlannerActionSheet } from '../components/plan/PlannerActionSheet'
+import { PlannerMealReviewSheet } from '../components/plan/PlannerMealReviewSheet'
 import { DayActionsMenu } from '../components/planner/DayActionsMenu'
 import { AddMealModal } from '../components/planner/AddMealModal'
 import { HouseholdMembersModal } from '../components/planner/HouseholdMembersModal'
 import { aggregateShoppingList } from '../lib/aggregateShoppingList'
 import { addDays, DAY_ORDER } from '../lib/planner'
 import { normalizeMealRecord } from '../lib/mealSchema'
+import { normalizeRecipe } from '../lib/recipeSchema'
 import { upsertShoppingListForDate } from '../lib/tonightPersistence'
+import { refineMeal } from '../lib/plannerFunction'
 import { groupByCategory } from '../utils/groceryCategories'
 import { supabase } from '../lib/supabase'
 
@@ -108,6 +111,12 @@ export function PlannerPage() {
   const [addMealTarget, setAddMealTarget] = useState(null)
   const [showMembersModal, setShowMembersModal] = useState(false)
   const [savingMembers, setSavingMembers] = useState(false)
+  const [refineTarget, setRefineTarget] = useState(null)
+  const [refineText, setRefineText] = useState('')
+  const [refining, setRefining] = useState(false)
+  const [reviewMeal, setReviewMeal] = useState(null)
+  const [reviewSlotKey, setReviewSlotKey] = useState(null)
+  const [reviewLoading, setReviewLoading] = useState(false)
 
   useEffect(() => {
     localStorage.setItem(PLANNER_VIEW_MODE_KEY, viewMode)
@@ -266,6 +275,7 @@ export function PlannerPage() {
         : (existingSlot?.planning_notes || ''),
       is_leftover: existingSlot?.is_leftover || false,
       leftover_source: existingSlot?.leftover_source || '',
+      dietary_focus: overrides.dietaryFocus || '',
     }
 
     setSaving(true)
@@ -283,8 +293,17 @@ export function PlannerPage() {
         await loadSchedule()
       }
 
-      await generateSlot({ household, members, slot, schedule: activeSchedule })
+      const result = await generateSlot({ household, members, slot, schedule: activeSchedule })
       toast.success('Meal generated.')
+
+      // Surface the new meal in the review sheet so user can accept or try another
+      const resultMeals = result?.draft_plan?.meals || result?.plan?.meals || []
+      const slotKey = `${dayKey}-${mealType}`
+      const newMeal = resultMeals.find((m) => `${m.day}-${m.meal}` === slotKey) || resultMeals[0]
+      if (newMeal) {
+        setReviewMeal(normalizeMealRecord(newMeal))
+        setReviewSlotKey(slotKey)
+      }
     } catch (err) {
       if (err?.message !== 'Session expired') {
         toast.error(err?.message || 'Could not generate meal for this slot.')
@@ -306,9 +325,9 @@ export function PlannerPage() {
       if (!members.length) return toast.error('Add household members first.')
       setSaving(true)
       try {
-        await swapMeal(meal, '')
-        const refreshedMeals = (mealPlan?.draft_plan?.meals || mealPlan?.plan?.meals || []).map((entry) => normalizeMealRecord(entry))
-        const items = aggregateShoppingList({ meals: refreshedMeals }, household?.staples_on_hand || '')
+        const result = await swapMeal(meal, '')
+        const resultMeals = result?.draft_plan?.meals || result?.plan?.meals || []
+        const items = aggregateShoppingList({ meals: resultMeals.map((m) => normalizeMealRecord(m)) }, household?.staples_on_hand || '')
         setShoppingItems(items)
         if (household?.id) {
           await upsertShoppingListForDate({
@@ -317,6 +336,13 @@ export function PlannerPage() {
             weekOf: new Date().toISOString().split('T')[0],
             items,
           })
+        }
+        // Show review sheet for the regenerated meal
+        const slotKey = `${meal.day}-${meal.meal}`
+        const newMeal = resultMeals.find((m) => `${m.day}-${m.meal}` === slotKey) || resultMeals[0]
+        if (newMeal) {
+          setReviewMeal(normalizeMealRecord(newMeal))
+          setReviewSlotKey(slotKey)
         }
         toast.success('Meal regenerated.')
       } catch {
@@ -354,6 +380,87 @@ export function PlannerPage() {
     }
   }
 
+  const handleRefine = async () => {
+    if (!refineTarget || !refineText.trim()) return
+    setRefining(true)
+    try {
+      const { data, error } = await refineMeal(refineTarget, refineText.trim())
+      if (error) throw new Error(error.message || 'Refine failed')
+      if (!data?.refined) throw new Error('No refinement returned')
+
+      const refined = normalizeMealRecord(data.refined)
+      const currentMeals = mealPlan?.draft_plan?.meals || []
+      const nextMeals = currentMeals.map((m) =>
+        m.id === refineTarget.id ? { ...refined, id: m.id, day: m.day, meal: m.meal } : m
+      )
+      const nextPlan = { ...(mealPlan.draft_plan || {}), meals: nextMeals }
+      await persistPlan(nextPlan)
+
+      const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '')
+      setShoppingItems(items)
+      if (household?.id) {
+        await upsertShoppingListForDate({
+          userId: household.user_id,
+          householdId: household.id,
+          weekOf: new Date().toISOString().split('T')[0],
+          items,
+        })
+      }
+
+      try {
+        await supabase.from('meal_signals').insert([
+          { user_id: household.user_id, meal_name: refineTarget.name, recipe_id: refineTarget.recipe_id || null, signal_type: 'refined_from', created_at: new Date().toISOString() },
+          { user_id: household.user_id, meal_name: refined.name, recipe_id: refined.recipe_id || null, signal_type: 'refined_to', created_at: new Date().toISOString() },
+        ])
+      } catch {
+        // non-fatal
+      }
+
+      setRefineTarget(null)
+      setRefineText('')
+      toast.success('Meal refined.')
+    } catch (err) {
+      toast.error(err.message || 'Could not refine meal.')
+    } finally {
+      setRefining(false)
+    }
+  }
+
+  const handleReviewAccept = () => {
+    setReviewMeal(null)
+    setReviewSlotKey(null)
+    setReviewLoading(false)
+  }
+
+  const handleReviewTryAnother = async () => {
+    if (!reviewMeal || !reviewSlotKey) return
+    setReviewLoading(true)
+    try {
+      const result = await swapMeal(reviewMeal, '')
+      const resultMeals = result?.draft_plan?.meals || result?.plan?.meals || []
+
+      const newMeal = resultMeals.find((m) => `${m.day}-${m.meal}` === reviewSlotKey) || resultMeals[0]
+      if (newMeal) {
+        setReviewMeal(normalizeMealRecord(newMeal))
+      }
+
+      const items = aggregateShoppingList({ meals: resultMeals.map((m) => normalizeMealRecord(m)) }, household?.staples_on_hand || '')
+      setShoppingItems(items)
+      if (household?.id) {
+        await upsertShoppingListForDate({
+          userId: household.user_id,
+          householdId: household.id,
+          weekOf: new Date().toISOString().split('T')[0],
+          items,
+        })
+      }
+    } catch {
+      // swapMeal shows its own error toast
+    } finally {
+      setReviewLoading(false)
+    }
+  }
+
   const handleSaveMembers = async (nextMembers) => {
     setSavingMembers(true)
     try {
@@ -387,7 +494,10 @@ export function PlannerPage() {
             meals={planMeals}
             selectedDate={selectedDate}
             viewMode={viewMode}
-            onChangeViewMode={setViewMode}
+            onChangeViewMode={(newMode) => {
+              if (newMode === 'week') setSelectedDate(new Date())
+              setViewMode(newMode)
+            }}
             onPrev={handlePrevRange}
             onNext={handleNextRange}
             onOpenDayActions={setDayActionTarget}
@@ -411,6 +521,7 @@ export function PlannerPage() {
           subtitle="Meal-level tools"
           actions={mealActionTarget ? [
             { label: 'Regenerate this meal', onClick: () => handleMealAction('regenerate', mealActionTarget.meal) },
+            { label: 'Refine…', onClick: () => { setMealActionTarget(null); setRefineTarget(mealActionTarget.meal); setRefineText('') } },
             { label: 'Replace…', onClick: () => handleMealAction('replace', mealActionTarget.meal) },
             { label: 'Remove', onClick: () => handleMealAction('remove', mealActionTarget.meal), danger: true },
           ] : []}
@@ -428,11 +539,11 @@ export function PlannerPage() {
           defaultEffort={addMealTarget ? (slotState[`${addMealTarget.day?.key}-${addMealTarget.mealSlot}`]?.effort_level || 'medium') : 'medium'}
           defaultAttendees={addMealTarget ? (slotState[`${addMealTarget.day?.key}-${addMealTarget.mealSlot}`]?.attendees || []) : []}
           startOnGenerate={addMealTarget?.startOnGenerate || false}
-          onGenerate={async ({ effort, attendees, planningNotes }) => {
+          onGenerate={async ({ effort, attendees, planningNotes, dietaryFocus }) => {
             const target = addMealTarget
             setAddMealTarget(null)
             if (target?.day?.key && target?.mealSlot) {
-              await handleGenerateSlot(target.day.key, target.mealSlot, { effort, attendees, planningNotes })
+              await handleGenerateSlot(target.day.key, target.mealSlot, { effort, attendees, planningNotes, dietaryFocus })
             }
           }}
           onSaveMeal={async (input) => {
@@ -475,14 +586,30 @@ export function PlannerPage() {
 
             // For catalog meals, fetch full recipe so ingredients/instructions/image are embedded
             let catalogRecipe = null
+            let normalizedCatalogRecipe = null
             if (input.meal_source === 'catalog' && input.source_recipe_id) {
               try {
                 const { data } = await supabase
                   .from('recipes')
-                  .select('image_url, servings, prep_time_minutes, cook_time_minutes, total_time_minutes, ingredient_groups_json, instruction_groups_json, ingredients_json, instructions_json, nutrition_json')
+                  .select('title, image_url, servings, prep_time_minutes, cook_time_minutes, total_time_minutes, ingredient_groups_json, instruction_groups_json, ingredients_json, instructions_json, nutrition_json')
                   .eq('id', input.source_recipe_id)
                   .maybeSingle()
                 catalogRecipe = data || null
+                if (catalogRecipe) {
+                  normalizedCatalogRecipe = normalizeRecipe({
+                    title: input.recipe?.title || catalogRecipe.title || mealTitle,
+                    imageUrl: catalogRecipe.image_url || input.recipe?.image_url || null,
+                    servings: catalogRecipe.servings || null,
+                    prepTime: catalogRecipe.prep_time_minutes || null,
+                    cookTime: catalogRecipe.cook_time_minutes || null,
+                    totalTime: catalogRecipe.total_time_minutes || null,
+                    ingredientGroups: catalogRecipe.ingredient_groups_json || null,
+                    instructionGroups: catalogRecipe.instruction_groups_json || null,
+                    ingredients: catalogRecipe.ingredients_json || null,
+                    instructions: catalogRecipe.instructions_json || null,
+                    nutrition: catalogRecipe.nutrition_json || null,
+                  })
+                }
               } catch {
                 // Non-fatal: meal saves without embedded recipe data
               }
@@ -499,17 +626,17 @@ export function PlannerPage() {
               source_recipe_id: input.source_recipe_id || null,
               place_name: input.place_name || null,
               source_note: input.source_note || null,
-              image_url: catalogRecipe?.image_url || input.recipe?.image_url || null,
-              ...(catalogRecipe ? {
-                servings: catalogRecipe.servings || null,
-                prep_time_minutes: catalogRecipe.prep_time_minutes || null,
-                cook_time_minutes: catalogRecipe.cook_time_minutes || null,
-                total_time_minutes: catalogRecipe.total_time_minutes || null,
-                ingredientGroups: catalogRecipe.ingredient_groups_json || null,
-                instructionGroups: catalogRecipe.instruction_groups_json || null,
-                ingredients: catalogRecipe.ingredients_json || null,
-                instructions: catalogRecipe.instructions_json || null,
-                nutrition: catalogRecipe.nutrition_json || null,
+              image_url: normalizedCatalogRecipe?.imageUrl || catalogRecipe?.image_url || input.recipe?.image_url || null,
+              ...(normalizedCatalogRecipe ? {
+                servings: normalizedCatalogRecipe.servings || catalogRecipe?.servings || null,
+                prep_time_minutes: normalizedCatalogRecipe.prepTime || catalogRecipe?.prep_time_minutes || null,
+                cook_time_minutes: normalizedCatalogRecipe.cookTime || catalogRecipe?.cook_time_minutes || null,
+                total_time_minutes: normalizedCatalogRecipe.totalTime || catalogRecipe?.total_time_minutes || null,
+                ingredientGroups: normalizedCatalogRecipe.ingredientGroups || null,
+                instructionGroups: normalizedCatalogRecipe.instructionGroups || null,
+                ingredients: normalizedCatalogRecipe.ingredientGroups?.flatMap((group) => group.ingredients || []) || normalizedCatalogRecipe.ingredients || null,
+                instructions: normalizedCatalogRecipe.instructionGroups?.flatMap((group) => group.steps || []).map((step) => step?.text).filter(Boolean) || normalizedCatalogRecipe.instructions || null,
+                nutrition: normalizedCatalogRecipe.nutrition || catalogRecipe?.nutrition_json || null,
               } : {}),
             }
             const nextMeals = input.existingMealId
@@ -544,6 +671,47 @@ export function PlannerPage() {
           }}
         />
 
+        {refineTarget && (
+          <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/40 p-4" onClick={() => { setRefineTarget(null); setRefineText('') }}>
+            <div
+              className="w-full max-w-md rounded-3xl bg-surface-card p-5 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-lg font-semibold text-ink-primary">Refine meal</div>
+              <div className="mt-0.5 text-sm text-ink-secondary">{refineTarget.name}</div>
+              <div className="mt-4">
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.18em] text-ink-tertiary">What should change?</label>
+                <input
+                  type="text"
+                  value={refineText}
+                  onChange={(e) => setRefineText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && refineText.trim() && !refining) handleRefine() }}
+                  placeholder="e.g. make it vegetarian, less spicy, use mushrooms"
+                  className="input w-full"
+                  autoFocus
+                />
+              </div>
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setRefineTarget(null); setRefineText('') }}
+                  className="flex-1 rounded-full border border-surface-muted px-4 py-2 text-sm font-medium text-ink-secondary hover:bg-stone-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRefine}
+                  disabled={!refineText.trim() || refining}
+                  className="flex-1 rounded-full bg-primary-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-primary-600"
+                >
+                  {refining ? 'Refining…' : 'Refine'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <HouseholdMembersModal
           open={showMembersModal}
           members={members}
@@ -551,6 +719,15 @@ export function PlannerPage() {
           onClose={() => setShowMembersModal(false)}
           onSave={handleSaveMembers}
         />
+
+        {reviewMeal && (
+          <PlannerMealReviewSheet
+            meal={reviewMeal}
+            loading={reviewLoading}
+            onAccept={handleReviewAccept}
+            onTryAnother={handleReviewTryAnother}
+          />
+        )}
 
         <div className="card mt-4">
           <div className="mb-3 font-display text-xl text-text-primary">Shopping List</div>

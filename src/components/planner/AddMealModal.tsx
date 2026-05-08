@@ -16,6 +16,7 @@ export type GenerateParams = {
   effort: string
   attendees: string[]
   planningNotes: string
+  dietaryFocus: string
 }
 
 type Props = {
@@ -72,6 +73,16 @@ const EFFORT_OPTIONS = [
   { value: 'high', label: 'Involved' },
 ]
 
+const DIETARY_OPTIONS = [
+  { value: '', label: 'No restriction' },
+  { value: 'low-carb', label: 'Low carb' },
+  { value: 'high-protein', label: 'High protein' },
+  { value: 'vegetarian', label: 'Vegetarian' },
+  { value: 'vegan', label: 'Vegan' },
+  { value: 'gluten-free', label: 'Gluten free' },
+  { value: 'keto', label: 'Keto' },
+]
+
 const diningMeta = {
   eat_out: { label: 'Eat Out', sublabel: 'Dining at a restaurant', icon: UtensilsIcon },
   takeout: { label: 'Takeout', sublabel: 'Picking up from a place', icon: ShoppingBagIcon },
@@ -105,6 +116,7 @@ export function AddMealModal({
     () => defaultAttendees?.length ? defaultAttendees : members.map((m) => m.id)
   )
   const [generateNotes, setGenerateNotes] = useState('')
+  const [generateDietaryFocus, setGenerateDietaryFocus] = useState('')
 
   const subtitle = useMemo(() => {
     const day = dayKey.toUpperCase()
@@ -238,6 +250,20 @@ export function AddMealModal({
                   </div>
                 )}
 
+                {/* Dietary focus */}
+                <div>
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-ink-tertiary">Dietary focus (optional)</div>
+                  <select
+                    value={generateDietaryFocus}
+                    onChange={(e) => setGenerateDietaryFocus(e.target.value)}
+                    className="input w-full text-sm"
+                  >
+                    {DIETARY_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Planning notes */}
                 <div>
                   <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-ink-tertiary">Notes (optional)</div>
@@ -256,7 +282,7 @@ export function AddMealModal({
                 type="button"
                 disabled={!canFireGenerate}
                 onClick={() => {
-                  onGenerate({ effort: generateEffort, attendees: generateAttendees, planningNotes: generateNotes })
+                  onGenerate({ effort: generateEffort, attendees: generateAttendees, planningNotes: generateNotes, dietaryFocus: generateDietaryFocus })
                   onClose()
                 }}
                 className="mt-5 group flex min-h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
