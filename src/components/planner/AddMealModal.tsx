@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CatalogPickerModal } from './CatalogPickerModal'
 
 type MealSource = 'generated' | 'catalog' | 'eat_out' | 'takeout' | 'delivery' | 'import'
@@ -29,6 +29,7 @@ type Props = {
   members?: Member[]
   defaultEffort?: string
   defaultAttendees?: string[]
+  startOnGenerate?: boolean
   onGenerate: (params: GenerateParams) => void
   onSaveMeal: (input: {
     existingMealId?: string | null
@@ -87,6 +88,7 @@ export function AddMealModal({
   members = [],
   defaultEffort = 'medium',
   defaultAttendees,
+  startOnGenerate = false,
   onGenerate,
   onSaveMeal,
 }: Props) {
@@ -109,6 +111,14 @@ export function AddMealModal({
     const slot = mealSlot.charAt(0).toUpperCase() + mealSlot.slice(1)
     return `${day} · ${slot}`
   }, [dayKey, mealSlot])
+
+  useEffect(() => {
+    if (open) {
+      setShowGeneratePanel(Boolean(startOnGenerate))
+    } else {
+      setShowGeneratePanel(false)
+    }
+  }, [open, startOnGenerate])
 
   if (!open) return null
 

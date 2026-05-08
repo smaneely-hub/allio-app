@@ -180,8 +180,8 @@ export function PlannerPage() {
     setViewMode('day')
   }
 
-  const handleOpenAddMeal = (day, mealSlot = 'dinner', existingMealId = null) => {
-    setAddMealTarget({ day, mealSlot, existingMealId })
+  const handleOpenAddMeal = (day, mealSlot = 'dinner', existingMealId = null, startOnGenerate = false) => {
+    setAddMealTarget({ day, mealSlot, existingMealId, startOnGenerate })
   }
 
   const handleClearDay = async (dayDate) => {
@@ -393,8 +393,6 @@ export function PlannerPage() {
             onOpenDayActions={setDayActionTarget}
             onOpenMealActions={setMealActionTarget}
             onOpenAddMeal={handleOpenAddMeal}
-            generating={saving || generating}
-            onGenerateSlot={members.length > 0 ? handleGenerateSlot : null}
             onSelectMonthDay={handleSelectMonthDay}
           />
         )}
@@ -429,6 +427,7 @@ export function PlannerPage() {
           members={members}
           defaultEffort={addMealTarget ? (slotState[`${addMealTarget.day?.key}-${addMealTarget.mealSlot}`]?.effort_level || 'medium') : 'medium'}
           defaultAttendees={addMealTarget ? (slotState[`${addMealTarget.day?.key}-${addMealTarget.mealSlot}`]?.attendees || []) : []}
+          startOnGenerate={addMealTarget?.startOnGenerate || false}
           onGenerate={async ({ effort, attendees, planningNotes }) => {
             const target = addMealTarget
             setAddMealTarget(null)
