@@ -13,7 +13,7 @@ const FEATURES = {
 }
 
 export function useSubscription() {
-  const [tier, setTier] = useState('free')
+  const [tier, setTier] = useState('premium')
   const [subscription, setSubscription] = useState(null)
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
@@ -22,8 +22,8 @@ export function useSubscription() {
     async function initSubscription() {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
-      setTier('free')
-      setSubscription(null)
+      setTier('premium')
+      setSubscription({ tier: 'premium', testingOverride: true })
       setLoading(false)
     }
 

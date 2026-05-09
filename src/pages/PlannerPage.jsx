@@ -388,15 +388,28 @@ export function PlannerPage() {
     return refined
   }
 
-  const handleFlowAccept = () => {
+  const handleFlowAccept = async (meal) => {
+    if (mealPlan?.id && meal) {
+      const currentMeals = mealPlan?.draft_plan?.meals || []
+      const nextMeals = currentMeals.map((m) =>
+        m.id === meal.id
+          ? normalizeMealRecord({ ...m, ...meal, id: m.id, day: m.day, meal: m.meal, locked: m.locked })
+          : m
+      )
+      await persistPlan({ ...(mealPlan.draft_plan || {}), meals: nextMeals })
+    }
     setGenerateFlowTarget(null)
     toast.success('Meal added to plan.')
   }
 
   const handleFlowLockAndAccept = async (meal) => {
-    if (mealPlan?.id) {
+    if (mealPlan?.id && meal) {
       const currentMeals = mealPlan?.draft_plan?.meals || []
-      const nextMeals = currentMeals.map((m) => m.id === meal.id ? { ...m, locked: true } : m)
+      const nextMeals = currentMeals.map((m) =>
+        m.id === meal.id
+          ? normalizeMealRecord({ ...m, ...meal, id: m.id, day: m.day, meal: m.meal, locked: true })
+          : m
+      )
       await persistPlan({ ...(mealPlan.draft_plan || {}), meals: nextMeals })
     }
     setGenerateFlowTarget(null)
