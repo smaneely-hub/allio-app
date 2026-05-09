@@ -178,7 +178,7 @@ function MonthView({ selectedDate, meals, onSelectDay }) {
   )
 }
 
-function SlotGroup({ slotGroup, day, onOpenAddMeal, onOpenMealActions, onOpenMeal }) {
+function SlotGroup({ slotGroup, day, onOpenAddMeal, onOpenMealActions, onOpenMeal, generatingSlotKey }) {
   return (
     <div>
       <div className="mb-1.5 flex items-center gap-2">
@@ -188,10 +188,11 @@ function SlotGroup({ slotGroup, day, onOpenAddMeal, onOpenMealActions, onOpenMea
             <button
               type="button"
               onClick={() => onOpenAddMeal(day, slotGroup.slot, null, true)}
-              className="flex cursor-pointer items-center gap-1 rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700 transition-colors duration-150 hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+              disabled={generatingSlotKey === `${day.key}-${slotGroup.slot}`}
+              className="flex cursor-pointer items-center gap-1 rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700 transition-colors duration-150 hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 disabled:cursor-wait disabled:opacity-70"
             >
               <SparklesIcon className="h-3 w-3" />
-              Generate
+              {generatingSlotKey === `${day.key}-${slotGroup.slot}` ? 'Generating…' : 'Generate'}
             </button>
           ) : null}
           <button
@@ -220,7 +221,7 @@ function SlotGroup({ slotGroup, day, onOpenAddMeal, onOpenMealActions, onOpenMea
   )
 }
 
-function DaySection({ day, expanded, onToggle, collapsible, onOpenMeal, onOpenDayActions, onOpenMealActions, onOpenAddMeal, showHeaderActions = true }) {
+function DaySection({ day, expanded, onToggle, collapsible, onOpenMeal, onOpenDayActions, onOpenMealActions, onOpenAddMeal, generatingSlotKey, showHeaderActions = true }) {
   const isToday = day.date.toDateString() === new Date().toDateString()
 
   return (
@@ -271,6 +272,7 @@ function DaySection({ day, expanded, onToggle, collapsible, onOpenMeal, onOpenDa
                 onOpenAddMeal={onOpenAddMeal}
                 onOpenMealActions={onOpenMealActions}
                 onOpenMeal={onOpenMeal}
+                generatingSlotKey={generatingSlotKey}
               />
             )
           })}
@@ -349,6 +351,7 @@ export function MealPlanWorkspace({
   onOpenMealActions,
   onOpenAddMeal,
   onSelectMonthDay,
+  generatingSlotKey = null,
 }) {
   const windowStart = useMemo(() => {
     const next = new Date(selectedDate)
@@ -454,6 +457,7 @@ export function MealPlanWorkspace({
                 onOpenDayActions={onOpenDayActions}
                 onOpenMealActions={onOpenMealActions}
                 onOpenAddMeal={onOpenAddMeal}
+                generatingSlotKey={generatingSlotKey}
               />
             ))
           )}

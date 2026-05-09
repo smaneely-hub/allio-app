@@ -117,6 +117,7 @@ export function PlannerPage() {
   const [reviewMeal, setReviewMeal] = useState(null)
   const [reviewSlotKey, setReviewSlotKey] = useState(null)
   const [reviewLoading, setReviewLoading] = useState(false)
+  const [generatingSlotKey, setGeneratingSlotKey] = useState(null)
 
   useEffect(() => {
     localStorage.setItem(PLANNER_VIEW_MODE_KEY, viewMode)
@@ -279,6 +280,7 @@ export function PlannerPage() {
     }
 
     setSaving(true)
+    setGeneratingSlotKey(slotKey)
     try {
       let activeSchedule = schedule
       if (!schedule?.id) {
@@ -310,6 +312,7 @@ export function PlannerPage() {
       }
     } finally {
       setSaving(false)
+      setGeneratingSlotKey(null)
     }
   }
 
@@ -504,6 +507,7 @@ export function PlannerPage() {
             onOpenMealActions={setMealActionTarget}
             onOpenAddMeal={handleOpenAddMeal}
             onSelectMonthDay={handleSelectMonthDay}
+            generatingSlotKey={generatingSlotKey}
           />
         )}
 
