@@ -9,6 +9,7 @@ import { ScheduleSkeleton, EmptyState } from '../components/LoadingStates'
 import { MealPlanWorkspace } from '../components/plan/MealPlanWorkspace'
 import { PlannerActionSheet } from '../components/plan/PlannerActionSheet'
 import { PlannerMealReviewSheet } from '../components/plan/PlannerMealReviewSheet'
+import { PlannerGenerationFlow } from '../components/plan/PlannerGenerationFlow'
 import { DayActionsMenu } from '../components/planner/DayActionsMenu'
 import { AddMealModal } from '../components/planner/AddMealModal'
 import { HouseholdMembersModal } from '../components/planner/HouseholdMembersModal'
@@ -109,6 +110,7 @@ export function PlannerPage() {
   const [dayActionTarget, setDayActionTarget] = useState(null)
   const [mealActionTarget, setMealActionTarget] = useState(null)
   const [addMealTarget, setAddMealTarget] = useState(null)
+  const [generateFlowTarget, setGenerateFlowTarget] = useState(null)
   const [showMembersModal, setShowMembersModal] = useState(false)
   const [savingMembers, setSavingMembers] = useState(false)
   const [refineTarget, setRefineTarget] = useState(null)
@@ -191,7 +193,11 @@ export function PlannerPage() {
   }
 
   const handleOpenAddMeal = (day, mealSlot = 'dinner', existingMealId = null, startOnGenerate = false) => {
-    setAddMealTarget({ day, mealSlot, existingMealId, startOnGenerate })
+    if (startOnGenerate) {
+      setGenerateFlowTarget({ dayKey: day?.key || day, mealSlot })
+    } else {
+      setAddMealTarget({ day, mealSlot, existingMealId, startOnGenerate })
+    }
   }
 
   const handleClearDay = async (dayDate) => {
@@ -256,8 +262,8 @@ export function PlannerPage() {
   }
 
   const handleGenerateSlot = async (dayKey, mealType, overrides = {}) => {
-    if (!members.length) return toast.error('Add household members first.')
-    if (!household?.id) return toast.error('Household not loaded yet.')
+    if (!members.length) { toast.error('Add household members first.'); return null }
+    if (!household?.id) { toast.error('Household not loaded yet.'); return null }
 
     const slotKey = `${dayKey}-${mealType}`
     const existingSlot = slotState[slotKey]
@@ -296,24 +302,71 @@ export function PlannerPage() {
       }
 
       const result = await generateSlot({ household, members, slot, schedule: activeSchedule })
-      toast.success('Meal generated.')
-
-      // Surface the new meal in the review sheet so user can accept or try another
       const resultMeals = result?.draft_plan?.meals || result?.plan?.meals || []
-      const slotKey = `${dayKey}-${mealType}`
       const newMeal = resultMeals.find((m) => `${m.day}-${m.meal}` === slotKey) || resultMeals[0]
-      if (newMeal) {
-        setReviewMeal(normalizeMealRecord(newMeal))
-        setReviewSlotKey(slotKey)
-      }
+      return newMeal ? normalizeMealRecord(newMeal) : null
     } catch (err) {
       if (err?.message !== 'Session expired') {
         toast.error(err?.message || 'Could not generate meal for this slot.')
       }
+      return null
     } finally {
       setSaving(false)
       setGeneratingSlotKey(null)
     }
+  }
+
+  // ── PlannerGenerationFlow callbacks ──────────────────────────────
+  const handleFlowGenerate = async ({ effort, attendees, planningNotes, dietaryFocus }) => {
+    if (!generateFlowTarget) return null
+    return handleGenerateSlot(generateFlowTarget.dayKey, generateFlowTarget.mealSlot, {
+      effort, attendees, planningNotes, dietaryFocus,
+    })
+  }
+
+  const handleFlowTryAnother = async (meal) => {
+    const result = await swapMeal(meal, '')
+    const resultMeals = result?.draft_plan?.meals || result?.plan?.meals || []
+    if (!generateFlowTarget) return null
+    const slotKey = `${generateFlowTarget.dayKey}-${generateFlowTarget.mealSlot}`
+    const newMeal = resultMeals.find((m) => `${m.day}-${m.meal}` === slotKey) || resultMeals[0]
+    return newMeal ? normalizeMealRecord(newMeal) : null
+  }
+
+  const handleFlowRefine = async (meal, text) => {
+    const { data, error } = await refineMeal(meal, text)
+    if (error) throw new Error(error.message || 'Refine failed')
+    if (!data?.refined) throw new Error('No refinement returned')
+    const refined = normalizeMealRecord(data.refined)
+    const currentMeals = mealPlan?.draft_plan?.meals || []
+    const nextMeals = currentMeals.map((m) =>
+      m.id === meal.id ? { ...refined, id: m.id, day: m.day, meal: m.meal } : m
+    )
+    const nextPlan = { ...(mealPlan.draft_plan || {}), meals: nextMeals }
+    await persistPlan(nextPlan)
+    try {
+      await supabase.from('meal_signals').insert([
+        { user_id: household.user_id, meal_name: meal.name, recipe_id: meal.recipe_id || null, signal_type: 'refined_from', created_at: new Date().toISOString() },
+        { user_id: household.user_id, meal_name: refined.name, recipe_id: refined.recipe_id || null, signal_type: 'refined_to', created_at: new Date().toISOString() },
+      ])
+    } catch { /* non-fatal */ }
+    toast.success('Meal refined.')
+    return refined
+  }
+
+  const handleFlowAccept = () => {
+    setGenerateFlowTarget(null)
+    toast.success('Meal added to plan.')
+  }
+
+  const handleFlowLockAndAccept = async (meal) => {
+    if (mealPlan?.id) {
+      const currentMeals = mealPlan?.draft_plan?.meals || []
+      const nextMeals = currentMeals.map((m) => m.id === meal.id ? { ...m, locked: true } : m)
+      await persistPlan({ ...(mealPlan.draft_plan || {}), meals: nextMeals })
+    }
+    setGenerateFlowTarget(null)
+    toast.success('Meal locked in.')
   }
 
   const handleMealAction = async (action, meal) => {
@@ -542,7 +595,14 @@ export function PlannerPage() {
           members={members}
           defaultEffort={addMealTarget ? (slotState[`${addMealTarget.day?.key}-${addMealTarget.mealSlot}`]?.effort_level || 'medium') : 'medium'}
           defaultAttendees={addMealTarget ? (slotState[`${addMealTarget.day?.key}-${addMealTarget.mealSlot}`]?.attendees || []) : []}
-          startOnGenerate={addMealTarget?.startOnGenerate || false}
+          startOnGenerate={false}
+          onOpenGenerateFlow={() => {
+            const target = addMealTarget
+            setAddMealTarget(null)
+            if (target?.day?.key && target?.mealSlot) {
+              setGenerateFlowTarget({ dayKey: target.day.key, mealSlot: target.mealSlot })
+            }
+          }}
           onGenerate={async ({ effort, attendees, planningNotes, dietaryFocus }) => {
             const target = addMealTarget
             setAddMealTarget(null)
@@ -722,6 +782,21 @@ export function PlannerPage() {
           saving={savingMembers}
           onClose={() => setShowMembersModal(false)}
           onSave={handleSaveMembers}
+        />
+
+        <PlannerGenerationFlow
+          open={Boolean(generateFlowTarget)}
+          onClose={() => setGenerateFlowTarget(null)}
+          dayKey={generateFlowTarget?.dayKey || 'mon'}
+          mealSlot={generateFlowTarget?.mealSlot || 'dinner'}
+          members={members}
+          defaultEffort={generateFlowTarget ? (slotState[`${generateFlowTarget.dayKey}-${generateFlowTarget.mealSlot}`]?.effort_level || 'medium') : 'medium'}
+          defaultAttendees={generateFlowTarget ? (slotState[`${generateFlowTarget.dayKey}-${generateFlowTarget.mealSlot}`]?.attendees || []) : []}
+          onGenerate={handleFlowGenerate}
+          onTryAnother={handleFlowTryAnother}
+          onRefine={handleFlowRefine}
+          onAccept={handleFlowAccept}
+          onLockAndAccept={handleFlowLockAndAccept}
         />
 
         {reviewMeal && (

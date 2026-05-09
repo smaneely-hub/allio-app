@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { CatalogPickerModal } from './CatalogPickerModal'
 
 type MealSource = 'generated' | 'catalog' | 'eat_out' | 'takeout' | 'delivery' | 'import'
@@ -31,6 +31,7 @@ type Props = {
   defaultEffort?: string
   defaultAttendees?: string[]
   startOnGenerate?: boolean
+  onOpenGenerateFlow?: () => void
   onGenerate: (params: GenerateParams) => void
   onSaveMeal: (input: {
     existingMealId?: string | null
@@ -63,26 +64,6 @@ function TruckIcon(props: any) {
 function ChevronRightIcon(props: any) {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}><path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
 }
-function ChevronLeftIcon(props: any) {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}><path d="m15 18-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-}
-
-const EFFORT_OPTIONS = [
-  { value: 'low', label: 'Easy' },
-  { value: 'medium', label: 'Moderate' },
-  { value: 'high', label: 'Involved' },
-]
-
-const DIETARY_OPTIONS = [
-  { value: '', label: 'No restriction' },
-  { value: 'low-carb', label: 'Low carb' },
-  { value: 'high-protein', label: 'High protein' },
-  { value: 'vegetarian', label: 'Vegetarian' },
-  { value: 'vegan', label: 'Vegan' },
-  { value: 'gluten-free', label: 'Gluten free' },
-  { value: 'keto', label: 'Keto' },
-]
-
 const diningMeta = {
   eat_out: { label: 'Eat Out', sublabel: 'Dining at a restaurant', icon: UtensilsIcon },
   takeout: { label: 'Takeout', sublabel: 'Picking up from a place', icon: ShoppingBagIcon },
@@ -97,10 +78,11 @@ export function AddMealModal({
   existingMealId,
   canGenerate = true,
   members = [],
-  defaultEffort = 'medium',
-  defaultAttendees,
-  startOnGenerate = false,
-  onGenerate,
+  defaultEffort: _defaultEffort,
+  defaultAttendees: _defaultAttendees,
+  startOnGenerate: _startOnGenerate,
+  onOpenGenerateFlow,
+  onGenerate: _onGenerate,
   onSaveMeal,
 }: Props) {
   const [showCatalog, setShowCatalog] = useState(false)
@@ -109,28 +91,11 @@ export function AddMealModal({
   const [sourceNote, setSourceNote] = useState('')
   const [savingDiningOut, setSavingDiningOut] = useState(false)
 
-  // Generate panel state
-  const [showGeneratePanel, setShowGeneratePanel] = useState(false)
-  const [generateEffort, setGenerateEffort] = useState(defaultEffort)
-  const [generateAttendees, setGenerateAttendees] = useState<string[]>(
-    () => defaultAttendees?.length ? defaultAttendees : members.map((m) => m.id)
-  )
-  const [generateNotes, setGenerateNotes] = useState('')
-  const [generateDietaryFocus, setGenerateDietaryFocus] = useState('')
-
   const subtitle = useMemo(() => {
     const day = dayKey.toUpperCase()
     const slot = mealSlot.charAt(0).toUpperCase() + mealSlot.slice(1)
     return `${day} · ${slot}`
   }, [dayKey, mealSlot])
-
-  useEffect(() => {
-    if (open) {
-      setShowGeneratePanel(Boolean(startOnGenerate))
-    } else {
-      setShowGeneratePanel(false)
-    }
-  }, [open, startOnGenerate])
 
   if (!open) return null
 
@@ -141,157 +106,17 @@ export function AddMealModal({
     setSavingDiningOut(false)
   }
 
-  const toggleAttendee = (id: string) => {
-    setGenerateAttendees((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    )
-  }
-
-  const canFireGenerate = members.length === 0 || generateAttendees.length > 0
-
   return (
     <>
       <div
         className="fixed inset-0 z-[60] bg-black/40"
-        onClick={() => { resetDiningFlow(); setShowGeneratePanel(false); onClose() }}
+        onClick={() => { resetDiningFlow(); onClose() }}
       >
         <div
           className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-surface-card p-4 shadow-2xl sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* ── Generate panel ─────────────────────────────── */}
-          {showGeneratePanel ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setShowGeneratePanel(false)}
-                className="mb-3 flex items-center gap-1 text-sm text-ink-secondary transition-colors duration-150 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 rounded-md cursor-pointer"
-              >
-                <ChevronLeftIcon className="h-4 w-4" />
-                Back
-              </button>
-
-              <div className="text-lg font-semibold text-ink-primary">Generate a meal</div>
-              <div className="mt-0.5 text-sm text-ink-secondary">{subtitle}</div>
-
-              <div className="mt-4 space-y-5">
-                {/* Effort */}
-                <div>
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-ink-tertiary">Effort</div>
-                  <div className="flex gap-2">
-                    {EFFORT_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setGenerateEffort(opt.value)}
-                        className={`rounded-full px-4 py-2 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 cursor-pointer ${
-                          generateEffort === opt.value
-                            ? 'bg-primary-500 text-white shadow-sm'
-                            : 'border border-surface-muted bg-white text-ink-secondary hover:border-primary-300 hover:bg-primary-50'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Attendees */}
-                {members.length > 0 && (
-                  <div>
-                    <div className="mb-2 flex items-center justify-between">
-                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-tertiary">Cooking for</div>
-                      <div className="flex gap-2 text-xs">
-                        <button
-                          type="button"
-                          onClick={() => setGenerateAttendees(members.map((m) => m.id))}
-                          className="text-primary-600 hover:underline cursor-pointer focus-visible:outline-none"
-                        >
-                          All
-                        </button>
-                        <span className="text-ink-tertiary">|</span>
-                        <button
-                          type="button"
-                          onClick={() => setGenerateAttendees([])}
-                          className="text-primary-600 hover:underline cursor-pointer focus-visible:outline-none"
-                        >
-                          Clear
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {members.map((member) => {
-                        const isSelected = generateAttendees.includes(member.id)
-                        const hasRestrictions =
-                          (member.dietary_restrictions?.length ?? 0) > 0 ||
-                          (member.food_preferences?.length ?? 0) > 0 ||
-                          (member.allergies?.length ?? 0) > 0
-                        return (
-                          <button
-                            key={member.id}
-                            type="button"
-                            onClick={() => toggleAttendee(member.id)}
-                            title={hasRestrictions ? 'Has dietary restrictions or preferences' : undefined}
-                            className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 cursor-pointer ${
-                              isSelected
-                                ? 'bg-primary-100 text-primary-700 border border-primary-300'
-                                : 'bg-white text-ink-secondary border border-surface-muted hover:border-primary-300'
-                            }`}
-                          >
-                            {member.name || member.label || 'Member'}
-                            {hasRestrictions && <span className="ml-1 text-xs opacity-70">*</span>}
-                          </button>
-                        )
-                      })}
-                    </div>
-                    {generateAttendees.length === 0 && (
-                      <p className="mt-1.5 text-xs text-amber-600">Select at least one person to generate for.</p>
-                    )}
-                  </div>
-                )}
-
-                {/* Dietary focus */}
-                <div>
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-ink-tertiary">Dietary focus (optional)</div>
-                  <select
-                    value={generateDietaryFocus}
-                    onChange={(e) => setGenerateDietaryFocus(e.target.value)}
-                    className="input w-full text-sm"
-                  >
-                    {DIETARY_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Planning notes */}
-                <div>
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-ink-tertiary">Notes (optional)</div>
-                  <input
-                    type="text"
-                    value={generateNotes}
-                    onChange={(e) => setGenerateNotes(e.target.value)}
-                    placeholder="e.g. something light, use chicken, no onions"
-                    className="input w-full text-sm"
-                  />
-                  <p className="mt-1 text-xs text-ink-tertiary">AI will take this into account when picking a recipe.</p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                disabled={!canFireGenerate}
-                onClick={() => {
-                  onGenerate({ effort: generateEffort, attendees: generateAttendees, planningNotes: generateNotes, dietaryFocus: generateDietaryFocus })
-                  onClose()
-                }}
-                className="mt-5 group flex min-h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <SparklesIcon className="h-4 w-4" />
-                Generate {mealSlot}
-              </button>
-            </>
-          ) : !diningSource ? (
+          {!diningSource ? (
             /* ── Main choice view ──────────────────────────── */
             <>
               <div className="text-lg font-semibold text-ink-primary">Add meal</div>
@@ -305,7 +130,10 @@ export function AddMealModal({
                   </div>
                   <button
                     type="button"
-                    onClick={() => setShowGeneratePanel(true)}
+                    onClick={() => {
+                      onClose()
+                      if (onOpenGenerateFlow) onOpenGenerateFlow()
+                    }}
                     className="group flex min-h-14 w-full cursor-pointer items-center gap-3 bg-surface-card p-4 text-left transition-colors duration-150 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2"
                   >
                     <SparklesIcon className="h-5 w-5 text-primary-500 transition-colors duration-150 group-hover:text-primary-600" />

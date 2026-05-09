@@ -12,7 +12,7 @@ function formatNutrition(nutrition) {
   ].filter(Boolean)
 }
 
-export function SwipeCard({ meal, image, onAccept, onReject }) {
+export function SwipeCard({ meal, image, onAccept, onReject, rejectLabel = 'Next', acceptLabel = 'Cook this' }) {
   const [dragX, setDragX] = useState(0)
   const [dragging, setDragging] = useState(false)
   const [animating, setAnimating] = useState(false)
@@ -235,14 +235,14 @@ export function SwipeCard({ meal, image, onAccept, onReject }) {
             onClick={onReject}
             className="flex-1 rounded-full border border-divider bg-white px-4 py-3 text-sm font-semibold text-text-secondary transition hover:bg-warm-50"
           >
-            Next
+            {rejectLabel}
           </button>
           <button
             type="button"
             onClick={onAccept}
             className="flex-1 rounded-full border border-primary-200 bg-primary-50 px-4 py-3 text-sm font-semibold text-primary-700 transition hover:bg-primary-100"
           >
-            Cook this
+            {acceptLabel}
           </button>
         </div>
       </div>
