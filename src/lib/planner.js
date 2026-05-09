@@ -251,7 +251,10 @@ export function buildPlannerDays({ start = new Date(), count = 7, meals = [], da
     const date = addDays(windowStart, index)
     const dayName = normalizeDayName(date.toLocaleDateString('en-US', { weekday: 'long' }))
     const short = DAY_SHORT[dayName]
-    const mealsForDay = normalizedMeals.filter((meal) => meal.day === short)
+    const dayDateStr = date.toISOString().slice(0, 10)
+    const mealsForDay = normalizedMeals.filter((meal) =>
+      meal.date ? meal.date === dayDateStr : meal.day === short
+    )
     const mealGroups = MEAL_SLOTS.map((slot) => {
       const slotMeals = mealsForDay.filter((meal) => meal.slot === slot)
       return {

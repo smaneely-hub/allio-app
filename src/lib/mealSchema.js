@@ -57,6 +57,8 @@ export function normalizeMealRecord(meal = {}, fallback = {}) {
     user_note: typeof meal.user_note === 'string' ? meal.user_note : '',
     swapped: Boolean(meal.swapped),
     original_name: typeof meal.original_name === 'string' ? meal.original_name : null,
+    date: (typeof meal.date === 'string' && meal.date) ? meal.date : (typeof fallback.date === 'string' && fallback.date ? fallback.date : null),
+    recurring: Boolean(meal.recurring ?? fallback.recurring ?? false),
     created_at: recipe.createdAt,
     updated_at: recipe.updatedAt,
   }

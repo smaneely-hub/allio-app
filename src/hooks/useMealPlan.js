@@ -354,7 +354,7 @@ export function useMealPlan(scheduleId) {
 
       const nextPlan = {
         ...mealPlan.draft_plan,
-        meals: mealPlan.draft_plan.meals.map((m) => m.id === mealToReplace.id ? applySourceDefaults(normalizeMealRecord({ ...replacement, day: m.day, meal: m.meal, id: m.id, locked: false, user_note: m.user_note, swapped: true, original_name: m.original_name || m.name }, { day: m.day, meal: m.meal })) : applySourceDefaults(m)),
+        meals: mealPlan.draft_plan.meals.map((m) => m.id === mealToReplace.id ? applySourceDefaults(normalizeMealRecord({ ...replacement, day: m.day, meal: m.meal, id: m.id, date: m.date, locked: false, user_note: m.user_note, swapped: true, original_name: m.original_name || m.name }, { day: m.day, meal: m.meal })) : applySourceDefaults(m)),
       }
       if (mealToReplace.name) {
         setRecentSwappedMealNames((prev) => [...prev.slice(-9), mealToReplace.name])
@@ -472,9 +472,17 @@ export function useMealPlan(scheduleId) {
 
       const currentMeals = mealPlan?.draft_plan?.meals || []
       const slotKey = `${normalizedSlot.day}-${normalizedSlot.meal}`
+      const existingSlotMeal = currentMeals.find((m) => `${m.day}-${m.meal}` === slotKey)
       const nextMeals = [
         ...currentMeals.filter((m) => `${m.day}-${m.meal}` !== slotKey),
-        applySourceDefaults({ ...newMeal, day: normalizedSlot.day, meal: normalizedSlot.meal, id: newMeal.id || crypto.randomUUID() }),
+        applySourceDefaults({
+          ...newMeal,
+          day: normalizedSlot.day,
+          meal: normalizedSlot.meal,
+          date: existingSlotMeal?.date || newMeal.date || null,
+          recurring: Boolean(existingSlotMeal?.recurring || newMeal.recurring),
+          id: newMeal.id || crypto.randomUUID(),
+        }),
       ]
       const nextPlan = withMealDefaults({ ...(mealPlan?.draft_plan || { meals: [] }), meals: nextMeals })
 

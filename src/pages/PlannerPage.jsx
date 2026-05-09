@@ -332,8 +332,7 @@ export function PlannerPage() {
 
       const result = await generateSlot({ household, members, slot, schedule: activeSchedule })
       const resultMeals = result?.draft_plan?.meals || result?.plan?.meals || []
-      const matchingDay = displayedDays.find((visibleDay) => visibleDay.key === dayKey)
-      const targetDate = toIsoLocalDate(matchingDay?.date instanceof Date ? matchingDay.date : new Date(selectedDate))
+      const targetDate = toIsoLocalDate(new Date(selectedDate))
       const newMeal = resultMeals.find((m) => `${m.day}-${m.meal}` === slotKey) || resultMeals[0]
       return newMeal ? normalizeMealRecord({ ...newMeal, day: dayKey, meal: mealType, date: targetDate, recurring: false }) : null
     } catch (err) {
@@ -368,8 +367,7 @@ export function PlannerPage() {
     const slotKey = `${generateFlowTarget.dayKey}-${generateFlowTarget.mealSlot}`
     let newMeal = resultMeals.find((m) => `${m.day}-${m.meal}` === slotKey) || resultMeals[0]
     if (!newMeal) return null
-    const matchingDay = displayedDays.find((day) => day.key === generateFlowTarget.dayKey)
-    const targetDate = toIsoLocalDate(matchingDay?.date instanceof Date ? matchingDay.date : new Date(selectedDate))
+    const targetDate = toIsoLocalDate(new Date(selectedDate))
     newMeal = normalizeMealRecord({ ...newMeal, day: generateFlowTarget.dayKey, meal: generateFlowTarget.mealSlot, date: targetDate, recurring: false })
     if (!newMeal.image_url && !newMeal.image) {
       const imageUrl = await fetchPlannerMealImage(newMeal.name)
@@ -385,7 +383,7 @@ export function PlannerPage() {
     const refined = normalizeMealRecord(data.refined)
     const currentMeals = mealPlan?.draft_plan?.meals || []
     const nextMeals = currentMeals.map((m) =>
-      m.id === meal.id ? { ...refined, id: m.id, day: m.day, meal: m.meal } : m
+      m.id === meal.id ? { ...refined, id: m.id, day: m.day, meal: m.meal, date: m.date || meal.date } : m
     )
     const nextPlan = { ...(mealPlan.draft_plan || {}), meals: nextMeals }
     await persistPlan(nextPlan)
@@ -404,7 +402,7 @@ export function PlannerPage() {
       const currentMeals = mealPlan?.draft_plan?.meals || []
       const nextMeals = currentMeals.map((m) =>
         m.id === meal.id
-          ? normalizeMealRecord({ ...m, ...meal, id: m.id, day: m.day, meal: m.meal, date: m.date, recurring: false, locked: m.locked })
+          ? normalizeMealRecord({ ...m, ...meal, id: m.id, day: m.day, meal: m.meal, date: meal.date || m.date, recurring: false, locked: m.locked })
           : m
       )
       await persistPlan({ ...(mealPlan.draft_plan || {}), meals: nextMeals })
@@ -418,7 +416,7 @@ export function PlannerPage() {
       const currentMeals = mealPlan?.draft_plan?.meals || []
       const nextMeals = currentMeals.map((m) =>
         m.id === meal.id
-          ? normalizeMealRecord({ ...m, ...meal, id: m.id, day: m.day, meal: m.meal, date: m.date, recurring: false, locked: true })
+          ? normalizeMealRecord({ ...m, ...meal, id: m.id, day: m.day, meal: m.meal, date: meal.date || m.date, recurring: false, locked: true })
           : m
       )
       await persistPlan({ ...(mealPlan.draft_plan || {}), meals: nextMeals })
@@ -505,7 +503,7 @@ export function PlannerPage() {
       const refined = normalizeMealRecord(data.refined)
       const currentMeals = mealPlan?.draft_plan?.meals || []
       const nextMeals = currentMeals.map((m) =>
-        m.id === refineTarget.id ? { ...refined, id: m.id, day: m.day, meal: m.meal } : m
+        m.id === refineTarget.id ? { ...refined, id: m.id, day: m.day, meal: m.meal, date: m.date } : m
       )
       const nextPlan = { ...(mealPlan.draft_plan || {}), meals: nextMeals }
       await persistPlan(nextPlan)
