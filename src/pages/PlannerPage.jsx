@@ -23,6 +23,28 @@ import { groupByCategory } from '../utils/groceryCategories'
 import { supabase } from '../lib/supabase'
 
 const days = DAY_ORDER
+
+async function fetchPlannerMealImage(mealName) {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-recipe-image`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ query: mealName || 'food' }),
+      }
+    )
+    const data = await res.json()
+    return typeof data?.imageUrl === 'string' && data.imageUrl.trim() ? data.imageUrl.trim() : null
+  } catch {
+    return null
+  }
+}
 const CATEGORY_EMOJI = {
   Produce: '🥬',
   'Meat & Seafood': '🥩',
@@ -319,9 +341,15 @@ export function PlannerPage() {
   // ── PlannerGenerationFlow callbacks ──────────────────────────────
   const handleFlowGenerate = async ({ effort, attendees, planningNotes, dietaryFocus }) => {
     if (!generateFlowTarget) return null
-    return handleGenerateSlot(generateFlowTarget.dayKey, generateFlowTarget.mealSlot, {
+    let meal = await handleGenerateSlot(generateFlowTarget.dayKey, generateFlowTarget.mealSlot, {
       effort, attendees, planningNotes, dietaryFocus,
     })
+    if (!meal) return null
+    if (!meal.image_url && !meal.image) {
+      const imageUrl = await fetchPlannerMealImage(meal.name)
+      if (imageUrl) meal = { ...meal, image: imageUrl, image_url: imageUrl }
+    }
+    return meal
   }
 
   const handleFlowTryAnother = async (meal) => {
@@ -329,8 +357,14 @@ export function PlannerPage() {
     const resultMeals = result?.draft_plan?.meals || result?.plan?.meals || []
     if (!generateFlowTarget) return null
     const slotKey = `${generateFlowTarget.dayKey}-${generateFlowTarget.mealSlot}`
-    const newMeal = resultMeals.find((m) => `${m.day}-${m.meal}` === slotKey) || resultMeals[0]
-    return newMeal ? normalizeMealRecord(newMeal) : null
+    let newMeal = resultMeals.find((m) => `${m.day}-${m.meal}` === slotKey) || resultMeals[0]
+    if (!newMeal) return null
+    newMeal = normalizeMealRecord({ ...newMeal, day: generateFlowTarget.dayKey, meal: generateFlowTarget.mealSlot })
+    if (!newMeal.image_url && !newMeal.image) {
+      const imageUrl = await fetchPlannerMealImage(newMeal.name)
+      if (imageUrl) newMeal = { ...newMeal, image: imageUrl, image_url: imageUrl }
+    }
+    return newMeal
   }
 
   const handleFlowRefine = async (meal, text) => {

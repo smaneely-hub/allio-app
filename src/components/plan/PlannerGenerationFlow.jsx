@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { SwipeCard } from '../SwipeCard'
+import { SwipeDeck } from '../SwipeDeck'
 
 function SparklesIcon(props) {
   return (
@@ -150,7 +150,10 @@ export function PlannerGenerationFlow({
 
   const mealImage = meal
     ? { url: meal.image_url || meal.image || null, photographer: null, photographerUrl: null }
-    : null
+    : { url: null, photographer: null, photographerUrl: null }
+
+  // Clear items while loading so SwipeDeck shows its built-in spinner
+  const mealItems = tryingAnother ? [] : (meal ? [{ meal, image: mealImage }] : [])
 
   const isCloseable = phase !== 'generating' && !tryingAnother && !locking
 
@@ -341,27 +344,20 @@ export function PlannerGenerationFlow({
       )}
 
       {/* ── Review phase ───────────────────────────────────────── */}
-      {phase === 'review' && meal && (
-        <div className="relative flex-1 overflow-hidden">
-          {tryingAnother ? (
-            <div className="flex h-full flex-col items-center justify-center gap-3 bg-white">
-              <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary-400 border-t-transparent" />
-              <p className="text-sm text-ink-secondary">Finding another option…</p>
-            </div>
-          ) : (
-            <SwipeCard
-              key={meal.id || meal.name}
-              meal={meal}
-              image={mealImage}
-              onAccept={() => onAccept(meal)}
+      {phase === 'review' && (
+        <div className="relative flex-1 overflow-y-auto">
+          <div className="px-4 py-4">
+            <SwipeDeck
+              items={mealItems}
+              batchLoading={tryingAnother}
+              onAccept={() => meal && onAccept(meal)}
               onReject={handleTryAnother}
-              rejectLabel="Try another"
-              acceptLabel="Accept"
+              onEdit={() => { setShowRefine((v) => !v); setRefineText('') }}
             />
-          )}
+          </div>
 
-          {/* Refine overlay — slides up over the card */}
-          {showRefine && !tryingAnother && (
+          {/* Refine overlay — slides up over the deck */}
+          {showRefine && meal && (
             <div
               className="absolute inset-0 flex flex-col items-end justify-end bg-black/50"
               onClick={() => { setShowRefine(false); setRefineText('') }}
