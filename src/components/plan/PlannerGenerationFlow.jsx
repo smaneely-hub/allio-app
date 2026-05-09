@@ -345,8 +345,8 @@ export function PlannerGenerationFlow({
 
       {/* ── Review phase ───────────────────────────────────────── */}
       {phase === 'review' && (
-        <div className="relative flex-1 overflow-y-auto">
-          <div className="px-4 py-4">
+        <div className="relative flex-1 overflow-y-auto bg-surface-base">
+          <div className="mx-auto w-full max-w-xl px-4 py-4">
             <SwipeDeck
               items={mealItems}
               batchLoading={tryingAnother}
