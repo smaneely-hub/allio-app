@@ -15,6 +15,13 @@ import { AddMealModal } from '../components/planner/AddMealModal'
 import { HouseholdMembersModal } from '../components/planner/HouseholdMembersModal'
 import { aggregateShoppingList } from '../lib/aggregateShoppingList'
 import { addDays, DAY_ORDER } from '../lib/planner'
+
+function toIsoLocalDate(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 import { normalizeMealRecord } from '../lib/mealSchema'
 import { normalizeRecipe } from '../lib/recipeSchema'
 import { upsertShoppingListForDate } from '../lib/tonightPersistence'
@@ -325,8 +332,9 @@ export function PlannerPage() {
 
       const result = await generateSlot({ household, members, slot, schedule: activeSchedule })
       const resultMeals = result?.draft_plan?.meals || result?.plan?.meals || []
+      const targetDate = toIsoLocalDate(day.date instanceof Date ? day.date : new Date(day.date || selectedDate))
       const newMeal = resultMeals.find((m) => `${m.day}-${m.meal}` === slotKey) || resultMeals[0]
-      return newMeal ? normalizeMealRecord(newMeal) : null
+      return newMeal ? normalizeMealRecord({ ...newMeal, day: day.key, meal: mealSlot, date: targetDate, recurring: false }) : null
     } catch (err) {
       if (err?.message !== 'Session expired') {
         toast.error(err?.message || 'Could not generate meal for this slot.')
@@ -359,7 +367,9 @@ export function PlannerPage() {
     const slotKey = `${generateFlowTarget.dayKey}-${generateFlowTarget.mealSlot}`
     let newMeal = resultMeals.find((m) => `${m.day}-${m.meal}` === slotKey) || resultMeals[0]
     if (!newMeal) return null
-    newMeal = normalizeMealRecord({ ...newMeal, day: generateFlowTarget.dayKey, meal: generateFlowTarget.mealSlot })
+    const matchingDay = displayedDays.find((day) => day.key === generateFlowTarget.dayKey)
+    const targetDate = toIsoLocalDate(matchingDay?.date instanceof Date ? matchingDay.date : new Date(selectedDate))
+    newMeal = normalizeMealRecord({ ...newMeal, day: generateFlowTarget.dayKey, meal: generateFlowTarget.mealSlot, date: targetDate, recurring: false })
     if (!newMeal.image_url && !newMeal.image) {
       const imageUrl = await fetchPlannerMealImage(newMeal.name)
       if (imageUrl) newMeal = { ...newMeal, image: imageUrl, image_url: imageUrl }
@@ -393,7 +403,7 @@ export function PlannerPage() {
       const currentMeals = mealPlan?.draft_plan?.meals || []
       const nextMeals = currentMeals.map((m) =>
         m.id === meal.id
-          ? normalizeMealRecord({ ...m, ...meal, id: m.id, day: m.day, meal: m.meal, locked: m.locked })
+          ? normalizeMealRecord({ ...m, ...meal, id: m.id, day: m.day, meal: m.meal, date: m.date, recurring: false, locked: m.locked })
           : m
       )
       await persistPlan({ ...(mealPlan.draft_plan || {}), meals: nextMeals })
@@ -407,7 +417,7 @@ export function PlannerPage() {
       const currentMeals = mealPlan?.draft_plan?.meals || []
       const nextMeals = currentMeals.map((m) =>
         m.id === meal.id
-          ? normalizeMealRecord({ ...m, ...meal, id: m.id, day: m.day, meal: m.meal, locked: true })
+          ? normalizeMealRecord({ ...m, ...meal, id: m.id, day: m.day, meal: m.meal, date: m.date, recurring: false, locked: true })
           : m
       )
       await persistPlan({ ...(mealPlan.draft_plan || {}), meals: nextMeals })

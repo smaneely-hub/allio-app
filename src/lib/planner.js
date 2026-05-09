@@ -163,8 +163,14 @@ function flattenMealDirections(recipe) {
 
 export function normalizeMeal(meal = {}, weekStart = getStartOfWeek()) {
   const slot = normalizeMealSlotName(meal.meal || meal.meal_type || meal.slot || '')
-  const dayName = normalizeDayName(meal.day)
-  const mealDate = getDateForDayName(weekStart, dayName)
+  const existingDate = meal?.date ? new Date(meal.date) : null
+  const hasStoredDate = existingDate && !Number.isNaN(existingDate.getTime())
+  if (hasStoredDate) existingDate.setHours(0, 0, 0, 0)
+  const derivedDayName = hasStoredDate
+    ? normalizeDayName(existingDate.toLocaleDateString('en-US', { weekday: 'long' }))
+    : normalizeDayName(meal.day)
+  const dayName = derivedDayName
+  const mealDate = hasStoredDate ? existingDate : getDateForDayName(weekStart, dayName)
   const recipe = normalizeRecipe({
     ...meal,
     title: meal.title || meal.name,
