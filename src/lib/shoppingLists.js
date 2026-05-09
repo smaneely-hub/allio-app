@@ -187,7 +187,7 @@ export function buildShoppingItemRows(meal, staplesOnHand = '', source = 'tonigh
     .filter((parsed) => !staples.some((staple) => parsed.normalizedName.includes(staple)))
     .map((parsed) => ({
       name: parsed.name,
-      quantity: parsed.quantity ? String(parsed.quantity) : '',
+      quantity: [parsed.quantityText, parsed.unit].filter(Boolean).join(' ').trim(),
       category: parsed.category,
       checked: false,
       source,
