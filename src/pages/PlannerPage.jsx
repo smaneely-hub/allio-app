@@ -332,9 +332,10 @@ export function PlannerPage() {
 
       const result = await generateSlot({ household, members, slot, schedule: activeSchedule })
       const resultMeals = result?.draft_plan?.meals || result?.plan?.meals || []
-      const targetDate = toIsoLocalDate(day.date instanceof Date ? day.date : new Date(day.date || selectedDate))
+      const matchingDay = displayedDays.find((visibleDay) => visibleDay.key === dayKey)
+      const targetDate = toIsoLocalDate(matchingDay?.date instanceof Date ? matchingDay.date : new Date(selectedDate))
       const newMeal = resultMeals.find((m) => `${m.day}-${m.meal}` === slotKey) || resultMeals[0]
-      return newMeal ? normalizeMealRecord({ ...newMeal, day: day.key, meal: mealSlot, date: targetDate, recurring: false }) : null
+      return newMeal ? normalizeMealRecord({ ...newMeal, day: dayKey, meal: mealType, date: targetDate, recurring: false }) : null
     } catch (err) {
       if (err?.message !== 'Session expired') {
         toast.error(err?.message || 'Could not generate meal for this slot.')
