@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { addDays, buildPlannerDays, formatIsoLocalDate, getStartOfWeek, MEAL_SLOTS, DAY_SHORT } from '../../lib/planner'
+import { addDays, buildPlannerDays, expandRecurringMeals, formatIsoLocalDate, getStartOfWeek, MEAL_SLOTS, DAY_SHORT } from '../../lib/planner'
 import { MealCard } from './MealCard'
 
 function ChevronLeftIcon(props) {
@@ -114,15 +114,17 @@ function MonthView({ selectedDate, meals, onSelectDay }) {
   const monthStart = useMemo(() => new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1), [selectedDate])
 
   const mealCoverage = useMemo(() => {
+    const gridStart = getStartOfWeek(monthStart)
+    const allMeals = expandRecurringMeals(meals, gridStart, 42)
     const map = {}
-    meals.forEach((meal) => {
+    allMeals.forEach((meal) => {
       // Date-first: use ISO date string as key; fall back to weekday short for legacy undated meals
       const key = meal.date || meal.day
       if (!map[key]) map[key] = new Set()
       map[key].add(meal.meal || meal.slot || 'dinner')
     })
     return map
-  }, [meals])
+  }, [meals, monthStart])
 
   const weeks = useMemo(() => {
     const gridStart = getStartOfWeek(monthStart)
@@ -393,7 +395,7 @@ export function MealPlanWorkspace({
   return (
     <div className="min-h-screen bg-surface-base">
       <div className="sticky top-0 z-20 border-b border-surface-muted bg-white">
-        <div className="mx-auto max-w-2xl px-4 pb-4 pt-3">
+        <div className="mx-auto max-w-xl px-4 pb-4 pt-3">
           <div className="flex justify-center">
             <div className="inline-flex rounded-full bg-surface-muted p-1">
               {VIEW_MODES.map(({ id, label }) => {
@@ -437,7 +439,7 @@ export function MealPlanWorkspace({
         </div>
       </div>
 
-      <div className="mx-auto max-w-2xl px-4 pb-24 pt-4">
+      <div className="mx-auto max-w-xl px-4 pb-24 pt-4">
         <div key={animateKey} className="animate-fadeIn space-y-3">
           {viewMode === 'month' ? (
             <MonthView

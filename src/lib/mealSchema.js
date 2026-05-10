@@ -1,5 +1,12 @@
 import { flattenRecipeIngredients, flattenRecipeInstructions, normalizeRecipe } from './recipeSchema'
 
+const RECURRENCE_TYPES = ['none', 'daily', 'weekdays', 'weekly', 'monthly', 'yearly']
+
+function normalizeRecurrenceField(value) {
+  const type = RECURRENCE_TYPES.includes(value?.type) ? value.type : 'none'
+  return { type }
+}
+
 export function normalizeMealRecord(meal = {}, fallback = {}) {
   const safeDay = typeof (meal.day ?? fallback.day) === 'string' ? String(meal.day ?? fallback.day).trim().toLowerCase() : 'mon'
   const safeMeal = typeof (meal.meal ?? fallback.meal) === 'string' ? String(meal.meal ?? fallback.meal).trim().toLowerCase() : 'dinner'
@@ -58,6 +65,7 @@ export function normalizeMealRecord(meal = {}, fallback = {}) {
     swapped: Boolean(meal.swapped),
     original_name: typeof meal.original_name === 'string' ? meal.original_name : null,
     date: (typeof meal.date === 'string' && meal.date) ? meal.date : (typeof fallback.date === 'string' && fallback.date ? fallback.date : null),
+    recurrence: normalizeRecurrenceField(meal.recurrence ?? fallback.recurrence),
     recurring: Boolean(meal.recurring ?? fallback.recurring ?? false),
     created_at: recipe.createdAt,
     updated_at: recipe.updatedAt,

@@ -234,6 +234,7 @@ export function normalizeMeal(meal = {}, weekStart = getStartOfWeek()) {
     user_note: meal.user_note || '',
     locked: Boolean(meal.locked),
     recurring: Boolean(meal.recurring),
+    recurrence: meal.recurrence || { type: 'none' },
     source_meal_id: meal.source_meal_id || null,
     isGenerated: true,
   }
@@ -264,12 +265,14 @@ export function buildPlannerDays({ start = new Date(), count = 7, meals = [], da
     return normalized
   })
 
+  const expandedMeals = expandRecurringMeals(normalizedMeals, windowStart, count)
+
   return Array.from({ length: count }, (_, index) => {
     const date = addDays(windowStart, index)
     const dayName = normalizeDayName(date.toLocaleDateString('en-US', { weekday: 'long' }))
     const short = DAY_SHORT[dayName]
     const dayDateStr = formatIsoLocalDate(date)
-    const mealsForDay = normalizedMeals.filter((meal) =>
+    const mealsForDay = expandedMeals.filter((meal) =>
       meal.date ? meal.date === dayDateStr : meal.day === short
     )
     const mealGroups = MEAL_SLOTS.map((slot) => {
@@ -314,6 +317,67 @@ export function buildPlannerDays({ start = new Date(), count = 7, meals = [], da
 
 export function buildPlannerWeek({ weekStart = new Date(), meals = [], dayNotes = {} } = {}) {
   return buildPlannerDays({ start: getStartOfWeek(weekStart), count: 7, meals, dayNotes })
+}
+
+// ── Recurrence expansion ─────────────────────────────────────────────────────
+
+const RECURRENCE_TYPES = ['none', 'daily', 'weekdays', 'weekly', 'monthly', 'yearly']
+
+export function normalizeRecurrenceType(value) {
+  return RECURRENCE_TYPES.includes(value) ? value : 'none'
+}
+
+function doesRecurOn(recurrenceType, anchorDate, targetDate) {
+  switch (recurrenceType) {
+    case 'daily': return true
+    case 'weekdays': {
+      const dow = targetDate.getDay()
+      return dow >= 1 && dow <= 5
+    }
+    case 'weekly': return targetDate.getDay() === anchorDate.getDay()
+    case 'monthly': return targetDate.getDate() === anchorDate.getDate()
+    case 'yearly':
+      return (
+        targetDate.getMonth() === anchorDate.getMonth() &&
+        targetDate.getDate() === anchorDate.getDate()
+      )
+    default: return false
+  }
+}
+
+// Expand recurring meals to fill the window [windowStart, windowStart+count).
+// Returns a flat list of base meals + virtual occurrence objects.
+// Virtual occurrences are never stored — they exist only for rendering.
+export function expandRecurringMeals(meals, windowStart, count) {
+  const result = []
+  for (const meal of meals) {
+    result.push(meal)
+    const recType = meal.recurrence?.type || 'none'
+    if (recType === 'none') continue
+    const anchorDate = parseIsoLocalDate(meal.date)
+    if (!anchorDate) continue
+
+    for (let i = 0; i < count; i++) {
+      const occDate = addDays(windowStart, i)
+      const occDateStr = formatIsoLocalDate(occDate)
+      if (occDateStr === meal.date) continue
+      if (occDate < anchorDate) continue
+      if (!doesRecurOn(recType, anchorDate, occDate)) continue
+
+      const fullDayName = occDate.toLocaleDateString('en-US', { weekday: 'long' })
+      const occDayName = normalizeDayName(fullDayName)
+      result.push({
+        ...meal,
+        id: `${meal.id}--recur-${occDateStr}`,
+        date: occDateStr,
+        day: DAY_SHORT[occDayName],
+        day_name: occDayName,
+        is_occurrence: true,
+        occurrence_source_id: meal.id,
+      })
+    }
+  }
+  return result
 }
 
 export { DAY_ORDER, DAY_SHORT }

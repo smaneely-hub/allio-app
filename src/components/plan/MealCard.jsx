@@ -7,6 +7,25 @@ import { normalizeRecipe } from '../../lib/recipeSchema'
 import { CookingMode } from '../CookingMode'
 import { MealDetailBody } from '../MealDetailBody'
 
+const RECURRENCE_LABELS = {
+  daily: 'Daily',
+  weekdays: 'Weekdays',
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+  yearly: 'Yearly',
+}
+
+function RepeatIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
+      <path d="M17 1l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 11V9a4 4 0 0 1 4-4h14" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7 23l-4-4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M21 13v2a4 4 0 0 1-4 4H3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 function MoreVerticalIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
@@ -152,7 +171,16 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
             </button>
             <button type="button" onClick={toggleExpanded} className="group min-w-0 flex-1 cursor-pointer rounded-xl p-1 text-left transition duration-150 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2">
               <div className="truncate text-sm font-medium text-ink-primary transition-colors duration-150 group-hover:text-stone-900">{title}</div>
-              <div className="mt-1 truncate text-sm text-ink-secondary transition-colors duration-150 group-hover:text-ink-primary">{subtitle}</div>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-ink-secondary transition-colors duration-150 group-hover:text-ink-primary">
+                <span className="truncate">{subtitle}</span>
+                {meal.recurrence?.type && meal.recurrence.type !== 'none' ? (
+                  <span className="inline-flex items-center gap-0.5 rounded-full bg-primary-50 px-1.5 py-0.5 text-xs font-medium text-primary-700">
+                    <RepeatIcon className="h-3 w-3" />
+                    {RECURRENCE_LABELS[meal.recurrence.type] || meal.recurrence.type}
+                    {meal.is_occurrence ? ' · occurrence' : ''}
+                  </span>
+                ) : null}
+              </div>
             </button>
             <ChevronDownIcon className={`h-4 w-4 shrink-0 text-ink-tertiary transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
             <button type="button" onClick={(event) => { event.stopPropagation(); onActionsClick?.(meal) }} className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full p-2 text-ink-tertiary transition-colors duration-150 hover:bg-stone-100 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label="Meal actions">
@@ -176,7 +204,16 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
           </button>
           <button type="button" onClick={toggleExpanded} className="group min-w-0 flex-1 cursor-pointer rounded-xl p-1 text-left transition duration-150 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2">
             <div className="truncate text-sm font-medium text-ink-primary transition-colors duration-150 group-hover:text-stone-900">{mealTitle}</div>
-            <div className="mt-1 text-sm text-ink-secondary transition-colors duration-150 group-hover:text-ink-primary">{servings} servings · {calories} kcal</div>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-ink-secondary transition-colors duration-150 group-hover:text-ink-primary">
+              <span>{servings} servings · {calories} kcal</span>
+              {meal.recurrence?.type && meal.recurrence.type !== 'none' ? (
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-primary-50 px-1.5 py-0.5 text-xs font-medium text-primary-700">
+                  <RepeatIcon className="h-3 w-3" />
+                  {RECURRENCE_LABELS[meal.recurrence.type] || meal.recurrence.type}
+                  {meal.is_occurrence ? ' · occurrence' : ''}
+                </span>
+              ) : null}
+            </div>
           </button>
           <ChevronDownIcon className={`h-4 w-4 shrink-0 text-ink-tertiary transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
           <button type="button" onClick={(event) => { event.stopPropagation(); onActionsClick?.(meal) }} className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full p-2 text-ink-tertiary transition-colors duration-150 hover:bg-stone-100 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label="Meal actions">

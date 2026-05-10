@@ -12,6 +12,7 @@ import { PlannerMealReviewSheet } from '../components/plan/PlannerMealReviewShee
 import { PlannerGenerationFlow } from '../components/plan/PlannerGenerationFlow'
 import { DayActionsMenu } from '../components/planner/DayActionsMenu'
 import { AddMealModal } from '../components/planner/AddMealModal'
+import { RecurrencePicker } from '../components/planner/RecurrencePicker'
 import { HouseholdMembersModal } from '../components/planner/HouseholdMembersModal'
 import { aggregateShoppingList } from '../lib/aggregateShoppingList'
 import { addDays, DAY_ORDER, formatIsoLocalDate, parseIsoLocalDate } from '../lib/planner'
@@ -146,6 +147,7 @@ export function PlannerPage() {
   const [reviewSlotKey, setReviewSlotKey] = useState(null)
   const [reviewLoading, setReviewLoading] = useState(false)
   const [generatingSlotKey, setGeneratingSlotKey] = useState(null)
+  const [recurrenceTarget, setRecurrenceTarget] = useState(null)
 
   useEffect(() => {
     localStorage.setItem(PLANNER_VIEW_MODE_KEY, viewMode)
@@ -476,7 +478,9 @@ export function PlannerPage() {
 
     if (action === 'remove') {
       if (!mealPlan?.draft_plan) return
-      const nextMeals = mealPlan.draft_plan.meals.filter((m) => m.id !== meal.id)
+      // Occurrences are virtual — remove the base meal (removes the whole series)
+      const targetId = meal.occurrence_source_id || meal.id
+      const nextMeals = mealPlan.draft_plan.meals.filter((m) => m.id !== targetId)
       const nextPlan = { ...mealPlan.draft_plan, meals: nextMeals }
       setSaving(true)
       try {
@@ -499,6 +503,28 @@ export function PlannerPage() {
       }
       return
     }
+  }
+
+  const handleSetRecurrence = async (meal, recurrenceType) => {
+    if (!mealPlan?.draft_plan) return
+    // Occurrences are virtual — update the base meal using occurrence_source_id
+    const targetId = meal.occurrence_source_id || meal.id
+    const nextMeals = mealPlan.draft_plan.meals.map((m) =>
+      m.id === targetId
+        ? { ...m, recurrence: { type: recurrenceType }, recurring: recurrenceType !== 'none' }
+        : m
+    )
+    const nextPlan = { ...mealPlan.draft_plan, meals: nextMeals }
+    setSaving(true)
+    try {
+      await persistPlan(nextPlan)
+      toast.success(recurrenceType === 'none' ? 'Recurrence removed.' : 'Recurrence set.')
+    } catch {
+      toast.error('Could not update recurrence.')
+    } finally {
+      setSaving(false)
+    }
+    setRecurrenceTarget(null)
   }
 
   const handleRefine = async () => {
@@ -598,7 +624,7 @@ export function PlannerPage() {
 
   return (
     <div className="min-h-screen bg-surface-base pb-24">
-      <div className="mx-auto max-w-2xl px-4 pb-24">
+      <div className="mx-auto max-w-xl px-4 pb-24">
         <div className="flex items-center justify-between pt-4">
           <h1 className="font-display text-xl text-ink-primary">Planner</h1>
           <div className="flex gap-2">
@@ -643,10 +669,13 @@ export function PlannerPage() {
           title={mealActionTarget ? `${mealActionTarget.label} actions` : 'Meal actions'}
           subtitle="Meal-level tools"
           actions={mealActionTarget ? [
-            { label: 'Regenerate this meal', onClick: () => handleMealAction('regenerate', mealActionTarget.meal) },
-            { label: 'Refine…', onClick: () => { setMealActionTarget(null); setRefineTarget(mealActionTarget.meal); setRefineText('') } },
-            { label: 'Replace…', onClick: () => handleMealAction('replace', mealActionTarget.meal) },
-            { label: 'Remove', onClick: () => handleMealAction('remove', mealActionTarget.meal), danger: true },
+            ...(mealActionTarget.meal.is_occurrence ? [] : [
+              { label: 'Regenerate this meal', onClick: () => handleMealAction('regenerate', mealActionTarget.meal) },
+              { label: 'Refine…', onClick: () => { setMealActionTarget(null); setRefineTarget(mealActionTarget.meal); setRefineText('') } },
+              { label: 'Replace…', onClick: () => handleMealAction('replace', mealActionTarget.meal) },
+            ]),
+            { label: 'Repeat…', onClick: () => { setMealActionTarget(null); setRecurrenceTarget(mealActionTarget.meal) } },
+            { label: mealActionTarget.meal.is_occurrence ? 'Remove series' : 'Remove', onClick: () => handleMealAction('remove', mealActionTarget.meal), danger: true },
           ] : []}
         />
 
@@ -855,6 +884,13 @@ export function PlannerPage() {
           saving={savingMembers}
           onClose={() => setShowMembersModal(false)}
           onSave={handleSaveMembers}
+        />
+
+        <RecurrencePicker
+          open={Boolean(recurrenceTarget)}
+          meal={recurrenceTarget}
+          onClose={() => setRecurrenceTarget(null)}
+          onSelect={(type) => handleSetRecurrence(recurrenceTarget, type)}
         />
 
         <PlannerGenerationFlow
