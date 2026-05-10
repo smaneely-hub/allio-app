@@ -64,6 +64,25 @@ export function useShoppingList(userId, listId = null) {
     refreshShoppingList()
   }, [refreshShoppingList])
 
+  useEffect(() => {
+    if (!userId) return undefined
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'hidden') return
+      refreshShoppingList()
+    }
+
+    window.addEventListener('focus', handleVisibilityOrFocus)
+    window.addEventListener('pageshow', handleVisibilityOrFocus)
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus)
+
+    return () => {
+      window.removeEventListener('focus', handleVisibilityOrFocus)
+      window.removeEventListener('pageshow', handleVisibilityOrFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus)
+    }
+  }, [refreshShoppingList, userId])
+
   const toggleItem = useCallback(async (itemId) => {
     const currentItem = items.find((item) => item.id === itemId)
     if (!currentItem) return null
