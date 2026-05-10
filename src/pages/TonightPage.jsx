@@ -291,11 +291,12 @@ async function persistTonightMealState({ userId, householdId, meal, staplesOnHan
   }
 
   const shoppingItems = buildShoppingItemsFromMeal(meal, staplesOnHand)
-  await upsertShoppingListForDate({
+  const defaultList = await ensureDefaultShoppingList(userId)
+  await addItemsToShoppingList({
     userId,
-    householdId,
-    weekOf: today,
+    listId: defaultList?.id || null,
     items: shoppingItems,
+    source: 'tonight',
   })
 }
 
