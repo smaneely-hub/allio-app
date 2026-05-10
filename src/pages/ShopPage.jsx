@@ -28,6 +28,7 @@ export function ShopPage() {
   const { user } = useAuth()
   const { isPremium, trackUsage } = useSubscription()
   const { shoppingList, items, loading, toggleItem, clearChecked, addItem, updateItem, deleteItem } = useShoppingList(user?.id)
+  const plannerItems = useMemo(() => (items || []).filter((item) => String(item?.source || '').trim().toLowerCase() === 'planner'), [items])
   const [newItemName, setNewItemName] = useState('')
   const [newItemQuantity, setNewItemQuantity] = useState('')
   const [editingItemId, setEditingItemId] = useState(null)
@@ -35,13 +36,13 @@ export function ShopPage() {
   const [editingQuantity, setEditingQuantity] = useState('')
   const displayGroups = useMemo(() => {
     return CATEGORY_ORDER.reduce((acc, category) => {
-      const grouped = (items || [])
+      const grouped = (plannerItems || [])
         .map((item) => ({ ...item, __itemKey: item.id }))
         .filter((item) => (item.category || 'other') === category)
       if (grouped.length) acc[category] = grouped
       return acc
     }, {})
-  }, [items])
+  }, [plannerItems])
   const [openCategories, setOpenCategories] = useState({})
   const [emailing, setEmailing] = useState(false)
   const [upgradeFeature, setUpgradeFeature] = useState(null)
@@ -63,14 +64,14 @@ export function ShopPage() {
   }, [displayGroups])
 
   const progress = useMemo(() => {
-    const checked = items.filter((item) => item.checked).length
+    const checked = plannerItems.filter((item) => item.checked).length
     return {
       checked,
-      total: items.length,
-      percent: items.length > 0 ? Math.round((checked / items.length) * 100) : 0,
-      label: `${items.length} items (${checked} checked)`
+      total: plannerItems.length,
+      percent: plannerItems.length > 0 ? Math.round((checked / plannerItems.length) * 100) : 0,
+      label: `${plannerItems.length} items (${checked} checked)`
     }
-  }, [items])
+  }, [plannerItems])
 
   const clearAllChecks = async () => {
     await clearChecked()
@@ -127,7 +128,7 @@ export function ShopPage() {
       return
     }
 
-    const text = shareListAsText(items || [], shoppingList?.name || 'Shopping List')
+    const text = shareListAsText(plannerItems || [], shoppingList?.name || 'Shopping List')
     await navigator.clipboard.writeText(text)
     toast.success('Shopping list copied!')
   }
@@ -147,8 +148,8 @@ export function ShopPage() {
       }
 
       const weekLabel = shoppingList?.name || 'Shopping List'
-      const itemCount = items?.length || 0
-      const html = formatShoppingListEmail(items || [], weekLabel, 'My Household')
+      const itemCount = plannerItems?.length || 0
+      const html = formatShoppingListEmail(plannerItems || [], weekLabel, 'My Household')
 
       const { error } = await supabase.functions.invoke('send-email', {
         body: { to: authUser.email, subject: `Your Allio shopping list — ${itemCount} items`, html }
@@ -187,15 +188,15 @@ export function ShopPage() {
     )
   }
 
-  if (!items?.length) {
+  if (!plannerItems?.length) {
     return (
       <div className="mx-auto max-w-6xl px-4 pb-24 pt-4 md:px-6 md:pt-6">
         <EmptyState
           emoji="🛒"
           headline="No shopping list yet"
-          body="Generate a meal on Tonight's Meal to create your shopping list."
-          ctaLabel="Generate meal"
-          ctaLink="/tonight"
+          body="Planned meals from Planner will populate your grocery list automatically."
+          ctaLabel="Open Planner"
+          ctaLink="/planner"
         />
       </div>
     )

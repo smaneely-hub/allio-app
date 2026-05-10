@@ -1,6 +1,6 @@
 import { addItemsToShoppingList, buildShoppingItemRows, ensureDefaultShoppingList, getShoppingListItems } from './shoppingLists'
 
-const PLANNER_SOURCES = new Set(['planner', 'tonight'])
+const PLANNER_SOURCES = new Set(['planner'])
 
 export function buildShoppingItemsFromMeal(meal, staplesOnHand = '') {
   return buildShoppingItemRows(meal, staplesOnHand, 'tonight')
