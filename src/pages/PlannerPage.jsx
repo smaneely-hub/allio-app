@@ -303,8 +303,11 @@ export function PlannerPage() {
     const slotKey = `${dayKey}-${mealType}`
     const existingSlot = slotState[slotKey]
     const fallbackAttendees = memberOptions.slice(0, 1).map((m) => m.id)
-    // Use explicitly provided targetDate; fall back to selectedDate (correct for day view, approximate for multi-day)
-    const targetDate = overrides.targetDate || toIsoLocalDate(new Date(selectedDate))
+    // Use explicitly provided targetDate; otherwise resolve the visible day's actual date.
+    const targetDate = overrides.targetDate || (() => {
+      const matchingDay = plannerDays.find((day) => day.key === dayKey)
+      return matchingDay?.date ? toIsoLocalDate(matchingDay.date) : toIsoLocalDate(new Date(selectedDate))
+    })()
 
     const slot = {
       day_of_week: dayKey,
@@ -438,7 +441,7 @@ export function PlannerPage() {
     setMealActionTarget(null)
 
     if (action === 'replace') {
-      handleOpenAddMeal({ key: meal.day, date: new Date(selectedDate) }, meal.meal, meal.id)
+      handleOpenAddMeal({ key: meal.day, date: meal.date ? new Date(meal.date) : new Date(selectedDate) }, meal.meal, meal.id)
       return
     }
 
@@ -621,6 +624,7 @@ export function PlannerPage() {
             }}
             onPrev={handlePrevRange}
             onNext={handleNextRange}
+            onOpenMeal={() => {}}
             onOpenDayActions={setDayActionTarget}
             onOpenMealActions={setMealActionTarget}
             onOpenAddMeal={handleOpenAddMeal}
