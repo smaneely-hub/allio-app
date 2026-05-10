@@ -417,6 +417,16 @@ export function PlannerPage() {
           : m
       )
       await persistPlan({ ...(mealPlan.draft_plan || {}), meals: nextMeals })
+      const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '')
+      setShoppingItems(items)
+      if (household?.id) {
+        await upsertShoppingListForDate({
+          userId: household.user_id,
+          householdId: household.id,
+          weekOf: new Date().toISOString().split('T')[0],
+          items,
+        })
+      }
     }
     setGenerateFlowTarget(null)
     toast.success('Meal added to plan.')
@@ -431,6 +441,16 @@ export function PlannerPage() {
           : m
       )
       await persistPlan({ ...(mealPlan.draft_plan || {}), meals: nextMeals })
+      const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '')
+      setShoppingItems(items)
+      if (household?.id) {
+        await upsertShoppingListForDate({
+          userId: household.user_id,
+          householdId: household.id,
+          weekOf: new Date().toISOString().split('T')[0],
+          items,
+        })
+      }
     }
     setGenerateFlowTarget(null)
     toast.success('Meal locked in.')
@@ -478,9 +498,7 @@ export function PlannerPage() {
 
     if (action === 'remove') {
       if (!mealPlan?.draft_plan) return
-      // Occurrences are virtual — remove the base meal (removes the whole series)
-      const targetId = meal.occurrence_source_id || meal.id
-      const nextMeals = mealPlan.draft_plan.meals.filter((m) => m.id !== targetId)
+      const nextMeals = mealPlan.draft_plan.meals.filter((m) => m.id !== meal.id)
       const nextPlan = { ...mealPlan.draft_plan, meals: nextMeals }
       setSaving(true)
       try {
@@ -503,22 +521,85 @@ export function PlannerPage() {
       }
       return
     }
+
+    // Remove only this occurrence (adds exdate to base meal's recurrence)
+    if (action === 'remove-occurrence') {
+      if (!mealPlan?.draft_plan || !meal.is_occurrence) return
+      const baseMealId = meal.occurrence_source_id || meal.id
+      const exdate = meal.date
+      if (!exdate) return
+      const nextMeals = mealPlan.draft_plan.meals.map((m) => {
+        if (m.id !== baseMealId) return m
+        const existingExdates = Array.isArray(m.recurrence?.exdates) ? m.recurrence.exdates : []
+        if (existingExdates.includes(exdate)) return m
+        return { ...m, recurrence: { ...(m.recurrence || {}), exdates: [...existingExdates, exdate] } }
+      })
+      const nextPlan = { ...mealPlan.draft_plan, meals: nextMeals }
+      setSaving(true)
+      try {
+        await persistPlan(nextPlan)
+        const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '')
+        setShoppingItems(items)
+        if (household?.id) {
+          await upsertShoppingListForDate({
+            userId: household.user_id,
+            householdId: household.id,
+            weekOf: new Date().toISOString().split('T')[0],
+            items,
+          })
+        }
+        toast.success('Occurrence removed.')
+      } catch {
+        toast.error('Could not remove occurrence.')
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
+
+    // Remove the entire series (removes base meal)
+    if (action === 'remove-series') {
+      if (!mealPlan?.draft_plan) return
+      const targetId = meal.occurrence_source_id || meal.id
+      const nextMeals = mealPlan.draft_plan.meals.filter((m) => m.id !== targetId)
+      const nextPlan = { ...mealPlan.draft_plan, meals: nextMeals }
+      setSaving(true)
+      try {
+        await persistPlan(nextPlan)
+        const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '')
+        setShoppingItems(items)
+        if (household?.id) {
+          await upsertShoppingListForDate({
+            userId: household.user_id,
+            householdId: household.id,
+            weekOf: new Date().toISOString().split('T')[0],
+            items,
+          })
+        }
+        toast.success('Series removed.')
+      } catch {
+        toast.error('Could not remove series.')
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
   }
 
-  const handleSetRecurrence = async (meal, recurrenceType) => {
+  const handleSetRecurrence = async (meal, recurrenceRule) => {
     if (!mealPlan?.draft_plan) return
-    // Occurrences are virtual — update the base meal using occurrence_source_id
+    // Occurrences are virtual — always update the base meal
     const targetId = meal.occurrence_source_id || meal.id
     const nextMeals = mealPlan.draft_plan.meals.map((m) =>
       m.id === targetId
-        ? { ...m, recurrence: { type: recurrenceType }, recurring: recurrenceType !== 'none' }
+        ? { ...m, recurrence: recurrenceRule, recurring: recurrenceRule.frequency !== 'none' }
         : m
     )
     const nextPlan = { ...mealPlan.draft_plan, meals: nextMeals }
     setSaving(true)
     try {
       await persistPlan(nextPlan)
-      toast.success(recurrenceType === 'none' ? 'Recurrence removed.' : 'Recurrence set.')
+      toast.success(recurrenceRule.frequency === 'none' ? 'Recurrence removed.' : 'Recurrence set.')
     } catch {
       toast.error('Could not update recurrence.')
     } finally {
@@ -675,7 +756,12 @@ export function PlannerPage() {
               { label: 'Replace…', onClick: () => handleMealAction('replace', mealActionTarget.meal) },
             ]),
             { label: 'Repeat…', onClick: () => { setMealActionTarget(null); setRecurrenceTarget(mealActionTarget.meal) } },
-            { label: mealActionTarget.meal.is_occurrence ? 'Remove series' : 'Remove', onClick: () => handleMealAction('remove', mealActionTarget.meal), danger: true },
+            ...(mealActionTarget.meal.is_occurrence ? [
+              { label: 'Remove this occurrence', onClick: () => handleMealAction('remove-occurrence', mealActionTarget.meal), danger: true },
+              { label: 'Remove series', onClick: () => handleMealAction('remove-series', mealActionTarget.meal), danger: true },
+            ] : [
+              { label: 'Remove', onClick: () => handleMealAction('remove', mealActionTarget.meal), danger: true },
+            ]),
           ] : []}
         />
 
