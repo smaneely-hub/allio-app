@@ -9,8 +9,8 @@ import { supabase } from '../lib/supabase'
 import { normalizeMealRecord } from '../lib/mealSchema'
 import { getLocalDateString } from '../lib/date'
 import { invokePlannerFunction, refineMeal } from '../lib/plannerFunction'
-import { buildShoppingItemsFromMeal, upsertShoppingListForDate } from '../lib/tonightPersistence'
-import { addItemsToShoppingList, ensureDefaultShoppingList } from '../lib/shoppingLists'
+import { upsertShoppingListForDate } from '../lib/tonightPersistence'
+import { ensureDefaultShoppingList } from '../lib/shoppingLists'
 import { calculateServings, logServingsCalculation, getDemographicBucket } from '../hooks/useServings'
 import { CookingMode } from '../components/CookingMode'
 import { MealDetailBody } from '../components/MealDetailBody'
@@ -290,14 +290,7 @@ async function persistTonightMealState({ userId, householdId, meal, staplesOnHan
     if (error) throw error
   }
 
-  const shoppingItems = buildShoppingItemsFromMeal(meal, staplesOnHand)
-  const defaultList = await ensureDefaultShoppingList(userId)
-  await addItemsToShoppingList({
-    userId,
-    listId: defaultList?.id || null,
-    items: shoppingItems,
-    source: 'tonight',
-  })
+  await ensureDefaultShoppingList(userId)
 }
 
 async function persistTonightMealForUser({ userId, meal, staplesOnHand = '' }) {
