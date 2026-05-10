@@ -1,9 +1,16 @@
+import { expandRecurringMeals, getStartOfWeek, parseIsoLocalDate } from './planner'
 import { buildGroupedShoppingItems, CATEGORY_LABELS, CATEGORY_ORDER, groupItemsByCategory } from './shoppingListUtils'
 
 export function aggregateShoppingList(mealPlan, staplesOnHand = '') {
   const meals = mealPlan?.meals || mealPlan || []
+  const datedMeals = meals
+    .map((meal) => parseIsoLocalDate(meal?.date))
+    .filter(Boolean)
+    .sort((a, b) => a.getTime() - b.getTime())
+  const windowAnchor = datedMeals[0] || new Date()
+  const expandedMeals = expandRecurringMeals(meals, getStartOfWeek(windowAnchor), 7)
   // Non-cooking meals don't contribute ingredients to the grocery list.
-  const cookingMeals = meals.filter((meal) => !['eat_out', 'takeout', 'delivery'].includes(meal?.meal_source || 'generated'))
+  const cookingMeals = expandedMeals.filter((meal) => !['eat_out', 'takeout', 'delivery'].includes(meal?.meal_source || 'generated'))
   return buildGroupedShoppingItems(cookingMeals, staplesOnHand)
 }
 
