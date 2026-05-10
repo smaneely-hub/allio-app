@@ -180,7 +180,7 @@ function flattenMealDirections(recipe) {
 
 export function normalizeMeal(meal = {}, weekStart = getStartOfWeek()) {
   const slot = normalizeMealSlotName(meal.meal || meal.meal_type || meal.slot || '')
-  const existingDate = meal?.date ? new Date(meal.date) : null
+  const existingDate = meal?.date ? parseIsoLocalDate(meal.date) : null
   const hasStoredDate = existingDate && !Number.isNaN(existingDate.getTime())
   if (hasStoredDate) existingDate.setHours(0, 0, 0, 0)
   const derivedDayName = hasStoredDate
