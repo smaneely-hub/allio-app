@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { addDays, buildPlannerDays, getStartOfWeek, MEAL_SLOTS, DAY_SHORT } from '../../lib/planner'
+import { addDays, buildPlannerDays, formatIsoLocalDate, getStartOfWeek, MEAL_SLOTS, DAY_SHORT } from '../../lib/planner'
 import { MealCard } from './MealCard'
 
 function ChevronLeftIcon(props) {
@@ -147,7 +147,7 @@ function MonthView({ selectedDate, meals, onSelectDay }) {
             {week.map((date, dayIndex) => {
               const isInMonth = date.getMonth() === currentMonth
               const isToday = date.toDateString() === today.toDateString()
-              const dateStr = date.toISOString().slice(0, 10)
+              const dateStr = formatIsoLocalDate(date)
               const fullDayName = date.toLocaleDateString('en-US', { weekday: 'long' })
               const shortKey = DAY_SHORT[fullDayName]
               // Date-keyed meals first; fall back to weekday key for legacy undated meals
@@ -375,7 +375,7 @@ export function MealPlanWorkspace({
     setExpandedDays((current) => {
       const next = {}
       plannerDays.forEach((day, index) => {
-        const stateKey = `${day.key}-${day.date.toISOString().slice(0, 10)}`
+        const stateKey = `${day.key}-${formatIsoLocalDate(day.date)}`
         next[stateKey] = Object.prototype.hasOwnProperty.call(current, stateKey)
           ? current[stateKey]
           : index === 0
@@ -448,12 +448,12 @@ export function MealPlanWorkspace({
           ) : (
             plannerDays.map((day) => (
               <DaySection
-                key={`${day.key}-${day.date.toISOString().slice(0, 10)}`}
+                key={`${day.key}-${formatIsoLocalDate(day.date)}`}
                 day={day}
                 collapsible
-                expanded={Boolean(expandedDays[`${day.key}-${day.date.toISOString().slice(0, 10)}`])}
+                expanded={Boolean(expandedDays[`${day.key}-${formatIsoLocalDate(day.date)}`])}
                 onToggle={() => {
-                  const stateKey = `${day.key}-${day.date.toISOString().slice(0, 10)}`
+                  const stateKey = `${day.key}-${formatIsoLocalDate(day.date)}`
                   setExpandedDays((current) => ({ ...current, [stateKey]: !current[stateKey] }))
                 }}
                 onOpenMeal={onOpenMeal}

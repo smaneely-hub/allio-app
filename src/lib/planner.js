@@ -29,6 +29,23 @@ export function addDays(date, amount) {
   return next
 }
 
+export function formatIsoLocalDate(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+export function parseIsoLocalDate(value) {
+  const text = String(value || '').trim()
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return null
+  const [, year, month, day] = match
+  const date = new Date(Number(year), Number(month) - 1, Number(day))
+  date.setHours(0, 0, 0, 0)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
 export function formatDayLabel(date, today = new Date()) {
   const isToday = date.toDateString() === today.toDateString()
   const base = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -189,10 +206,10 @@ export function normalizeMeal(meal = {}, weekStart = getStartOfWeek()) {
 
   return {
     ...meal,
-    id: meal.id || `${mealDate.toISOString().slice(0, 10)}-${slot}`,
+    id: meal.id || `${formatIsoLocalDate(mealDate)}-${slot}`,
     day: DAY_SHORT[dayName],
     day_name: dayName,
-    date: mealDate.toISOString().slice(0, 10),
+    date: formatIsoLocalDate(mealDate),
     meal: slot,
     slot,
     title: recipe.title || meal.title || meal.name || 'Meal',
@@ -231,7 +248,7 @@ export function buildPlannerDays({ start = new Date(), count = 7, meals = [], da
   // saved Friday meal onto a different visible day.
   const normalizedMeals = meals.map((meal) => {
     const normalized = normalizeMeal(meal, windowStart)
-    const storedDate = meal?.date ? new Date(meal.date) : null
+    const storedDate = parseIsoLocalDate(meal?.date)
 
     if (storedDate && !Number.isNaN(storedDate.getTime())) {
       storedDate.setHours(0, 0, 0, 0)
@@ -240,7 +257,7 @@ export function buildPlannerDays({ start = new Date(), count = 7, meals = [], da
         ...normalized,
         day: DAY_SHORT[storedDayName],
         day_name: storedDayName,
-        date: storedDate.toISOString().slice(0, 10),
+        date: formatIsoLocalDate(storedDate),
       }
     }
 
@@ -251,7 +268,7 @@ export function buildPlannerDays({ start = new Date(), count = 7, meals = [], da
     const date = addDays(windowStart, index)
     const dayName = normalizeDayName(date.toLocaleDateString('en-US', { weekday: 'long' }))
     const short = DAY_SHORT[dayName]
-    const dayDateStr = date.toISOString().slice(0, 10)
+    const dayDateStr = formatIsoLocalDate(date)
     const mealsForDay = normalizedMeals.filter((meal) =>
       meal.date ? meal.date === dayDateStr : meal.day === short
     )

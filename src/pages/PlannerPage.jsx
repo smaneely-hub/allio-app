@@ -14,13 +14,10 @@ import { DayActionsMenu } from '../components/planner/DayActionsMenu'
 import { AddMealModal } from '../components/planner/AddMealModal'
 import { HouseholdMembersModal } from '../components/planner/HouseholdMembersModal'
 import { aggregateShoppingList } from '../lib/aggregateShoppingList'
-import { addDays, DAY_ORDER } from '../lib/planner'
+import { addDays, DAY_ORDER, formatIsoLocalDate, parseIsoLocalDate } from '../lib/planner'
 
 function toIsoLocalDate(date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return formatIsoLocalDate(date)
 }
 import { normalizeMealRecord } from '../lib/mealSchema'
 import { normalizeRecipe } from '../lib/recipeSchema'
@@ -441,7 +438,7 @@ export function PlannerPage() {
     setMealActionTarget(null)
 
     if (action === 'replace') {
-      handleOpenAddMeal({ key: meal.day, date: meal.date ? new Date(meal.date) : new Date(selectedDate) }, meal.meal, meal.id)
+      handleOpenAddMeal({ key: meal.day, date: meal.date ? parseIsoLocalDate(meal.date) : new Date(selectedDate) }, meal.meal, meal.id)
       return
     }
 
