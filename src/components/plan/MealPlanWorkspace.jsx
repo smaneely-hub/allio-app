@@ -116,7 +116,8 @@ function MonthView({ selectedDate, meals, onSelectDay }) {
   const mealCoverage = useMemo(() => {
     const map = {}
     meals.forEach((meal) => {
-      const key = meal.day
+      // Date-first: use ISO date string as key; fall back to weekday short for legacy undated meals
+      const key = meal.date || meal.day
       if (!map[key]) map[key] = new Set()
       map[key].add(meal.meal || meal.slot || 'dinner')
     })
@@ -146,9 +147,11 @@ function MonthView({ selectedDate, meals, onSelectDay }) {
             {week.map((date, dayIndex) => {
               const isInMonth = date.getMonth() === currentMonth
               const isToday = date.toDateString() === today.toDateString()
+              const dateStr = date.toISOString().slice(0, 10)
               const fullDayName = date.toLocaleDateString('en-US', { weekday: 'long' })
               const shortKey = DAY_SHORT[fullDayName]
-              const filledSlots = mealCoverage[shortKey] || new Set()
+              // Date-keyed meals first; fall back to weekday key for legacy undated meals
+              const filledSlots = mealCoverage[dateStr] || mealCoverage[shortKey] || new Set()
 
               return (
                 <button

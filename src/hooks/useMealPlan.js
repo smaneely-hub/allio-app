@@ -395,6 +395,7 @@ export function useMealPlan(scheduleId) {
       const normalizedSlot = {
         day: (typeof slot.day_of_week === 'string' ? slot.day_of_week : slot.day || '').trim().slice(0, 3).toLowerCase() || 'mon',
         meal: (typeof slot.meal_type === 'string' ? slot.meal_type : slot.meal || '').trim().toLowerCase().replace(/\s+/g, '_') || 'dinner',
+        date: typeof slot.target_date === 'string' && slot.target_date ? slot.target_date : null,
         attendees: Array.isArray(slot.attendees) ? slot.attendees : [],
         effort_level: slot.effort_level || 'medium',
         planning_notes: slot.planning_notes || '',
@@ -472,15 +473,24 @@ export function useMealPlan(scheduleId) {
 
       const currentMeals = mealPlan?.draft_plan?.meals || []
       const slotKey = `${normalizedSlot.day}-${normalizedSlot.meal}`
-      const existingSlotMeal = currentMeals.find((m) => `${m.day}-${m.meal}` === slotKey)
+      const targetDate = normalizedSlot.date
+
+      // Date-first: find/remove meal by exact date when known; fall back to weekday+slot for legacy undated meals
+      const existingSlotMeal = targetDate
+        ? currentMeals.find((m) => m.date === targetDate && m.meal === normalizedSlot.meal)
+        : currentMeals.find((m) => `${m.day}-${m.meal}` === slotKey)
+
       const nextMeals = [
-        ...currentMeals.filter((m) => `${m.day}-${m.meal}` !== slotKey),
+        ...currentMeals.filter((m) => {
+          if (targetDate && m.date) return !(m.date === targetDate && m.meal === normalizedSlot.meal)
+          return `${m.day}-${m.meal}` !== slotKey
+        }),
         applySourceDefaults({
           ...newMeal,
           day: normalizedSlot.day,
           meal: normalizedSlot.meal,
-          date: existingSlotMeal?.date || newMeal.date || null,
-          recurring: Boolean(existingSlotMeal?.recurring || newMeal.recurring),
+          date: targetDate || existingSlotMeal?.date || newMeal.date || null,
+          recurring: false,
           id: newMeal.id || crypto.randomUUID(),
         }),
       ]

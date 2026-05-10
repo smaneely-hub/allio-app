@@ -223,7 +223,8 @@ export function PlannerPage() {
 
   const handleOpenAddMeal = (day, mealSlot = 'dinner', existingMealId = null, startOnGenerate = false) => {
     if (startOnGenerate) {
-      setGenerateFlowTarget({ dayKey: day?.key || day, mealSlot })
+      const dayTargetDate = day?.date ? toIsoLocalDate(day.date) : toIsoLocalDate(new Date(selectedDate))
+      setGenerateFlowTarget({ dayKey: day?.key || day, mealSlot, targetDate: dayTargetDate })
     } else {
       setAddMealTarget({ day, mealSlot, existingMealId, startOnGenerate })
     }
@@ -231,11 +232,16 @@ export function PlannerPage() {
 
   const handleClearDay = async (dayDate) => {
     const target = new Date(dayDate)
+    target.setHours(0, 0, 0, 0)
+    const targetDateStr = toIsoLocalDate(target)
     const dayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][target.getDay()]
 
     let nextMeals = mealPlan?.draft_plan?.meals || []
     if (mealPlan?.draft_plan?.meals?.length) {
-      nextMeals = mealPlan.draft_plan.meals.filter((m) => m.day !== dayKey)
+      // Date-first: remove meals on this exact date; fall back to weekday key for legacy undated meals
+      nextMeals = mealPlan.draft_plan.meals.filter((m) =>
+        m.date ? m.date !== targetDateStr : m.day !== dayKey
+      )
       const nextPlan = { ...mealPlan.draft_plan, meals: nextMeals }
       try {
         await persistPlan(nextPlan)
@@ -297,10 +303,13 @@ export function PlannerPage() {
     const slotKey = `${dayKey}-${mealType}`
     const existingSlot = slotState[slotKey]
     const fallbackAttendees = memberOptions.slice(0, 1).map((m) => m.id)
+    // Use explicitly provided targetDate; fall back to selectedDate (correct for day view, approximate for multi-day)
+    const targetDate = overrides.targetDate || toIsoLocalDate(new Date(selectedDate))
 
     const slot = {
       day_of_week: dayKey,
       meal_type: mealType,
+      target_date: targetDate,
       active: true,
       attendees: overrides.attendees?.length
         ? overrides.attendees
@@ -332,7 +341,6 @@ export function PlannerPage() {
 
       const result = await generateSlot({ household, members, slot, schedule: activeSchedule })
       const resultMeals = result?.draft_plan?.meals || result?.plan?.meals || []
-      const targetDate = toIsoLocalDate(new Date(selectedDate))
       const newMeal = resultMeals.find((m) => `${m.day}-${m.meal}` === slotKey) || resultMeals[0]
       return newMeal ? normalizeMealRecord({ ...newMeal, day: dayKey, meal: mealType, date: targetDate, recurring: false }) : null
     } catch (err) {
@@ -351,6 +359,7 @@ export function PlannerPage() {
     if (!generateFlowTarget) return null
     let meal = await handleGenerateSlot(generateFlowTarget.dayKey, generateFlowTarget.mealSlot, {
       effort, attendees, planningNotes, dietaryFocus,
+      targetDate: generateFlowTarget.targetDate,
     })
     if (!meal) return null
     if (!meal.image_url && !meal.image) {
@@ -367,7 +376,7 @@ export function PlannerPage() {
     const slotKey = `${generateFlowTarget.dayKey}-${generateFlowTarget.mealSlot}`
     let newMeal = resultMeals.find((m) => `${m.day}-${m.meal}` === slotKey) || resultMeals[0]
     if (!newMeal) return null
-    const targetDate = toIsoLocalDate(new Date(selectedDate))
+    const targetDate = generateFlowTarget.targetDate || toIsoLocalDate(new Date(selectedDate))
     newMeal = normalizeMealRecord({ ...newMeal, day: generateFlowTarget.dayKey, meal: generateFlowTarget.mealSlot, date: targetDate, recurring: false })
     if (!newMeal.image_url && !newMeal.image) {
       const imageUrl = await fetchPlannerMealImage(newMeal.name)
@@ -656,14 +665,16 @@ export function PlannerPage() {
             const target = addMealTarget
             setAddMealTarget(null)
             if (target?.day?.key && target?.mealSlot) {
-              setGenerateFlowTarget({ dayKey: target.day.key, mealSlot: target.mealSlot })
+              const dayTargetDate = target.day?.date ? toIsoLocalDate(target.day.date) : toIsoLocalDate(new Date(selectedDate))
+              setGenerateFlowTarget({ dayKey: target.day.key, mealSlot: target.mealSlot, targetDate: dayTargetDate })
             }
           }}
           onGenerate={async ({ effort, attendees, planningNotes, dietaryFocus }) => {
             const target = addMealTarget
             setAddMealTarget(null)
             if (target?.day?.key && target?.mealSlot) {
-              await handleGenerateSlot(target.day.key, target.mealSlot, { effort, attendees, planningNotes, dietaryFocus })
+              const dayTargetDate = target.day?.date ? toIsoLocalDate(target.day.date) : toIsoLocalDate(new Date(selectedDate))
+              await handleGenerateSlot(target.day.key, target.mealSlot, { effort, attendees, planningNotes, dietaryFocus, targetDate: dayTargetDate })
             }
           }}
           onSaveMeal={async (input) => {
@@ -736,10 +747,15 @@ export function PlannerPage() {
             }
 
             const currentMeals = mealPlan?.draft_plan?.meals || []
+            const saveMealTargetDate = addMealTarget?.day?.date
+              ? toIsoLocalDate(addMealTarget.day.date)
+              : toIsoLocalDate(new Date(selectedDate))
             const newMeal = {
               id: input.existingMealId || crypto.randomUUID(),
               day: input.dayKey,
               meal: input.mealSlot,
+              date: saveMealTargetDate,
+              recurring: false,
               name: mealTitle,
               source: input.meal_source,
               source_type: input.meal_source,

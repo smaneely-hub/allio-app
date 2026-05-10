@@ -189,7 +189,7 @@ export function normalizeMeal(meal = {}, weekStart = getStartOfWeek()) {
 
   return {
     ...meal,
-    id: meal.id || `${DAY_SHORT[dayName]}-${slot}`,
+    id: meal.id || `${mealDate.toISOString().slice(0, 10)}-${slot}`,
     day: DAY_SHORT[dayName],
     day_name: dayName,
     date: mealDate.toISOString().slice(0, 10),

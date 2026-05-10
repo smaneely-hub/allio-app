@@ -17,7 +17,7 @@ export function normalizeMealRecord(meal = {}, fallback = {}) {
   })
 
   return {
-    id: typeof meal.id === 'string' && meal.id ? meal.id : `${safeDay}-${safeMeal}`,
+    id: typeof meal.id === 'string' && meal.id ? meal.id : (typeof meal.date === 'string' && meal.date ? `${meal.date}-${safeMeal}` : `${safeDay}-${safeMeal}`),
     day: safeDay || 'mon',
     meal: safeMeal || 'dinner',
     meal_source: mealSource,
