@@ -47,7 +47,34 @@ function fractionToNumber(value = '') {
 function formatQuantity(value) {
   if (!Number.isFinite(value)) return ''
   const rounded = Math.round(value * 100) / 100
+  const fractionMap = new Map([
+    [0.25, '1/4'],
+    [0.33, '1/3'],
+    [0.5, '1/2'],
+    [0.67, '2/3'],
+    [0.75, '3/4'],
+  ])
+  const whole = Math.trunc(rounded)
+  const remainder = Math.round((rounded - whole) * 100) / 100
+  if (fractionMap.has(rounded)) return fractionMap.get(rounded)
+  if (whole > 0 && fractionMap.has(remainder)) return `${whole} ${fractionMap.get(remainder)}`
   return Number.isInteger(rounded) ? String(rounded) : String(rounded)
+}
+
+function cleanupIngredientDisplayName(name = '') {
+  return String(name)
+    .replace(/,\s*(diced|halved|chopped|minced|grated|sliced|shredded|crushed)\b/gi, '')
+    .replace(/^grated\s+/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function shouldHideUnit(unit = '', quantity = null) {
+  const normalized = String(unit || '').trim().toLowerCase()
+  if (!normalized) return true
+  if (normalized === 'piece' || normalized === 'pieces') return true
+  if ((normalized === 'medium' || normalized === 'large' || normalized === 'small') && Number.isFinite(quantity)) return true
+  return false
 }
 
 /** Normalize ingredient names for matching and grouping. */
@@ -106,10 +133,10 @@ export function parseIngredient(rawIngredient) {
     }
   }
 
-  const cleanedName = String(name || '')
+  const cleanedName = cleanupIngredientDisplayName(String(name || '')
     .replace(/^[-•*]\s*/, '')
     .replace(/\s+/g, ' ')
-    .trim()
+    .trim())
 
   const normalizedName = normalizeIngredientName(cleanedName)
   if (!cleanedName || cleanedName.length < 2) return null
@@ -165,7 +192,7 @@ export function buildGroupedShoppingItems(meals = [], staplesOnHand = '') {
         bucket.set(key, {
           name: parsed.name,
           quantity: parsed.quantity,
-          unit: parsed.unit,
+          unit: shouldHideUnit(parsed.unit, parsed.quantity) ? '' : parsed.unit,
           category: parsed.category,
           checked: false,
           used_in: [usageKey],
