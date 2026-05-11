@@ -156,10 +156,13 @@ export function parseIngredient(rawIngredient) {
 
 /** Build grouped shopping items from meals while skipping pantry staples. */
 function unwrapMealIngredients(meal = {}) {
-  if (Array.isArray(meal.ingredients) && meal.ingredients.length > 0) return meal.ingredients
-  if (Array.isArray(meal.ingredientGroups)) {
-    return meal.ingredientGroups.flatMap((group) => Array.isArray(group?.ingredients) ? group.ingredients : [])
+  // Prefer structured groups — quantity is preserved as a separate numeric field,
+  // avoiding the string-parsing path that drops quantity for unit-less items like "2 eggs".
+  if (Array.isArray(meal.ingredientGroups) && meal.ingredientGroups.length > 0) {
+    const items = meal.ingredientGroups.flatMap((group) => Array.isArray(group?.ingredients) ? group.ingredients : [])
+    if (items.length > 0) return items
   }
+  if (Array.isArray(meal.ingredients) && meal.ingredients.length > 0) return meal.ingredients
   return []
 }
 

@@ -208,7 +208,7 @@ export function PlannerGenerationFlow({
       {phase === 'config' && (
         <>
           <div className="flex-1 overflow-y-auto p-4">
-            <div className="space-y-5">
+            <div className="mx-auto max-w-xl space-y-5">
               {/* Effort */}
               <div>
                 <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-ink-tertiary">Effort</div>
@@ -321,15 +321,17 @@ export function PlannerGenerationFlow({
           </div>
 
           <div className="shrink-0 border-t border-surface-muted bg-white p-4">
-            <button
-              type="button"
-              disabled={!canFireGenerate}
-              onClick={handleGenerate}
-              className="group flex min-h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <SparklesIcon className="h-4 w-4" />
-              Generate {mealSlot}
-            </button>
+            <div className="mx-auto max-w-xl">
+              <button
+                type="button"
+                disabled={!canFireGenerate}
+                onClick={handleGenerate}
+                className="group flex min-h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors duration-150 hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <SparklesIcon className="h-4 w-4" />
+                Generate {mealSlot}
+              </button>
+            </div>
           </div>
         </>
       )}
