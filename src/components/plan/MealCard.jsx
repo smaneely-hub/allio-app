@@ -7,12 +7,32 @@ import { normalizeRecipe } from '../../lib/recipeSchema'
 import { CookingMode } from '../CookingMode'
 import { MealDetailBody } from '../MealDetailBody'
 
-const RECURRENCE_LABELS = {
-  daily: 'Daily',
-  weekdays: 'Weekdays',
-  weekly: 'Weekly',
-  monthly: 'Monthly',
-  yearly: 'Yearly',
+const DOW_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+const DOW_INITIALS = { mon: 'M', tue: 'T', wed: 'W', thu: 'T', fri: 'F', sat: 'S', sun: 'S' }
+
+function getRecurrenceLabel(recurrence) {
+  if (!recurrence) return null
+
+  // V2 format
+  if (recurrence.frequency) {
+    const { frequency, interval = 1, byWeekday = [] } = recurrence
+    if (frequency === 'none') return null
+    if (frequency === 'daily') return interval === 1 ? 'Daily' : `Every ${interval}d`
+    if (frequency === 'weekly') {
+      if (byWeekday.length > 0) {
+        const initials = DOW_ORDER.filter((d) => byWeekday.includes(d)).map((d) => DOW_INITIALS[d]).join('')
+        return interval === 1 ? initials : `${initials}·${interval}wk`
+      }
+      return interval === 1 ? 'Weekly' : `Every ${interval}wk`
+    }
+    if (frequency === 'monthly') return interval === 1 ? 'Monthly' : `Every ${interval}mo`
+    if (frequency === 'yearly') return interval === 1 ? 'Yearly' : `Every ${interval}yr`
+    return null
+  }
+
+  // Legacy Phase 1 format
+  const legacyLabels = { daily: 'Daily', weekdays: 'Weekdays', weekly: 'Weekly', monthly: 'Monthly', yearly: 'Yearly' }
+  return legacyLabels[recurrence.type] || null
 }
 
 function RepeatIcon(props) {
@@ -135,6 +155,10 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
         </div>
       )}
       <div className="space-y-4 px-3 pb-4 pt-3">
+        <div>
+          <h3 className="text-base font-semibold text-ink-primary">{mealTitle}</h3>
+          <p className="mt-1 text-sm text-ink-secondary">{servings} servings · {calories} kcal</p>
+        </div>
         {(prepTime > 0 || cookTime > 0) && (
           <div className="flex flex-wrap gap-2">
             {prepTime > 0 && <span className="rounded-full bg-warm-50 px-3 py-1 text-xs text-ink-secondary">Prep {prepTime} min</span>}
@@ -173,11 +197,11 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
               <div className="truncate text-sm font-medium text-ink-primary transition-colors duration-150 group-hover:text-stone-900">{title}</div>
               <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-ink-secondary transition-colors duration-150 group-hover:text-ink-primary">
                 <span className="truncate">{subtitle}</span>
-                {meal.recurrence?.type && meal.recurrence.type !== 'none' ? (
+                {getRecurrenceLabel(meal.recurrence) ? (
                   <span className="inline-flex items-center gap-0.5 rounded-full bg-primary-50 px-1.5 py-0.5 text-xs font-medium text-primary-700">
                     <RepeatIcon className="h-3 w-3" />
-                    {RECURRENCE_LABELS[meal.recurrence.type] || meal.recurrence.type}
-                    {meal.is_occurrence ? ' · occurrence' : ''}
+                    {getRecurrenceLabel(meal.recurrence)}
+                    {meal.is_occurrence ? ' · occ' : ''}
                   </span>
                 ) : null}
               </div>
