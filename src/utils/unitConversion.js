@@ -77,26 +77,78 @@ function toBase(quantity, normUnit, table) {
   return quantity * (table[normUnit] ?? 1)
 }
 
-function bestDisplay(baseQty, table) {
-  const entries = Object.entries(table)
+function getStoredUnitPreference() {
+  if (typeof window === 'undefined' || !window.localStorage) return 'imperial'
+  return window.localStorage.getItem('allio-unit-preference') === 'metric' ? 'metric' : 'imperial'
+}
+
+function getDisplayUnitsForFamily(familyName, preferredSystem) {
+  if (familyName === 'us_volume') {
+    return preferredSystem === 'metric' ? ['ml', 'l'] : ['tsp', 'tbsp', 'cup', 'pint', 'quart', 'gallon']
+  }
+  if (familyName === 'metric_volume') {
+    return preferredSystem === 'metric' ? ['ml', 'l'] : ['tsp', 'tbsp', 'cup', 'pint', 'quart', 'gallon']
+  }
+  if (familyName === 'us_weight') {
+    return preferredSystem === 'metric' ? ['g', 'kg'] : ['oz', 'lb']
+  }
+  if (familyName === 'metric_weight') {
+    return preferredSystem === 'metric' ? ['g', 'kg'] : ['oz', 'lb']
+  }
+  return []
+}
+
+function convertBetweenFamilies(baseQty, familyName, preferredSystem) {
+  if (familyName === 'us_volume' && preferredSystem === 'metric') return { familyName: 'metric_volume', baseQty: baseQty / 0.202884 }
+  if (familyName === 'metric_volume' && preferredSystem !== 'metric') return { familyName: 'us_volume', baseQty: baseQty * 0.202884 }
+  if (familyName === 'us_weight' && preferredSystem === 'metric') return { familyName: 'metric_weight', baseQty: baseQty / 0.035274 }
+  if (familyName === 'metric_weight' && preferredSystem !== 'metric') return { familyName: 'us_weight', baseQty: baseQty * 0.035274 }
+  return { familyName, baseQty }
+}
+
+function bestDisplay(baseQty, familyName, preferredSystem = getStoredUnitPreference()) {
+  const converted = convertBetweenFamilies(baseQty, familyName, preferredSystem)
+  const family = FAMILIES.find((entry) => entry.name === converted.familyName)
+  const table = family?.table || {}
+  const preferredUnits = getDisplayUnitsForFamily(converted.familyName, preferredSystem)
+  const entries = preferredUnits.map((unit) => [unit, table[unit]]).filter(([, mult]) => Number.isFinite(mult))
+
   let bestUnit = null
   let bestMult = 0
 
   for (const [unit, mult] of entries) {
-    if (baseQty / mult >= 1 && mult > bestMult) {
+    const value = converted.baseQty / mult
+    if (value >= 1 && mult > bestMult) {
       bestUnit = unit
       bestMult = mult
     }
   }
 
   if (!bestUnit) {
-    // All display quantities < 1 — use the smallest unit
-    const [unit, mult] = entries.sort((a, b) => a[1] - b[1])[0]
-    bestUnit = unit
-    bestMult = mult
+    if (converted.familyName.endsWith('volume')) {
+      if (preferredSystem === 'metric') {
+        bestUnit = converted.baseQty >= 1000 ? 'l' : 'ml'
+      } else if (converted.baseQty >= 48) {
+        bestUnit = 'cup'
+      } else if (converted.baseQty >= 3) {
+        bestUnit = 'tbsp'
+      } else {
+        bestUnit = 'tsp'
+      }
+    } else if (converted.familyName.endsWith('weight')) {
+      if (preferredSystem === 'metric') {
+        bestUnit = converted.baseQty >= 1000 ? 'kg' : 'g'
+      } else {
+        bestUnit = converted.baseQty >= 16 ? 'lb' : 'oz'
+      }
+    } else {
+      const [unit] = entries[0] || []
+      bestUnit = unit || null
+    }
+    bestMult = table[bestUnit] || 1
   }
 
-  return { unit: bestUnit, quantity: baseQty / bestMult }
+  return { unit: bestUnit, quantity: converted.baseQty / bestMult }
 }
 
 function parseFraction(value) {
@@ -209,7 +261,7 @@ export function mergeIngredients(ingredients) {
       let displayQty
 
       if (family.table) {
-        const best = bestDisplay(baseTotal, family.table)
+        const best = bestDisplay(baseTotal, family.name)
         displayUnit = best.unit
         displayQty = best.quantity
       } else {

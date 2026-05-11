@@ -13,6 +13,8 @@ const DEFAULT_PREFERENCES = {
   default_servings: 4,
 }
 
+const UNIT_PREFERENCE_STORAGE_KEY = 'allio-unit-preference'
+
 function isMissingPreferencesTable(error) {
   const message = String(error?.message || error?.details || '')
   return message.includes("Could not find the table 'public.user_preferences'")
@@ -68,10 +70,12 @@ export function SettingsPage() {
         }
         setPreferences(DEFAULT_PREFERENCES)
       } else {
-        setPreferences({
+        const nextPreferences = {
           ...DEFAULT_PREFERENCES,
           ...(data || {}),
-        })
+        }
+        setPreferences(nextPreferences)
+        localStorage.setItem(UNIT_PREFERENCE_STORAGE_KEY, nextPreferences.units === 'metric' ? 'metric' : 'imperial')
       }
       setLoadingPrefs(false)
     }
@@ -87,6 +91,8 @@ export function SettingsPage() {
   const persistPreferences = async (next) => {
     if (!user?.id) return
     setPreferences(next)
+    localStorage.setItem(UNIT_PREFERENCE_STORAGE_KEY, next.units === 'metric' ? 'metric' : 'imperial')
+
     const payload = {
       user_id: user.id,
       weekly_meal_reminders: Boolean(next.weekly_meal_reminders),
