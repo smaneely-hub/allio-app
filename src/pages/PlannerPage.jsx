@@ -738,7 +738,7 @@ export function PlannerPage() {
         )}
 
         <DayActionsMenu
-          dayDate={dayActionTarget?.date?.toISOString?.().slice(0, 10) || ''}
+          dayDate={dayActionTarget?.date ? toIsoLocalDate(dayActionTarget.date) : ''}
           open={Boolean(dayActionTarget)}
           onClose={() => setDayActionTarget(null)}
           onClearDay={handleClearDay}
