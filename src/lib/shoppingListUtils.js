@@ -163,6 +163,15 @@ function unwrapMealIngredients(meal = {}) {
   return []
 }
 
+function getMealServingsScale(meal = {}) {
+  const plannedServings = Math.max(1, Number(meal?.servings || 1) || 1)
+  const recipeServings = Math.max(
+    1,
+    Number(meal?.recipe_servings || String(meal?.yield || '').match(/\d+/)?.[0] || meal?.servings || 1) || 1,
+  )
+  return plannedServings / recipeServings
+}
+
 export function buildGroupedShoppingItems(meals = [], staplesOnHand = '') {
   const staples = String(staplesOnHand)
     .toLowerCase()
@@ -176,6 +185,7 @@ export function buildGroupedShoppingItems(meals = [], staplesOnHand = '') {
     if (meal?.is_leftover) continue
 
     const usageKey = `${meal?.day || 'tonight'}_${meal?.meal || 'dinner'}`
+    const servingsScale = getMealServingsScale(meal)
 
     for (const rawIngredient of unwrapMealIngredients(meal)) {
       const parsed = parseIngredient(rawIngredient)
@@ -185,13 +195,15 @@ export function buildGroupedShoppingItems(meals = [], staplesOnHand = '') {
       const key = `${parsed.normalizedName}::${String(parsed.unit).toLowerCase()}`
       const existing = bucket.get(key)
 
+      const scaledQuantity = parsed.quantity * servingsScale
+
       if (existing) {
-        existing.quantity += parsed.quantity
+        existing.quantity += scaledQuantity
         if (!existing.used_in.includes(usageKey)) existing.used_in.push(usageKey)
       } else {
         bucket.set(key, {
           name: parsed.name,
-          quantity: parsed.quantity,
+          quantity: scaledQuantity,
           unit: shouldHideUnit(parsed.unit, parsed.quantity) ? '' : parsed.unit,
           category: parsed.category,
           checked: false,
