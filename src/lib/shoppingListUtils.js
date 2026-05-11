@@ -1,3 +1,5 @@
+import { mergeIngredients, normalizeUnit } from '../utils/unitConversion'
+
 const UNIT_WORDS = new Set([
   'lb', 'lbs', 'pound', 'pounds', 'oz', 'ounce', 'ounces', 'g', 'kg', 'mg',
   'cup', 'cups', 'tbsp', 'tablespoon', 'tablespoons', 'tsp', 'teaspoon', 'teaspoons',
@@ -182,7 +184,7 @@ export function buildGroupedShoppingItems(meals = [], staplesOnHand = '') {
     .map((value) => value.trim())
     .filter(Boolean)
 
-  const bucket = new Map()
+  const allIngredients = []
 
   for (const meal of meals) {
     if (meal?.is_leftover) continue
@@ -195,28 +197,18 @@ export function buildGroupedShoppingItems(meals = [], staplesOnHand = '') {
       if (!parsed) continue
       if (staples.some((staple) => parsed.normalizedName.includes(staple))) continue
 
-      const key = `${parsed.normalizedName}::${String(parsed.unit).toLowerCase()}`
-      const existing = bucket.get(key)
-
-      const scaledQuantity = parsed.quantity * servingsScale
-
-      if (existing) {
-        existing.quantity += scaledQuantity
-        if (!existing.used_in.includes(usageKey)) existing.used_in.push(usageKey)
-      } else {
-        bucket.set(key, {
-          name: parsed.name,
-          quantity: scaledQuantity,
-          unit: shouldHideUnit(parsed.unit, parsed.quantity) ? '' : parsed.unit,
-          category: parsed.category,
-          checked: false,
-          used_in: [usageKey],
-        })
-      }
+      allIngredients.push({
+        name: parsed.name,
+        normalizedName: parsed.normalizedName,
+        quantity: parsed.quantity * servingsScale,
+        unit: normalizeUnit(parsed.unit),
+        category: parsed.category,
+        usageKey,
+      })
     }
   }
 
-  return Array.from(bucket.values()).sort((a, b) => {
+  return mergeIngredients(allIngredients).sort((a, b) => {
     if (a.category !== b.category) {
       return CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category)
     }

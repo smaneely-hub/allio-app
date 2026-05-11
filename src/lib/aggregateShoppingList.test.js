@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { aggregateShoppingList, normalizeIngredient } from './aggregateShoppingList.js'
+import { aggregateShoppingList } from './aggregateShoppingList.js'
+import { normalizeIngredientName } from './shoppingListUtils.js'
 
 const samplePlan = {
   meals: [
@@ -30,8 +31,9 @@ test('basic aggregation across two meals', () => {
 
 test('deduplication of same ingredient across meals', () => {
   const items = aggregateShoppingList(samplePlan, '')
-  const chicken = items.find((item) => item.name === 'chicken breasts')
+  const chicken = items.find((item) => item.normalizedName === 'chicken breasts')
   assert.equal(chicken.quantity, 3)
+  assert.equal(chicken.unit, 'lb')
 })
 
 test('staple removal', () => {
@@ -55,5 +57,5 @@ test('category assignment', () => {
 })
 
 test('normalize ingredient removes adjectives and applies synonyms', () => {
-  assert.equal(normalizeIngredient(' Fresh chicken breast '), 'chicken breasts')
+  assert.equal(normalizeIngredientName('Fresh chicken breast'), 'chicken breasts')
 })
