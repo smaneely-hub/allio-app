@@ -13,7 +13,7 @@ export async function upsertShoppingListForDate({ userId, householdId, weekOf, i
   const plannerKeepers = (existingItems || []).filter((item) => !PLANNER_SOURCES.has(String(item.source || '').trim().toLowerCase()))
   const nextPlannerItems = (items || []).map((item) => ({
     name: item.name,
-    quantity: item.quantity,
+    quantity: [item.quantity, item.unit].filter(Boolean).join(' ').trim() || null,
     category: item.category,
     checked: Boolean(item.checked),
     source: item.source || 'planner',
