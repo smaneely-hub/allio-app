@@ -206,7 +206,9 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
                 ) : null}
               </div>
             </button>
-            <ChevronDownIcon className={`h-4 w-4 shrink-0 text-ink-tertiary transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-tertiary transition-colors duration-150 group-hover:bg-stone-100 group-hover:text-ink-primary">
+              <ChevronDownIcon className={`h-4 w-4 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+            </span>
             <button type="button" onClick={(event) => { event.stopPropagation(); onActionsClick?.(meal) }} className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full p-2 text-ink-tertiary transition-colors duration-150 hover:bg-stone-100 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label="Meal actions">
               <MoreVerticalIcon className="h-5 w-5" />
             </button>
@@ -239,7 +241,9 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
               ) : null}
             </div>
           </button>
-          <ChevronDownIcon className={`h-4 w-4 shrink-0 text-ink-tertiary transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-tertiary transition-colors duration-150 group-hover:bg-stone-100 group-hover:text-ink-primary">
+            <ChevronDownIcon className={`h-4 w-4 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+          </span>
           <button type="button" onClick={(event) => { event.stopPropagation(); onActionsClick?.(meal) }} className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full p-2 text-ink-tertiary transition-colors duration-150 hover:bg-stone-100 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label="Meal actions">
             <MoreVerticalIcon className="h-5 w-5" />
           </button>
