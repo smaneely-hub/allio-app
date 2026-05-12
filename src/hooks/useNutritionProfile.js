@@ -128,9 +128,9 @@ export function useNutritionProfile() {
   const save = useCallback(async (next) => {
     if (!user?.id) return
     setSaving(true)
-    const payload = {
+
+    const basePayload = {
       user_id: user.id,
-      profile_member_id: next.profile_member_id || null,
       goal_type: next.goal_type || 'maintain',
       target_weight_kg: next.target_weight_kg !== '' && next.target_weight_kg != null ? Number(next.target_weight_kg) : null,
       calories_target: next.calories_target !== '' && next.calories_target != null ? Number(next.calories_target) : null,
@@ -142,9 +142,25 @@ export function useNutritionProfile() {
       dietary_restrictions: Array.isArray(next.dietary_restrictions) ? next.dietary_restrictions : [],
       allergies: Array.isArray(next.allergies) ? next.allergies : [],
     }
-    const { error } = await supabase
+
+    let payload = {
+      ...basePayload,
+      profile_member_id: next.profile_member_id || null,
+    }
+
+    let { error } = await supabase
       .from('user_preferences')
       .upsert(payload, { onConflict: 'user_id' })
+
+    const profileMemberColumnMissing = String(error?.message || '').includes('profile_member_id') || error?.code === 'PGRST204'
+    if (profileMemberColumnMissing) {
+      payload = basePayload
+      const retry = await supabase
+        .from('user_preferences')
+        .upsert(payload, { onConflict: 'user_id' })
+      error = retry.error
+    }
+
     if (error) {
       toast.error('Could not save nutrition profile')
       console.error('[useNutritionProfile] save error', error)
