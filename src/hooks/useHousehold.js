@@ -10,12 +10,23 @@ const toIntOrNull = (value) => {
   return Number.isNaN(parsed) ? null : parsed
 }
 
-const roleFromAge = (age) => {
-  const n = toIntOrNull(age)
-  if (n == null) return 'adult'
-  if (n <= 4) return 'toddler'
-  if (n <= 12) return 'child'
-  if (n <= 17) return 'teen'
+const calculateAgeFromBirthDate = (dateOfBirth) => {
+  if (!dateOfBirth) return null
+  const dob = new Date(dateOfBirth)
+  if (Number.isNaN(dob.getTime())) return null
+  const today = new Date()
+  let age = today.getFullYear() - dob.getFullYear()
+  const hasBirthdayPassed = today.getMonth() > dob.getMonth() || (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate())
+  if (!hasBirthdayPassed) age -= 1
+  return age >= 0 ? age : null
+}
+
+const roleFromAge = (age, dateOfBirth = null) => {
+  const derivedAge = age != null && age !== '' ? toIntOrNull(age) : calculateAgeFromBirthDate(dateOfBirth)
+  if (derivedAge == null) return 'adult'
+  if (derivedAge <= 4) return 'toddler'
+  if (derivedAge <= 12) return 'child'
+  if (derivedAge <= 17) return 'teen'
   return 'adult'
 }
 
@@ -201,8 +212,8 @@ export function useHousehold() {
           household_id: effectiveHouseholdId,
           label: member.name || member.label || `Member ${index + 1}`,
           name: member.name || member.label || '',
-          age: toIntOrNull(member.age),
-          role: roleFromAge(member.age),
+          age: toIntOrNull(member.age ?? calculateAgeFromBirthDate(member.date_of_birth)),
+          role: roleFromAge(member.age, member.date_of_birth),
           gender: member.gender || member.sex || '',
           sex: member.sex || member.gender || '',
           height_inches: toIntOrNull(member.height_inches),
@@ -215,6 +226,7 @@ export function useHousehold() {
           food_preferences: member.food_preferences || [],
           allergies: member.allergies || [],
           health_considerations: member.health_considerations || [],
+          date_of_birth: member.date_of_birth || null,
         }))
 
         // Non-destructive save: delete only members removed from the list,
@@ -315,6 +327,7 @@ export function useHousehold() {
         label: `member-${index + 1}`,
         name: total === 1 && index === 0 ? 'Me' : `Member ${index + 1}`,
         age: null,
+        date_of_birth: null,
         role: index === 0 ? 'adult' : 'child',
         gender: null,
         sex: '',

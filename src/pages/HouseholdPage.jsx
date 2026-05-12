@@ -59,6 +59,30 @@ function displayToInches(val, isMetric) {
   if (val === '' || val == null) return null
   return isMetric ? +(Number(val) / 2.54).toFixed(1) : Number(val)
 }
+function inchesToFeetInches(totalInches) {
+  if (totalInches == null || totalInches === '') return { feet: '', inches: '' }
+  const numeric = Number(totalInches)
+  const feet = Math.floor(numeric / 12)
+  const inches = Math.round(numeric - feet * 12)
+  return { feet: String(feet), inches: String(inches) }
+}
+function feetInchesToInches(feet, inches) {
+  const f = feet === '' || feet == null ? 0 : Number(feet)
+  const i = inches === '' || inches == null ? 0 : Number(inches)
+  if (Number.isNaN(f) || Number.isNaN(i)) return null
+  const total = (f * 12) + i
+  return total > 0 ? total : null
+}
+function calculateAgeFromBirthDate(dateOfBirth) {
+  if (!dateOfBirth) return ''
+  const dob = new Date(dateOfBirth)
+  if (Number.isNaN(dob.getTime())) return ''
+  const today = new Date()
+  let age = today.getFullYear() - dob.getFullYear()
+  const hasBirthdayPassed = today.getMonth() > dob.getMonth() || (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate())
+  if (!hasBirthdayPassed) age -= 1
+  return age >= 0 ? age : ''
+}
 function lbsToDisplay(lbs, isMetric) {
   if (lbs == null || lbs === '') return ''
   return isMetric ? +(Number(lbs) / 2.20462).toFixed(1) : Number(lbs)
@@ -167,6 +191,7 @@ function normalizeMember(form, fallbackLabel) {
     name: String(form.name || '').trim(),
     label: String(form.name || form.label || fallbackLabel).trim(),
     age: form.age === '' ? '' : Number(form.age),
+    date_of_birth: form.date_of_birth || null,
     sex: form.sex || '',
     gender: form.sex || form.gender || '',
     height_inches: form.height_inches === '' ? null : Number(form.height_inches),
@@ -187,6 +212,7 @@ function EmptyMemberForm() {
   return {
     name: '',
     age: '',
+    date_of_birth: '',
     sex: '',
     height_inches: '',
     weight_lbs: '',
@@ -200,12 +226,18 @@ function EmptyMemberForm() {
 function MemberForm({ title, submitLabel, initialMember, onSubmit, saving }) {
   const isMetric = getIsMetric()
 
-  const memberToDisplay = (m) => ({
-    ...EmptyMemberForm(),
-    ...m,
-    height_inches: inchesToDisplay(m.height_inches, isMetric),
-    weight_lbs: lbsToDisplay(m.weight_lbs, isMetric),
-  })
+  const memberToDisplay = (m) => {
+    const splitHeight = isMetric ? { feet: '', inches: '' } : inchesToFeetInches(m.height_inches)
+    return {
+      ...EmptyMemberForm(),
+      ...m,
+      age: m.date_of_birth ? calculateAgeFromBirthDate(m.date_of_birth) : (m.age ?? ''),
+      height_inches: inchesToDisplay(m.height_inches, isMetric),
+      height_feet: splitHeight.feet,
+      height_only_inches: splitHeight.inches,
+      weight_lbs: lbsToDisplay(m.weight_lbs, isMetric),
+    }
+  }
 
   const [form, setForm] = useState(() => memberToDisplay(initialMember))
 
@@ -229,7 +261,8 @@ function MemberForm({ title, submitLabel, initialMember, onSubmit, saving }) {
     event.preventDefault()
     const imperial = {
       ...form,
-      height_inches: displayToInches(form.height_inches, isMetric),
+      age: form.date_of_birth ? calculateAgeFromBirthDate(form.date_of_birth) : form.age,
+      height_inches: isMetric ? displayToInches(form.height_inches, isMetric) : feetInchesToInches(form.height_feet, form.height_only_inches),
       weight_lbs: displayToLbs(form.weight_lbs, isMetric),
     }
     await onSubmit(normalizeMember(imperial, 'Member 1'))
@@ -248,8 +281,8 @@ function MemberForm({ title, submitLabel, initialMember, onSubmit, saving }) {
           <input className="input w-full" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Name" />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-text-primary">Age</label>
-          <input type="number" min="0" max="120" className="input w-full" value={form.age} onChange={(event) => setForm((current) => ({ ...current, age: event.target.value }))} placeholder="Age" />
+          <label className="mb-1 block text-sm font-medium text-text-primary">Birthday</label>
+          <input type="date" className="input w-full" value={form.date_of_birth || ''} onChange={(event) => setForm((current) => ({ ...current, date_of_birth: event.target.value, age: calculateAgeFromBirthDate(event.target.value) }))} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-text-primary">Sex</label>
@@ -259,8 +292,15 @@ function MemberForm({ title, submitLabel, initialMember, onSubmit, saving }) {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-text-primary">{isMetric ? 'Height (cm)' : 'Height (inches)'}</label>
-          <input type="number" min={isMetric ? 100 : 20} max={isMetric ? 250 : 96} className="input w-full" value={form.height_inches} onChange={(event) => setForm((current) => ({ ...current, height_inches: event.target.value }))} placeholder={isMetric ? 'e.g. 170' : 'e.g. 68'} />
+          <label className="mb-1 block text-sm font-medium text-text-primary">{isMetric ? 'Height (cm)' : 'Height'}</label>
+          {isMetric ? (
+            <input type="number" min={100} max={250} className="input w-full" value={form.height_inches} onChange={(event) => setForm((current) => ({ ...current, height_inches: event.target.value }))} placeholder="e.g. 170" />
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <input type="number" min={1} max={8} className="input w-full" value={form.height_feet || ''} onChange={(event) => setForm((current) => ({ ...current, height_feet: event.target.value }))} placeholder="ft" />
+              <input type="number" min={0} max={11} className="input w-full" value={form.height_only_inches || ''} onChange={(event) => setForm((current) => ({ ...current, height_only_inches: event.target.value }))} placeholder="in" />
+            </div>
+          )}
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-text-primary">{isMetric ? 'Weight (kg)' : 'Weight (lb)'}</label>
@@ -302,17 +342,23 @@ function MemberForm({ title, submitLabel, initialMember, onSubmit, saving }) {
 function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionProfile, nutritionTargets, saveNutritionProfile, isPrimaryProfileMember }) {
   const isMetric = getIsMetric()
 
-  const memberToDisplay = (m) => ({
-    name: m.name || m.label || '',
-    age: m.age ?? '',
-    sex: m.sex || m.gender || '',
-    height_inches: inchesToDisplay(m.height_inches, isMetric),
-    weight_lbs: lbsToDisplay(m.weight_lbs, isMetric),
-    activity_level: m.activity_level || 'moderate',
-    goal: m.goal || 'maintain',
-    dietary_restrictions: Array.isArray(m.dietary_restrictions) ? m.dietary_restrictions : [],
-    allergies: Array.isArray(m.allergies) ? m.allergies : (Array.isArray(m.food_preferences) ? m.food_preferences : []),
-  })
+  const memberToDisplay = (m) => {
+    const splitHeight = isMetric ? { feet: '', inches: '' } : inchesToFeetInches(m.height_inches)
+    return {
+      name: m.name || m.label || '',
+      age: m.date_of_birth ? calculateAgeFromBirthDate(m.date_of_birth) : (m.age ?? ''),
+      date_of_birth: m.date_of_birth || '',
+      sex: m.sex || m.gender || '',
+      height_inches: inchesToDisplay(m.height_inches, isMetric),
+      height_feet: splitHeight.feet,
+      height_only_inches: splitHeight.inches,
+      weight_lbs: lbsToDisplay(m.weight_lbs, isMetric),
+      activity_level: m.activity_level || 'moderate',
+      goal: m.goal || 'maintain',
+      dietary_restrictions: Array.isArray(m.dietary_restrictions) ? m.dietary_restrictions : [],
+      allergies: Array.isArray(m.allergies) ? m.allergies : (Array.isArray(m.food_preferences) ? m.food_preferences : []),
+    }
+  }
 
   const [form, setForm] = useState(() => memberToDisplay(member))
 
@@ -364,7 +410,8 @@ function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionPr
     event.preventDefault()
     const imperial = {
       ...form,
-      height_inches: displayToInches(form.height_inches, isMetric),
+      age: form.date_of_birth ? calculateAgeFromBirthDate(form.date_of_birth) : form.age,
+      height_inches: isMetric ? displayToInches(form.height_inches, isMetric) : feetInchesToInches(form.height_feet, form.height_only_inches),
       weight_lbs: displayToLbs(form.weight_lbs, isMetric),
     }
     await onSave(member.id, normalizeMember(imperial, `Member ${index + 1}`))
@@ -426,8 +473,8 @@ function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionPr
 
   const metricProfile = {
     weight_kg: displayToKg(form.weight_lbs, isMetric),
-    height_cm: displayToCm(form.height_inches, isMetric),
-    age_years: form.age,
+    height_cm: isMetric ? displayToCm(form.height_inches, isMetric) : (feetInchesToInches(form.height_feet, form.height_only_inches) ? +(Number(feetInchesToInches(form.height_feet, form.height_only_inches)) * 2.54).toFixed(1) : ''),
+    age_years: form.date_of_birth ? calculateAgeFromBirthDate(form.date_of_birth) : form.age,
     sex: form.sex,
     activity_level: form.activity_level,
     goal_type: form.goal,
@@ -436,10 +483,10 @@ function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionPr
   const effectiveTargets = nutritionForm.nutrition_mode !== 'manual' ? nutritionTargets : null
 
   const intakeSummary = [
-    member.age != null && member.age !== '' ? `Age ${member.age}` : null,
+    (member.date_of_birth || (member.age != null && member.age !== '')) ? `Age ${member.date_of_birth ? calculateAgeFromBirthDate(member.date_of_birth) : member.age}` : null,
     member.sex ? member.sex : null,
     member.height_inches
-      ? (isMetric ? `${+(member.height_inches * 2.54).toFixed(0)} cm` : `${member.height_inches}"`)
+      ? (isMetric ? `${+(member.height_inches * 2.54).toFixed(0)} cm` : `${Math.floor(member.height_inches / 12)}'${Math.round(member.height_inches % 12)}\"`)
       : null,
     member.weight_lbs
       ? (isMetric ? `${+(member.weight_lbs / 2.20462).toFixed(1)} kg` : `${member.weight_lbs} lb`)
