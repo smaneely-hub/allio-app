@@ -152,9 +152,29 @@ export function useNutritionProfile() {
       .from('user_preferences')
       .upsert(payload, { onConflict: 'user_id' })
 
-    const profileMemberColumnMissing = String(error?.message || '').includes('profile_member_id') || error?.code === 'PGRST204'
+    const missingColumnMessage = String(error?.message || '')
+    const profileMemberColumnMissing = missingColumnMessage.includes('profile_member_id') || error?.code === 'PGRST204'
     if (profileMemberColumnMissing) {
       payload = basePayload
+      const retry = await supabase
+        .from('user_preferences')
+        .upsert(payload, { onConflict: 'user_id' })
+      error = retry.error
+    }
+
+    const nutritionColumnsMissing = String(error?.message || '').includes('target_weight_kg')
+      || String(error?.message || '').includes('goal_type')
+      || String(error?.message || '').includes('calories_target')
+      || String(error?.message || '').includes('protein_target_g')
+      || String(error?.message || '').includes('carbs_target_g')
+      || String(error?.message || '').includes('fat_target_g')
+      || String(error?.message || '').includes('nutrition_mode')
+      || String(error?.message || '').includes('foods_to_avoid')
+      || String(error?.message || '').includes('dietary_restrictions')
+      || String(error?.message || '').includes('allergies')
+
+    if (nutritionColumnsMissing) {
+      payload = { user_id: user.id }
       const retry = await supabase
         .from('user_preferences')
         .upsert(payload, { onConflict: 'user_id' })
