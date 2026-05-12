@@ -96,11 +96,6 @@ function ChipGroup({ options, values, onToggle }) {
   )
 }
 
-const NUTRITION_SEX_OPTIONS = [
-  { value: 'male', label: 'Male' },
-  { value: 'female', label: 'Female' },
-  { value: 'other', label: 'Other' },
-]
 const NUTRITION_GOAL_OPTIONS = [
   { value: 'lose', label: 'Lose' },
   { value: 'maintain', label: 'Maintain' },
@@ -164,177 +159,6 @@ function SegmentControl({ options, value, onChange, className = '' }) {
   )
 }
 
-function NutritionProfileSection({ profile, saving, onSave, derivedTargets, primaryMemberName }) {
-  const isMetric = getIsMetric()
-
-  const toDisplay = (p) => ({
-    ...p,
-    weight_kg: kgToDisplay(p.weight_kg, isMetric),
-    height_cm: cmToDisplay(p.height_cm, isMetric),
-    target_weight_kg: kgToDisplay(p.target_weight_kg, isMetric),
-  })
-
-  const toMetric = (f) => ({
-    ...f,
-    weight_kg: displayToKg(f.weight_kg, isMetric),
-    height_cm: displayToCm(f.height_cm, isMetric),
-    target_weight_kg: displayToKg(f.target_weight_kg, isMetric),
-  })
-
-  const [form, setForm] = useState(() => toDisplay(profile))
-
-  useEffect(() => {
-    setForm(toDisplay(profile))
-  }, [profile])
-
-  const field = (name) => ({
-    value: form[name] ?? '',
-    onChange: (e) => setForm((f) => ({ ...f, [name]: e.target.value })),
-    onBlur: () => onSave(toMetric(form)),
-  })
-
-  const toggleChip = (fieldName, value) => {
-    const current = Array.isArray(form[fieldName]) ? form[fieldName] : []
-    const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value]
-    const updated = { ...form, [fieldName]: next }
-    setForm(updated)
-    onSave(toMetric(updated))
-  }
-
-  const setAndSave = (patch) => {
-    const updated = { ...form, ...patch }
-    setForm(updated)
-    onSave(toMetric(updated))
-  }
-
-  const metricForm = toMetric(form)
-  const tdee = calculateTDEE(metricForm)
-  const isAutoMode = form.nutrition_mode !== 'manual'
-  const effectiveTargets = isAutoMode ? derivedTargets : null
-
-  const [foodsInput, setFoodsInput] = useState('')
-  useEffect(() => {
-    setFoodsInput((form.foods_to_avoid || []).join(', '))
-  }, [profile])
-
-  const commitFoodsToAvoid = () => {
-    const parsed = foodsInput.split(',').map((s) => s.trim()).filter(Boolean)
-    const updated = { ...form, foods_to_avoid: parsed }
-    setForm(updated)
-    onSave(updated)
-  }
-
-  return (
-    <section className="card p-5 space-y-4">
-      <div>
-        <h2 className="font-display text-xl text-text-primary">Nutrition profile</h2>
-        <p className="mt-1 text-sm text-text-secondary">Calorie and macro targets for your meal generation. Personal body stats come from {primaryMemberName ? `${primaryMemberName} in household members` : 'your primary household member'} so you only maintain them once.</p>
-      </div>
-
-      <SectionCard title="Body stats shared from family demographics">
-        <div className="rounded-xl bg-surface px-4 py-3 text-sm text-text-secondary">
-          <p>Your weight, height, age, sex, activity level, and goal are managed from the matching household member card above.</p>
-          <p className="mt-1 text-xs text-text-muted">Update them there and your nutrition targets recalculate automatically here.</p>
-        </div>
-        {tdee && (
-          <p className="mt-3 text-xs text-text-muted">
-            Estimated TDEE: <span className="font-semibold text-text-primary">{tdee.toLocaleString()} kcal/day</span>
-          </p>
-        )}
-      </SectionCard>
-
-      <SectionCard title="Activity & goal">
-        <div className="space-y-3">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-text-secondary">Activity level</label>
-            <select className="input w-full max-w-sm" value={form.activity_level || ''} onChange={(e) => setAndSave({ activity_level: e.target.value })}>
-              <option value="">Select activity level</option>
-              {Object.entries(ACTIVITY_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-2 block text-xs font-medium text-text-secondary">Goal</label>
-            <SegmentControl options={NUTRITION_GOAL_OPTIONS} value={form.goal_type || 'maintain'} onChange={(v) => setAndSave({ goal_type: v })} />
-          </div>
-          {form.goal_type !== 'maintain' && (
-            <NumericInput label="Target weight" unit={isMetric ? 'kg' : 'lbs'} min={isMetric ? 30 : 66} max={isMetric ? 300 : 661} placeholder={isMetric ? '65' : '143'} {...field('target_weight_kg')} />
-          )}
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Nutrition targets" description="Auto mode calculates from your stats. Manual lets you override.">
-        <div className="space-y-4">
-          <div>
-            <label className="mb-2 block text-xs font-medium text-text-secondary">Mode</label>
-            <SegmentControl
-              options={[{ value: 'auto', label: 'Auto (TDEE)' }, { value: 'manual', label: 'Manual' }]}
-              value={form.nutrition_mode || 'auto'}
-              onChange={(v) => setAndSave({ nutrition_mode: v })}
-            />
-          </div>
-          {isAutoMode ? (
-            effectiveTargets ? (
-              <div className="rounded-xl bg-surface px-4 py-3 text-sm">
-                <div className="flex flex-wrap gap-x-6 gap-y-1">
-                  <span className="text-text-secondary">Calories: <strong className="text-text-primary">{effectiveTargets.calories.toLocaleString()} kcal</strong></span>
-                  <>
-                    <span className="text-text-secondary">Protein: <strong className="text-text-primary">{effectiveTargets.protein_g}g</strong></span>
-                    <span className="text-text-secondary">Carbs: <strong className="text-text-primary">{effectiveTargets.carbs_g}g</strong></span>
-                    <span className="text-text-secondary">Fat: <strong className="text-text-primary">{effectiveTargets.fat_g}g</strong></span>
-                  </>
-                </div>
-                <p className="mt-1.5 text-xs text-text-muted">
-                  {form.goal_type === 'lose' ? '−500 kcal from TDEE' : form.goal_type === 'gain' ? '+500 kcal from TDEE' : 'Matches TDEE'}
-                  {' · '}macros split 30/40/30 (protein/carbs/fat)
-                </p>
-              </div>
-            ) : (
-              <p className="text-xs text-text-muted">Fill in your body stats and activity level to see your calculated targets.</p>
-            )
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <NumericInput label="Calories" unit="kcal" min={800} max={6000} placeholder="2000" {...field('calories_target')} />
-              <NumericInput label="Protein" unit="g" min={0} max={500} placeholder="150" {...field('protein_target_g')} />
-              <NumericInput label="Carbs" unit="g" min={0} max={700} placeholder="200" {...field('carbs_target_g')} />
-              <NumericInput label="Fat" unit="g" min={0} max={400} placeholder="65" {...field('fat_target_g')} />
-            </div>
-          )}
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Dietary preferences" description="Applied at the profile level in addition to household member settings.">
-        <div className="space-y-4">
-          <div>
-            <label className="mb-2 block text-xs font-medium text-text-secondary">Dietary restrictions</label>
-            <ChipGroup options={NUTRITION_DIETARY_OPTIONS} values={form.dietary_restrictions || []} onToggle={(v) => toggleChip('dietary_restrictions', v)} />
-          </div>
-          <div>
-            <label className="mb-2 block text-xs font-medium text-text-secondary">Allergies</label>
-            <ChipGroup options={NUTRITION_ALLERGY_OPTIONS} values={form.allergies || []} onToggle={(v) => toggleChip('allergies', v)} />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-text-secondary">
-              Foods to avoid
-              <span className="ml-1 font-normal text-text-muted">(comma-separated)</span>
-            </label>
-            <textarea
-              className="input w-full resize-none"
-              rows={2}
-              placeholder="e.g. cilantro, blue cheese, anchovies"
-              value={foodsInput}
-              onChange={(e) => setFoodsInput(e.target.value)}
-              onBlur={commitFoodsToAvoid}
-            />
-          </div>
-        </div>
-      </SectionCard>
-
-      {saving && <p className="text-xs text-text-muted">Saving…</p>}
-    </section>
-  )
-}
 
 function normalizeMember(form, fallbackLabel) {
   const dietary = Array.isArray(form.dietary_restrictions) ? form.dietary_restrictions : []
@@ -475,7 +299,7 @@ function MemberForm({ title, submitLabel, initialMember, onSubmit, saving }) {
   )
 }
 
-function MemberCard({ member, index, open, onToggle, onSave, saving }) {
+function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionProfile, nutritionTargets, saveNutritionProfile, isPrimaryProfileMember }) {
   const isMetric = getIsMetric()
 
   const memberToDisplay = (m) => ({
@@ -492,9 +316,37 @@ function MemberCard({ member, index, open, onToggle, onSave, saving }) {
 
   const [form, setForm] = useState(() => memberToDisplay(member))
 
+  const [nutritionForm, setNutritionForm] = useState(() => ({
+    goal_type: nutritionProfile?.goal_type || member.goal || 'maintain',
+    target_weight_kg: kgToDisplay(nutritionProfile?.target_weight_kg, isMetric),
+    calories_target: nutritionProfile?.calories_target ?? '',
+    protein_target_g: nutritionProfile?.protein_target_g ?? '',
+    carbs_target_g: nutritionProfile?.carbs_target_g ?? '',
+    fat_target_g: nutritionProfile?.fat_target_g ?? '',
+    foods_to_avoid: Array.isArray(nutritionProfile?.foods_to_avoid) ? nutritionProfile.foods_to_avoid : [],
+    dietary_restrictions: Array.isArray(nutritionProfile?.dietary_restrictions) ? nutritionProfile.dietary_restrictions : [],
+    allergies: Array.isArray(nutritionProfile?.allergies) ? nutritionProfile.allergies : [],
+    nutrition_mode: nutritionProfile?.nutrition_mode || 'auto',
+  }))
+
   useEffect(() => {
     setForm(memberToDisplay(member))
   }, [member])
+
+  useEffect(() => {
+    setNutritionForm({
+      goal_type: nutritionProfile?.goal_type || member.goal || 'maintain',
+      target_weight_kg: kgToDisplay(nutritionProfile?.target_weight_kg, isMetric),
+      calories_target: nutritionProfile?.calories_target ?? '',
+      protein_target_g: nutritionProfile?.protein_target_g ?? '',
+      carbs_target_g: nutritionProfile?.carbs_target_g ?? '',
+      fat_target_g: nutritionProfile?.fat_target_g ?? '',
+      foods_to_avoid: Array.isArray(nutritionProfile?.foods_to_avoid) ? nutritionProfile.foods_to_avoid : [],
+      dietary_restrictions: Array.isArray(nutritionProfile?.dietary_restrictions) ? nutritionProfile.dietary_restrictions : [],
+      allergies: Array.isArray(nutritionProfile?.allergies) ? nutritionProfile.allergies : [],
+      nutrition_mode: nutritionProfile?.nutrition_mode || 'auto',
+    })
+  }, [nutritionProfile, member.goal, isMetric])
 
   const toggleArrayValue = (field, value) => {
     setForm((current) => {
@@ -517,6 +369,71 @@ function MemberCard({ member, index, open, onToggle, onSave, saving }) {
     }
     await onSave(member.id, normalizeMember(imperial, `Member ${index + 1}`))
   }
+
+  const nutritionField = (name) => ({
+    value: nutritionForm[name] ?? '',
+    onChange: (e) => setNutritionForm((current) => ({ ...current, [name]: e.target.value })),
+    onBlur: async () => {
+      await saveNutritionProfile({
+        ...nutritionProfile,
+        ...nutritionForm,
+        profile_member_id: member.id,
+        target_weight_kg: displayToKg(nutritionForm.target_weight_kg, isMetric),
+      })
+    },
+  })
+
+  const setAndSaveNutrition = async (patch) => {
+    const updated = { ...nutritionForm, ...patch }
+    setNutritionForm(updated)
+    await saveNutritionProfile({
+      ...nutritionProfile,
+      ...updated,
+      profile_member_id: member.id,
+      target_weight_kg: displayToKg(updated.target_weight_kg, isMetric),
+    })
+  }
+
+  const toggleNutritionChip = async (fieldName, value) => {
+    const current = Array.isArray(nutritionForm[fieldName]) ? nutritionForm[fieldName] : []
+    const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value]
+    const updated = { ...nutritionForm, [fieldName]: next }
+    setNutritionForm(updated)
+    await saveNutritionProfile({
+      ...nutritionProfile,
+      ...updated,
+      profile_member_id: member.id,
+      target_weight_kg: displayToKg(updated.target_weight_kg, isMetric),
+    })
+  }
+
+  const [foodsInput, setFoodsInput] = useState('')
+  useEffect(() => {
+    setFoodsInput((nutritionForm.foods_to_avoid || []).join(', '))
+  }, [nutritionForm.foods_to_avoid])
+
+  const commitFoodsToAvoid = async () => {
+    const parsed = foodsInput.split(',').map((s) => s.trim()).filter(Boolean)
+    const updated = { ...nutritionForm, foods_to_avoid: parsed }
+    setNutritionForm(updated)
+    await saveNutritionProfile({
+      ...nutritionProfile,
+      ...updated,
+      profile_member_id: member.id,
+      target_weight_kg: displayToKg(updated.target_weight_kg, isMetric),
+    })
+  }
+
+  const metricProfile = {
+    weight_kg: displayToKg(form.weight_lbs, isMetric),
+    height_cm: displayToCm(form.height_inches, isMetric),
+    age_years: form.age,
+    sex: form.sex,
+    activity_level: form.activity_level,
+    goal_type: form.goal,
+  }
+  const tdee = calculateTDEE(metricProfile)
+  const effectiveTargets = nutritionForm.nutrition_mode !== 'manual' ? nutritionTargets : null
 
   const intakeSummary = [
     member.age != null && member.age !== '' ? `Age ${member.age}` : null,
@@ -593,6 +510,85 @@ function MemberCard({ member, index, open, onToggle, onSave, saving }) {
             <label className="mb-2 block text-sm font-medium text-text-primary">Allergies</label>
             <ChipGroup options={ALLERGY_OPTIONS} values={form.allergies} onToggle={(value) => toggleArrayValue('allergies', value)} />
           </div>
+
+          {isPrimaryProfileMember ? (
+            <>
+              <div className="mt-6 border-t border-divider pt-5">
+                <div className="mb-4">
+                  <h4 className="text-sm font-semibold text-text-primary">Nutrition targets</h4>
+                  <p className="mt-1 text-sm text-text-secondary">This member is your personal nutrition profile, so meal target settings live directly here.</p>
+                </div>
+
+                {tdee ? (
+                  <p className="mb-4 text-xs text-text-muted">
+                    Estimated TDEE: <span className="font-semibold text-text-primary">{tdee.toLocaleString()} kcal/day</span>
+                  </p>
+                ) : null}
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-text-primary">Nutrition mode</label>
+                    <SegmentControl
+                      options={[{ value: 'auto', label: 'Auto (TDEE)' }, { value: 'manual', label: 'Manual' }]}
+                      value={nutritionForm.nutrition_mode || 'auto'}
+                      onChange={(value) => setAndSaveNutrition({ nutrition_mode: value })}
+                    />
+                  </div>
+
+                  {form.goal !== 'maintain' ? (
+                    <NumericInput label="Target weight" unit={isMetric ? 'kg' : 'lbs'} min={isMetric ? 30 : 66} max={isMetric ? 300 : 661} placeholder={isMetric ? '65' : '143'} {...nutritionField('target_weight_kg')} />
+                  ) : null}
+
+                  {nutritionForm.nutrition_mode !== 'manual' ? (
+                    effectiveTargets ? (
+                      <div className="rounded-xl bg-surface px-4 py-3 text-sm">
+                        <div className="flex flex-wrap gap-x-6 gap-y-1">
+                          <span className="text-text-secondary">Calories: <strong className="text-text-primary">{effectiveTargets.calories.toLocaleString()} kcal</strong></span>
+                          <span className="text-text-secondary">Protein: <strong className="text-text-primary">{effectiveTargets.protein_g}g</strong></span>
+                          <span className="text-text-secondary">Carbs: <strong className="text-text-primary">{effectiveTargets.carbs_g}g</strong></span>
+                          <span className="text-text-secondary">Fat: <strong className="text-text-primary">{effectiveTargets.fat_g}g</strong></span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-text-muted">Fill in body stats to see calculated nutrition targets.</p>
+                    )
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <NumericInput label="Calories" unit="kcal" min={800} max={6000} placeholder="2000" {...nutritionField('calories_target')} />
+                      <NumericInput label="Protein" unit="g" min={0} max={500} placeholder="150" {...nutritionField('protein_target_g')} />
+                      <NumericInput label="Carbs" unit="g" min={0} max={700} placeholder="200" {...nutritionField('carbs_target_g')} />
+                      <NumericInput label="Fat" unit="g" min={0} max={400} placeholder="65" {...nutritionField('fat_target_g')} />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-text-primary">Nutrition-level dietary restrictions</label>
+                    <ChipGroup options={NUTRITION_DIETARY_OPTIONS} values={nutritionForm.dietary_restrictions || []} onToggle={(value) => toggleNutritionChip('dietary_restrictions', value)} />
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-text-primary">Nutrition-level allergies</label>
+                    <ChipGroup options={NUTRITION_ALLERGY_OPTIONS} values={nutritionForm.allergies || []} onToggle={(value) => toggleNutritionChip('allergies', value)} />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-text-primary">
+                      Foods to avoid
+                      <span className="ml-1 font-normal text-text-muted">(comma-separated)</span>
+                    </label>
+                    <textarea
+                      className="input w-full resize-none"
+                      rows={2}
+                      placeholder="e.g. cilantro, blue cheese, anchovies"
+                      value={foodsInput}
+                      onChange={(e) => setFoodsInput(e.target.value)}
+                      onBlur={commitFoodsToAvoid}
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : null}
 
           <div className="mt-5 flex justify-end">
             <button type="submit" disabled={saving} className="btn-primary text-sm disabled:opacity-50">
@@ -698,6 +694,7 @@ export function HouseholdPage() {
   }, [members, nutritionProfile.profile_member_id])
 
   const primaryMemberName = primaryMember?.name || primaryMember?.label || 'you'
+  const primaryProfileMemberId = primaryMember?.id || null
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-24 pt-4 md:px-6 md:pt-6">
@@ -759,6 +756,10 @@ export function HouseholdPage() {
                       saving={savingMembers}
                       onToggle={() => setOpenMemberId((current) => current === memberKey ? null : memberKey)}
                       onSave={handleSaveMember}
+                      nutritionProfile={nutritionProfile}
+                      nutritionTargets={nutritionTargets}
+                      saveNutritionProfile={saveNutritionProfile}
+                      isPrimaryProfileMember={member.id === primaryProfileMemberId}
                     />
                   )
                 })}
@@ -780,15 +781,9 @@ export function HouseholdPage() {
           </div>
         </section>
 
-        {!loadingNutrition && (
-          <NutritionProfileSection
-            profile={nutritionProfile}
-            saving={savingNutrition}
-            onSave={saveNutritionProfile}
-            derivedTargets={nutritionTargets}
-            primaryMemberName={primaryMemberName}
-          />
-        )}
+        {!loadingNutrition && savingNutrition ? (
+          <p className="text-xs text-text-muted">Saving nutrition profile…</p>
+        ) : null}
       </div>
     </div>
   )
