@@ -6,8 +6,6 @@ import { useNutritionProfile } from '../hooks/useNutritionProfile'
 import {
   ACTIVITY_LABELS,
   calculateTDEE,
-  calculateTargetCalories,
-  calculateMacros,
 } from '../lib/nutrition'
 
 const ACTIVITY_LEVELS = [
@@ -166,7 +164,7 @@ function SegmentControl({ options, value, onChange, className = '' }) {
   )
 }
 
-function NutritionProfileSection({ profile, saving, onSave }) {
+function NutritionProfileSection({ profile, saving, onSave, derivedTargets, primaryMemberName }) {
   const isMetric = getIsMetric()
 
   const toDisplay = (p) => ({
@@ -211,9 +209,8 @@ function NutritionProfileSection({ profile, saving, onSave }) {
 
   const metricForm = toMetric(form)
   const tdee = calculateTDEE(metricForm)
-  const autoCalories = calculateTargetCalories(metricForm)
-  const autoMacros = autoCalories ? calculateMacros(autoCalories) : null
   const isAutoMode = form.nutrition_mode !== 'manual'
+  const effectiveTargets = isAutoMode ? derivedTargets : null
 
   const [foodsInput, setFoodsInput] = useState('')
   useEffect(() => {
@@ -231,21 +228,13 @@ function NutritionProfileSection({ profile, saving, onSave }) {
     <section className="card p-5 space-y-4">
       <div>
         <h2 className="font-display text-xl text-text-primary">Nutrition profile</h2>
-        <p className="mt-1 text-sm text-text-secondary">Calorie and macro targets for your meal generation. Based on your personal stats, not per household member.</p>
+        <p className="mt-1 text-sm text-text-secondary">Calorie and macro targets for your meal generation. Personal body stats come from {primaryMemberName ? `${primaryMemberName} in household members` : 'your primary household member'} so you only maintain them once.</p>
       </div>
 
-      <SectionCard title="Body stats">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <NumericInput label="Weight" unit={isMetric ? 'kg' : 'lbs'} min={isMetric ? 30 : 66} max={isMetric ? 300 : 661} placeholder={isMetric ? '70' : '154'} {...field('weight_kg')} />
-          <NumericInput label="Height" unit={isMetric ? 'cm' : 'in'} min={isMetric ? 100 : 39} max={isMetric ? 250 : 98} placeholder={isMetric ? '170' : '67'} {...field('height_cm')} />
-          <NumericInput label="Age" unit="yrs" min={10} max={120} placeholder="35" {...field('age_years')} />
-          <div>
-            <label className="mb-1 block text-xs font-medium text-text-secondary">Sex</label>
-            <select className="input w-full" value={form.sex || ''} onChange={(e) => setAndSave({ sex: e.target.value })}>
-              <option value="">—</option>
-              {NUTRITION_SEX_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
+      <SectionCard title="Body stats shared from family demographics">
+        <div className="rounded-xl bg-surface px-4 py-3 text-sm text-text-secondary">
+          <p>Your weight, height, age, sex, activity level, and goal are managed from the matching household member card above.</p>
+          <p className="mt-1 text-xs text-text-muted">Update them there and your nutrition targets recalculate automatically here.</p>
         </div>
         {tdee && (
           <p className="mt-3 text-xs text-text-muted">
@@ -286,17 +275,15 @@ function NutritionProfileSection({ profile, saving, onSave }) {
             />
           </div>
           {isAutoMode ? (
-            autoCalories ? (
+            effectiveTargets ? (
               <div className="rounded-xl bg-surface px-4 py-3 text-sm">
                 <div className="flex flex-wrap gap-x-6 gap-y-1">
-                  <span className="text-text-secondary">Calories: <strong className="text-text-primary">{autoCalories.toLocaleString()} kcal</strong></span>
-                  {autoMacros && (
-                    <>
-                      <span className="text-text-secondary">Protein: <strong className="text-text-primary">{autoMacros.protein_g}g</strong></span>
-                      <span className="text-text-secondary">Carbs: <strong className="text-text-primary">{autoMacros.carbs_g}g</strong></span>
-                      <span className="text-text-secondary">Fat: <strong className="text-text-primary">{autoMacros.fat_g}g</strong></span>
-                    </>
-                  )}
+                  <span className="text-text-secondary">Calories: <strong className="text-text-primary">{effectiveTargets.calories.toLocaleString()} kcal</strong></span>
+                  <>
+                    <span className="text-text-secondary">Protein: <strong className="text-text-primary">{effectiveTargets.protein_g}g</strong></span>
+                    <span className="text-text-secondary">Carbs: <strong className="text-text-primary">{effectiveTargets.carbs_g}g</strong></span>
+                    <span className="text-text-secondary">Fat: <strong className="text-text-primary">{effectiveTargets.fat_g}g</strong></span>
+                  </>
                 </div>
                 <p className="mt-1.5 text-xs text-text-muted">
                   {form.goal_type === 'lose' ? '−500 kcal from TDEE' : form.goal_type === 'gain' ? '+500 kcal from TDEE' : 'Matches TDEE'}
@@ -370,6 +357,7 @@ function normalizeMember(form, fallbackLabel) {
     health_considerations: [],
   }
 }
+
 
 function EmptyMemberForm() {
   return {
@@ -621,7 +609,13 @@ export function HouseholdPage() {
   useDocumentTitle('Family Demographics | Allio')
 
   const { household, members, loading, saveMembers, repairMembers } = useHousehold()
-  const { profile: nutritionProfile, loading: loadingNutrition, saving: savingNutrition, save: saveNutritionProfile } = useNutritionProfile()
+  const {
+    profile: nutritionProfile,
+    loading: loadingNutrition,
+    saving: savingNutrition,
+    save: saveNutritionProfile,
+    derivedTargets: nutritionTargets,
+  } = useNutritionProfile()
   const [savingMembers, setSavingMembers] = useState(false)
   const [openMemberId, setOpenMemberId] = useState(null)
   const [showAddMemberForm, setShowAddMemberForm] = useState(false)
@@ -635,11 +629,15 @@ export function HouseholdPage() {
   const handleSaveMember = async (memberId, nextMember) => {
     setSavingMembers(true)
     try {
-      const nextMembers = members.map((member, index) => {
+      const targetIndex = members.findIndex((member, index) => {
         const currentKey = member.id || `member-${index}`
-        return currentKey === memberId || member.id === memberId ? { ...member, ...nextMember } : member
+        return currentKey === memberId || member.id === memberId
       })
-      await saveMembers(nextMembers)
+      const nextMembers = members.map((member, index) => index === targetIndex ? { ...member, ...nextMember } : member)
+      const refreshedMembers = await saveMembers(nextMembers)
+      if (targetIndex === 0 && refreshedMembers?.[0]?.id) {
+        await saveNutritionProfile({ ...nutritionProfile, profile_member_id: refreshedMembers[0].id })
+      }
       toast.success('Family demographics saved')
     } catch (error) {
       toast.error(error?.message || 'Could not save family demographics')
@@ -663,7 +661,10 @@ export function HouseholdPage() {
   const handleAddFirstMember = async (nextMember) => {
     setSavingMembers(true)
     try {
-      await saveMembers([nextMember])
+      const refreshedMembers = await saveMembers([nextMember])
+      if (refreshedMembers?.[0]?.id) {
+        await saveNutritionProfile({ ...nutritionProfile, profile_member_id: refreshedMembers[0].id })
+      }
       setShowAddMemberForm(false)
       toast.success('Family member added')
     } catch (error) {
@@ -690,6 +691,13 @@ export function HouseholdPage() {
     if (members.length > 0) return `${members.length} household member${members.length === 1 ? '' : 's'}`
     return 'No members configured yet'
   }, [members.length])
+
+  const primaryMember = useMemo(() => {
+    if (!members.length) return null
+    return members.find((member) => member.id && member.id === nutritionProfile.profile_member_id) || members[0]
+  }, [members, nutritionProfile.profile_member_id])
+
+  const primaryMemberName = primaryMember?.name || primaryMember?.label || 'you'
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-24 pt-4 md:px-6 md:pt-6">
@@ -777,6 +785,8 @@ export function HouseholdPage() {
             profile={nutritionProfile}
             saving={savingNutrition}
             onSave={saveNutritionProfile}
+            derivedTargets={nutritionTargets}
+            primaryMemberName={primaryMemberName}
           />
         )}
       </div>
