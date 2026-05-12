@@ -43,7 +43,7 @@ export function ShopPage() {
   const { isPremium, trackUsage } = useSubscription()
   const [searchParams, setSearchParams] = useSearchParams()
   const selectedListId = searchParams.get('list') || null
-  const { createList, makeDefault } = useShoppingLists(user?.id)
+  const { createList, makeDefault, deleteList } = useShoppingLists(user?.id)
   const { shoppingList, items, availableLists, loading, toggleItem, clearChecked, addItem, updateItem, deleteItem } = useShoppingList(user?.id, selectedListId)
   const listLabel = shoppingList?.name || 'Shopping List'
   const [newItemName, setNewItemName] = useState('')
@@ -56,6 +56,7 @@ export function ShopPage() {
   const [openCategories, setOpenCategories] = useState({})
   const [emailing, setEmailing] = useState(false)
   const [upgradeFeature, setUpgradeFeature] = useState(null)
+  const [deletingList, setDeletingList] = useState(false)
 
   const displayGroups = useMemo(() => {
     return CATEGORY_ORDER.reduce((acc, category) => {
@@ -157,6 +158,29 @@ export function ShopPage() {
     if (!shoppingList?.id) return
     await makeDefault(shoppingList.id)
     toast.success(`${shoppingList.name} is now your default list`)
+  }
+
+  const handleDeleteList = async () => {
+    if (!shoppingList?.id) return
+    const itemCount = items?.length || 0
+    const confirmMsg = itemCount > 0
+      ? `Delete "${shoppingList.name}" and its ${itemCount} item${itemCount !== 1 ? 's' : ''}?`
+      : `Delete "${shoppingList.name}"?`
+    if (!window.confirm(confirmMsg)) return
+    setDeletingList(true)
+    try {
+      await deleteList(shoppingList.id)
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('list')
+        return next
+      })
+      toast.success('Shopping list deleted')
+    } catch (err) {
+      toast.error(err?.message || 'Could not delete shopping list')
+    } finally {
+      setDeletingList(false)
+    }
   }
 
   const startEditingItem = (item) => {
@@ -293,6 +317,14 @@ export function ShopPage() {
               </select>
               <button type="button" onClick={handleMakeDefault} className="btn-secondary whitespace-nowrap" disabled={shoppingList?.is_default}>
                 {shoppingList?.is_default ? 'Default list' : 'Set default'}
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteList}
+                disabled={deletingList}
+                className="rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 whitespace-nowrap"
+              >
+                {deletingList ? 'Deleting…' : 'Delete list'}
               </button>
             </div>
           </div>

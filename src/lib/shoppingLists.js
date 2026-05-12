@@ -302,6 +302,30 @@ function mergeQuantities(existingQuantity, nextQuantity) {
   return String(nextQuantity || existingQuantity || '').trim() || null
 }
 
+export async function deleteShoppingList(userId, listId) {
+  if (!userId || !listId) throw new Error('User and list are required')
+
+  const { data: allLists, error: fetchError } = await withTransientRetry('shopping_lists select before delete', () =>
+    supabase.from('shopping_lists').select('*').eq('user_id', userId))
+  if (fetchError) throw fetchError
+
+  const wasDefault = allLists?.find((l) => l.id === listId)?.is_default
+  const remaining = (allLists || []).filter((l) => l.id !== listId)
+
+  const { error: itemsError } = await withTransientRetry('shopping_list_items delete for list', () =>
+    supabase.from('shopping_list_items').delete().eq('list_id', listId))
+  if (itemsError) throw itemsError
+
+  const { error } = await withTransientRetry('shopping_lists delete', () =>
+    supabase.from('shopping_lists').delete().eq('id', listId).eq('user_id', userId))
+  if (error) throw error
+
+  if (wasDefault && remaining.length > 0) {
+    await withTransientRetry('shopping_lists promote default after delete', () =>
+      supabase.from('shopping_lists').update({ is_default: true }).eq('id', remaining[0].id))
+  }
+}
+
 export async function addItemsToShoppingList({ userId, listId = null, items = [], source = 'tonight' }) {
   if (!userId) throw new Error('User is required to add shopping items.')
   if (!Array.isArray(items) || items.length === 0) return []

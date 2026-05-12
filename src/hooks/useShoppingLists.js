@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { createShoppingList, listShoppingLists, renameShoppingList, setDefaultShoppingList } from '../lib/shoppingLists'
+import { createShoppingList, deleteShoppingList, listShoppingLists, renameShoppingList, setDefaultShoppingList } from '../lib/shoppingLists'
 
 export function useShoppingLists(userId) {
   const [lists, setLists] = useState([])
@@ -51,6 +51,11 @@ export function useShoppingLists(userId) {
     return updated
   }, [refreshLists, userId])
 
+  const deleteList = useCallback(async (listId) => {
+    await deleteShoppingList(userId, listId)
+    await refreshLists()
+  }, [refreshLists, userId])
+
   return {
     lists,
     loading,
@@ -59,5 +64,6 @@ export function useShoppingLists(userId) {
     createList,
     renameList,
     makeDefault,
+    deleteList,
   }
 }

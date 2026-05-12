@@ -161,7 +161,7 @@ export function Catalog() {
   const hasActiveFilters = cuisine || mealType || minRating || favoritesOnly || sortBy !== 'newest'
 
   return (
-    <div className="px-3 pb-24 pt-0 md:px-0">
+    <div className="mx-auto max-w-6xl px-4 pb-24 pt-4 md:px-6 md:pt-6">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <div className="mb-2 h-1 w-12 rounded-full bg-gradient-to-r from-primary-400 via-teal-400 to-purple-400" />

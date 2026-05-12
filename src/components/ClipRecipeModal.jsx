@@ -86,15 +86,44 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
         body: JSON.stringify({ url: trimmed }),
       })
       const data = await res.json()
-      if (!res.ok || !data?.ok) throw new Error(data.error || 'Import failed')
-      toast.success(`Saved “${data.title || 'recipe'}” to your catalog!`)
-      onSaved?.()
-      onClose()
+      if (!res.ok || !data?.recipe) throw new Error(data.error || 'Could not extract a recipe from this URL')
+      const r = data.recipe
+      setForm({
+        title: r.title || '',
+        description: r.description || '',
+        meal_type: 'dinner',
+        prep_time_minutes: r.prep_time_minutes ?? '',
+        cook_time_minutes: r.cook_time_minutes ?? '',
+        servings: r.servings ?? '',
+        image_url: r.image_url || '',
+        source_url: r.source_url || '',
+        source_domain: r.source_domain || '',
+        ingredients_text: (r.ingredients || []).join('\n'),
+        steps_text: (r.steps || []).join('\n'),
+      })
+      setStep('preview')
     } catch (e) {
       setError(e.message)
     } finally {
       setLoading(false)
     }
+  }
+
+  function handleCreateManually() {
+    setForm({
+      title: '',
+      description: '',
+      meal_type: 'dinner',
+      prep_time_minutes: '',
+      cook_time_minutes: '',
+      servings: '',
+      image_url: '',
+      source_url: '',
+      source_domain: '',
+      ingredients_text: '',
+      steps_text: '',
+    })
+    setStep('preview')
   }
 
   function buildRecipeRow(formState, userId) {
@@ -250,6 +279,18 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
                 className="btn-primary w-full"
               >
                 {loading ? 'Importing…' : 'Import Recipe'}
+              </button>
+              <div className="flex items-center gap-3 py-1">
+                <div className="flex-1 border-t border-divider" />
+                <span className="text-xs text-text-muted">or</span>
+                <div className="flex-1 border-t border-divider" />
+              </div>
+              <button
+                type="button"
+                onClick={handleCreateManually}
+                className="w-full rounded-xl border border-divider bg-white py-2 text-sm font-medium text-text-primary hover:bg-warm-50"
+              >
+                Create recipe manually
               </button>
             </div>
           )}
