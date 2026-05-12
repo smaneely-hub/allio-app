@@ -54,20 +54,27 @@ function calculateServings(members: any[]): number {
 }
 // Build dynamic system prompt based on scheduled slots
 function buildSystemPrompt(
-  slots: Array<{ day: string; meal: string; is_leftover?: boolean; planning_notes?: string; effort?: string; effort_level?: string }>, 
-  members: Array<{ 
+  slots: Array<{ day: string; meal: string; is_leftover?: boolean; planning_notes?: string; effort?: string; effort_level?: string }>,
+  members: Array<{
     name?: string;
     label?: string;
     age?: number;
-    restrictions?: string; 
+    restrictions?: string;
     preferences?: string;
     dietary_restrictions?: string[];
     food_preferences?: string[];
     health_considerations?: string[];
-  }>, 
+  }>,
   household: { cooking_comfort?: string; staples_on_hand?: string; total_people?: number; diet_focus?: string },
   suggestion?: string,
-  weekNotes?: string
+  weekNotes?: string,
+  nutritionProfile?: {
+    calories_target?: number | null;
+    protein_target_g?: number | null;
+    carbs_target_g?: number | null;
+    fat_target_g?: number | null;
+    foods_to_avoid?: string[];
+  } | null
 ) {
   const slotDescriptions = slots
     .filter((s) => s.meal !== 'prep_block' && s.meal !== 'prep')
@@ -94,6 +101,22 @@ function buildSystemPrompt(
   }).join('\n')
   const staplesOnHand = household?.staples_on_hand || 'olive oil, salt, pepper, garlic'
 
+  // Build nutrition context block when profile data is present
+  const nutritionLines: string[] = []
+  if (nutritionProfile?.calories_target) {
+    const parts = [`- Target calories: ${nutritionProfile.calories_target} kcal/day`]
+    if (nutritionProfile.protein_target_g) parts.push(`protein ~${nutritionProfile.protein_target_g}g`)
+    if (nutritionProfile.carbs_target_g) parts.push(`carbs ~${nutritionProfile.carbs_target_g}g`)
+    if (nutritionProfile.fat_target_g) parts.push(`fat ~${nutritionProfile.fat_target_g}g`)
+    nutritionLines.push(parts.join(' | '))
+  }
+  if (nutritionProfile?.foods_to_avoid && nutritionProfile.foods_to_avoid.length > 0) {
+    nutritionLines.push(`- Avoid (user preference): ${nutritionProfile.foods_to_avoid.join(', ')}`)
+  }
+  const nutritionContext = nutritionLines.length > 0
+    ? `\nNUTRITION TARGETS:\n${nutritionLines.join('\n')}\n`
+    : ''
+
   const cookingComplexity: Record<string, string> = {
     'takeout or frozen': 'Keep the technique extremely simple, 15 minutes or less, minimal dishes.',
     'simple meals': 'Simple weeknight cooking, mostly under 30 minutes, approachable technique.',
@@ -113,7 +136,7 @@ HOUSEHOLD TO COOK FOR:
 - Staples already on hand and not needed in shopping list: ${staplesOnHand}
 ${suggestion ? `- User request to actively shape the meal: ${suggestion}` : ''}
 ${weekNotes ? `- Week context: ${weekNotes}` : ''}
-
+${nutritionContext}
 MEMBER CONTEXT:
 ${householdContext || '- No detailed member context provided.'}
 
@@ -650,7 +673,7 @@ serve(async (req) => {
 
 
     const messages = [
-      { role: 'system', content: buildSystemPrompt(payload.slots, payload.members, payload.household, payload.replace_slot?.suggestion, payload.week_notes) },
+      { role: 'system', content: buildSystemPrompt(payload.slots, payload.members, payload.household, payload.replace_slot?.suggestion, payload.week_notes, payload.nutrition_profile) },
       { role: 'user', content: JSON.stringify(payload) },
     ]
 
@@ -683,7 +706,7 @@ serve(async (req) => {
       retryCount += 1
       console.warn(`[generate-plan] LLM validation failed, retrying (${retryCount}/${MAX_VALIDATION_RETRIES}):`, validation.failures)
       const retryMessages = [
-        { role: 'system', content: buildRetryPrompt(buildSystemPrompt(payload.slots, payload.members, payload.household, payload.replace_slot?.suggestion, payload.week_notes), validation.failures) },
+        { role: 'system', content: buildRetryPrompt(buildSystemPrompt(payload.slots, payload.members, payload.household, payload.replace_slot?.suggestion, payload.week_notes, payload.nutrition_profile), validation.failures) },
         { role: 'user', content: JSON.stringify(payload) },
       ]
       llmJson = await callLlm(retryMessages, dynamicMaxTokens)

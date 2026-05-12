@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { groupItemsByCategory } from '../lib/shoppingListUtils'
-import { addItemsToShoppingList, ensureDefaultShoppingList, getShoppingListItems } from '../lib/shoppingLists'
+import { addItemsToShoppingList, ensureDefaultShoppingList, getShoppingListItems, listShoppingLists } from '../lib/shoppingLists'
 
 export function useShoppingList(userId, listId = null) {
   const [shoppingList, setShoppingList] = useState(null)
   const [items, setItems] = useState([])
+  const [availableLists, setAvailableLists] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -14,6 +15,7 @@ export function useShoppingList(userId, listId = null) {
     if (!userId) {
       setShoppingList(null)
       setItems([])
+      setAvailableLists([])
       setLoading(false)
       return null
     }
@@ -22,19 +24,20 @@ export function useShoppingList(userId, listId = null) {
     setError(null)
 
     try {
+      const lists = await listShoppingLists(userId)
+      setAvailableLists(lists)
+
       let targetList = null
 
       if (listId) {
-        const { data, error: listError } = await supabase
-          .from('shopping_lists')
-          .select('*')
-          .eq('id', listId)
-          .eq('user_id', userId)
-          .maybeSingle()
+        targetList = lists.find((entry) => entry.id === listId) || null
+      }
 
-        if (listError) throw listError
-        targetList = data
-      } else {
+      if (!targetList) {
+        targetList = lists.find((entry) => entry.is_default) || null
+      }
+
+      if (!targetList) {
         targetList = await ensureDefaultShoppingList(userId)
       }
 
@@ -52,6 +55,7 @@ export function useShoppingList(userId, listId = null) {
     } catch (err) {
       setShoppingList(null)
       setItems([])
+      setAvailableLists([])
       setError(err)
       toast.error(err.message || 'Could not load shopping list')
       return null
@@ -203,6 +207,7 @@ export function useShoppingList(userId, listId = null) {
     shoppingList,
     items,
     groupedItems,
+    availableLists,
     loading,
     error,
     refreshShoppingList,

@@ -319,28 +319,98 @@ export function buildPlannerWeek({ weekStart = new Date(), meals = [], dayNotes 
   return buildPlannerDays({ start: getStartOfWeek(weekStart), count: 7, meals, dayNotes })
 }
 
-// ── Recurrence expansion ─────────────────────────────────────────────────────
+// ── Recurrence rule (Phase 2) ────────────────────────────────────────────────
 
-const RECURRENCE_TYPES = ['none', 'daily', 'weekdays', 'weekly', 'monthly', 'yearly']
+// Maps Date.getDay() (0=Sun) to short weekday key
+const DOW_INDEX_TO_SHORT = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+const MS_PER_DAY = 1000 * 60 * 60 * 24
 
-export function normalizeRecurrenceType(value) {
-  return RECURRENCE_TYPES.includes(value) ? value : 'none'
+const VALID_FREQUENCIES = ['none', 'daily', 'weekly', 'monthly', 'yearly']
+const VALID_END_TYPES = ['never', 'date', 'count']
+const VALID_WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+
+// Legacy type → new frequency (Phase 1 backward compat)
+const LEGACY_FREQ_MAP = {
+  none: 'none',
+  daily: 'daily',
+  weekdays: 'weekly',
+  weekly: 'weekly',
+  monthly: 'monthly',
+  yearly: 'yearly',
+}
+const LEGACY_WEEKDAY_MAP = {
+  weekdays: ['mon', 'tue', 'wed', 'thu', 'fri'],
 }
 
-function doesRecurOn(recurrenceType, anchorDate, targetDate) {
-  switch (recurrenceType) {
-    case 'daily': return true
-    case 'weekdays': {
-      const dow = targetDate.getDay()
-      return dow >= 1 && dow <= 5
+export function normalizeRecurrenceRule(value) {
+  if (!value || typeof value !== 'object') {
+    return { frequency: 'none', interval: 1, byWeekday: [], endType: 'never', endDate: null, endCount: null, exdates: [] }
+  }
+
+  // Legacy Phase 1 format: { type: 'daily' } with no frequency field
+  if (value.type && !value.frequency) {
+    const legacyType = String(value.type)
+    const frequency = VALID_FREQUENCIES.includes(LEGACY_FREQ_MAP[legacyType]) ? LEGACY_FREQ_MAP[legacyType] : 'none'
+    const byWeekday = LEGACY_WEEKDAY_MAP[legacyType] || []
+    return { frequency, interval: 1, byWeekday, endType: 'never', endDate: null, endCount: null, exdates: [] }
+  }
+
+  // Phase 2 format
+  const frequency = VALID_FREQUENCIES.includes(value.frequency) ? value.frequency : 'none'
+  const interval = Math.max(1, Math.floor(Number(value.interval) || 1))
+  const byWeekday = Array.isArray(value.byWeekday)
+    ? value.byWeekday.filter((d) => VALID_WEEKDAYS.includes(d))
+    : []
+  const endType = VALID_END_TYPES.includes(value.endType) ? value.endType : 'never'
+  const endDate = typeof value.endDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.endDate) ? value.endDate : null
+  const endCount = value.endCount != null && Number.isInteger(Number(value.endCount)) && Number(value.endCount) >= 1
+    ? Number(value.endCount) : null
+  const exdates = Array.isArray(value.exdates) ? value.exdates.filter((d) => typeof d === 'string') : []
+
+  return { frequency, interval, byWeekday, endType, endDate, endCount, exdates }
+}
+
+// Keep for backward compat (was exported, now delegates to normalizeRecurrenceRule)
+export function normalizeRecurrenceType(value) {
+  const rule = normalizeRecurrenceRule(value)
+  return rule.frequency === 'none' ? 'none' : rule.frequency
+}
+
+function doesRecurOnV2(rule, anchorDate, targetDate) {
+  const { frequency, interval = 1, byWeekday = [] } = rule
+
+  switch (frequency) {
+    case 'daily': {
+      const diffDays = Math.round((targetDate.getTime() - anchorDate.getTime()) / MS_PER_DAY)
+      return diffDays > 0 && diffDays % interval === 0
     }
-    case 'weekly': return targetDate.getDay() === anchorDate.getDay()
-    case 'monthly': return targetDate.getDate() === anchorDate.getDate()
-    case 'yearly':
-      return (
-        targetDate.getMonth() === anchorDate.getMonth() &&
-        targetDate.getDate() === anchorDate.getDate()
+    case 'weekly': {
+      const targetDow = DOW_INDEX_TO_SHORT[targetDate.getDay()]
+      // If no byWeekday specified, recur on anchor's weekday only
+      const activeDays = byWeekday.length > 0 ? byWeekday : [DOW_INDEX_TO_SHORT[anchorDate.getDay()]]
+      if (!activeDays.includes(targetDow)) return false
+
+      const anchorWeekStart = getStartOfWeek(anchorDate)
+      const targetWeekStart = getStartOfWeek(targetDate)
+      const diffWeeks = Math.round(
+        (targetWeekStart.getTime() - anchorWeekStart.getTime()) / (MS_PER_DAY * 7)
       )
+      // Allow same week as anchor (diffWeeks === 0) for multi-day patterns
+      return diffWeeks >= 0 && diffWeeks % interval === 0
+    }
+    case 'monthly': {
+      if (targetDate.getDate() !== anchorDate.getDate()) return false
+      const monthsDiff =
+        (targetDate.getFullYear() - anchorDate.getFullYear()) * 12 +
+        (targetDate.getMonth() - anchorDate.getMonth())
+      return monthsDiff > 0 && monthsDiff % interval === 0
+    }
+    case 'yearly': {
+      if (targetDate.getMonth() !== anchorDate.getMonth()) return false
+      if (targetDate.getDate() !== anchorDate.getDate()) return false
+      const yearsDiff = targetDate.getFullYear() - anchorDate.getFullYear()
+      return yearsDiff > 0 && yearsDiff % interval === 0
+    }
     default: return false
   }
 }
@@ -348,33 +418,58 @@ function doesRecurOn(recurrenceType, anchorDate, targetDate) {
 // Expand recurring meals to fill the window [windowStart, windowStart+count).
 // Returns a flat list of base meals + virtual occurrence objects.
 // Virtual occurrences are never stored — they exist only for rendering.
+// Supports: custom intervals, byWeekday, endType (never/date/count), exdates.
 export function expandRecurringMeals(meals, windowStart, count) {
   const result = []
+  const windowEnd = addDays(windowStart, count)
+
   for (const meal of meals) {
     result.push(meal)
-    const recType = meal.recurrence?.type || 'none'
-    if (recType === 'none') continue
+
+    const rule = normalizeRecurrenceRule(meal.recurrence)
+    if (rule.frequency === 'none') continue
+
     const anchorDate = parseIsoLocalDate(meal.date)
     if (!anchorDate) continue
 
-    for (let i = 0; i < count; i++) {
-      const occDate = addDays(windowStart, i)
-      const occDateStr = formatIsoLocalDate(occDate)
-      if (occDateStr === meal.date) continue
-      if (occDate < anchorDate) continue
-      if (!doesRecurOn(recType, anchorDate, occDate)) continue
+    const exdateSet = new Set(rule.exdates || [])
+    const endDateParsed = (rule.endType === 'date' && rule.endDate) ? parseIsoLocalDate(rule.endDate) : null
 
-      const fullDayName = occDate.toLocaleDateString('en-US', { weekday: 'long' })
-      const occDayName = normalizeDayName(fullDayName)
-      result.push({
-        ...meal,
-        id: `${meal.id}--recur-${occDateStr}`,
-        date: occDateStr,
-        day: DAY_SHORT[occDayName],
-        day_name: occDayName,
-        is_occurrence: true,
-        occurrence_source_id: meal.id,
-      })
+    // For endCount we must count from anchor; otherwise start from windowStart.
+    const needsCountFrom = rule.endType === 'count' && rule.endCount != null
+    const scanStart = needsCountFrom ? addDays(anchorDate, 1) : windowStart
+
+    let occurrenceCount = 1 // anchor is occurrence #1
+    let cursor = new Date(scanStart)
+    cursor.setHours(0, 0, 0, 0)
+
+    while (cursor < windowEnd) {
+      // Early exit for date-based end condition (dates advance monotonically)
+      if (endDateParsed && cursor > endDateParsed) break
+
+      const occDateStr = formatIsoLocalDate(cursor)
+
+      if (occDateStr !== meal.date && cursor >= anchorDate && doesRecurOnV2(rule, anchorDate, cursor)) {
+        occurrenceCount++
+
+        if (rule.endType === 'count' && rule.endCount != null && occurrenceCount > rule.endCount) break
+
+        if (cursor >= windowStart && !exdateSet.has(occDateStr)) {
+          const fullDayName = cursor.toLocaleDateString('en-US', { weekday: 'long' })
+          const occDayName = normalizeDayName(fullDayName)
+          result.push({
+            ...meal,
+            id: `${meal.id}--recur-${occDateStr}`,
+            date: occDateStr,
+            day: DAY_SHORT[occDayName],
+            day_name: occDayName,
+            is_occurrence: true,
+            occurrence_source_id: meal.id,
+          })
+        }
+      }
+
+      cursor = addDays(cursor, 1)
     }
   }
   return result

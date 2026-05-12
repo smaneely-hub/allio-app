@@ -4,6 +4,16 @@ import toast from 'react-hot-toast'
 import { useHousehold } from '../hooks/useHousehold'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
+import { useShoppingLists } from '../hooks/useShoppingLists'
+import { useNutritionProfile } from '../hooks/useNutritionProfile'
+import { useTheme } from '../contexts/ThemeContext'
+import {
+  ACTIVITY_LABELS,
+  GOAL_LABELS,
+  calculateTDEE,
+  calculateTargetCalories,
+  calculateMacros,
+} from '../lib/nutrition'
 
 const DEFAULT_PREFERENCES = {
   weekly_meal_reminders: true,
@@ -11,9 +21,24 @@ const DEFAULT_PREFERENCES = {
   product_updates: false,
   units: 'imperial',
   default_servings: 4,
+  default_shopping_list_id: null,
+  always_ask_shopping_list: false,
 }
 
 const UNIT_PREFERENCE_STORAGE_KEY = 'allio-unit-preference'
+
+const DIETARY_OPTIONS = ['vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'halal', 'kosher', 'low-carb', 'paleo', 'keto']
+const ALLERGY_OPTIONS = ['peanut', 'tree nut', 'egg', 'dairy', 'soy', 'shellfish', 'sesame', 'wheat', 'fish']
+const SEX_OPTIONS = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'other', label: 'Other' },
+]
+const GOAL_OPTIONS = [
+  { value: 'lose', label: 'Lose' },
+  { value: 'maintain', label: 'Maintain' },
+  { value: 'gain', label: 'Gain' },
+]
 
 function isMissingPreferencesTable(error) {
   const message = String(error?.message || error?.details || '')
@@ -38,14 +63,319 @@ function ToggleRow({ label, checked, onChange }) {
   )
 }
 
+function SectionCard({ title, description, children }) {
+  return (
+    <div className="rounded-2xl border border-divider bg-white p-4">
+      {title && (
+        <div className="mb-3">
+          <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
+          {description && <p className="mt-0.5 text-xs text-text-muted">{description}</p>}
+        </div>
+      )}
+      {children}
+    </div>
+  )
+}
+
+function NumericInput({ label, value, onChange, onBlur, unit, min, max, placeholder }) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-text-secondary">{label}</label>
+      <div className="flex items-center gap-1.5">
+        <input
+          type="number"
+          min={min}
+          max={max}
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          placeholder={placeholder}
+          className="input w-full max-w-[7rem]"
+        />
+        {unit && <span className="text-sm text-text-muted">{unit}</span>}
+      </div>
+    </div>
+  )
+}
+
+function ChipGroup({ options, values, onToggle }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((option) => {
+        const active = values.includes(option)
+        return (
+          <button
+            key={option}
+            type="button"
+            onClick={() => onToggle(option)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${active ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-divider bg-white text-text-secondary hover:border-primary-200 hover:bg-primary-50'}`}
+          >
+            {option}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function SegmentControl({ options, value, onChange, className = '' }) {
+  return (
+    <div className={`inline-flex rounded-full bg-surface-muted p-1 ${className}`}>
+      {options.map((opt) => {
+        const active = value === opt.value
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${active ? 'bg-white text-text-primary shadow-card' : 'text-text-secondary'}`}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function NutritionProfileSection({ profile, saving, onSave }) {
+  const [form, setForm] = useState(profile)
+
+  useEffect(() => {
+    setForm(profile)
+  }, [profile])
+
+  const field = (name) => ({
+    value: form[name] ?? '',
+    onChange: (e) => setForm((f) => ({ ...f, [name]: e.target.value })),
+    onBlur: () => handleBlurSave(),
+  })
+
+  const handleBlurSave = () => {
+    onSave(form)
+  }
+
+  const toggleChip = (fieldName, value) => {
+    const current = Array.isArray(form[fieldName]) ? form[fieldName] : []
+    const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value]
+    const updated = { ...form, [fieldName]: next }
+    setForm(updated)
+    onSave(updated)
+  }
+
+  const setAndSave = (patch) => {
+    const updated = { ...form, ...patch }
+    setForm(updated)
+    onSave(updated)
+  }
+
+  // Derived TDEE / macro preview for auto mode
+  const tdee = calculateTDEE(form)
+  const autoCalories = calculateTargetCalories(form)
+  const autoMacros = autoCalories ? calculateMacros(autoCalories) : null
+  const isAutoMode = form.nutrition_mode !== 'manual'
+
+  const [foodsInput, setFoodsInput] = useState('')
+  useEffect(() => {
+    setFoodsInput((form.foods_to_avoid || []).join(', '))
+  }, [profile]) // only reset from DB, not on every form change
+
+  const commitFoodsToAvoid = () => {
+    const parsed = foodsInput
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    const updated = { ...form, foods_to_avoid: parsed }
+    setForm(updated)
+    onSave(updated)
+  }
+
+  return (
+    <section className="card p-5 space-y-4">
+      <div>
+        <h2 className="font-display text-xl text-text-primary">Your nutrition profile</h2>
+        <p className="mt-1 text-sm text-text-secondary">Used to calculate calorie and macro targets for meal generation.</p>
+      </div>
+
+      {/* Body stats */}
+      <SectionCard title="Body stats">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <NumericInput
+            label="Weight"
+            unit="kg"
+            min={30}
+            max={300}
+            placeholder="70"
+            {...field('weight_kg')}
+          />
+          <NumericInput
+            label="Height"
+            unit="cm"
+            min={100}
+            max={250}
+            placeholder="170"
+            {...field('height_cm')}
+          />
+          <NumericInput
+            label="Age"
+            unit="yrs"
+            min={10}
+            max={120}
+            placeholder="35"
+            {...field('age_years')}
+          />
+          <div>
+            <label className="mb-1 block text-xs font-medium text-text-secondary">Sex</label>
+            <select
+              className="input w-full"
+              value={form.sex || ''}
+              onChange={(e) => setAndSave({ sex: e.target.value })}
+            >
+              <option value="">—</option>
+              {SEX_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+        </div>
+        {tdee && (
+          <p className="mt-3 text-xs text-text-muted">
+            Estimated TDEE: <span className="font-semibold text-text-primary">{tdee.toLocaleString()} kcal/day</span>
+          </p>
+        )}
+      </SectionCard>
+
+      {/* Activity & goal */}
+      <SectionCard title="Activity & goal">
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-text-secondary">Activity level</label>
+            <select
+              className="input w-full max-w-sm"
+              value={form.activity_level || ''}
+              onChange={(e) => setAndSave({ activity_level: e.target.value })}
+            >
+              <option value="">Select activity level</option>
+              {Object.entries(ACTIVITY_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-2 block text-xs font-medium text-text-secondary">Goal</label>
+            <SegmentControl
+              options={GOAL_OPTIONS}
+              value={form.goal_type || 'maintain'}
+              onChange={(v) => setAndSave({ goal_type: v })}
+            />
+          </div>
+          {form.goal_type !== 'maintain' && (
+            <NumericInput
+              label="Target weight"
+              unit="kg"
+              min={30}
+              max={300}
+              placeholder="65"
+              {...field('target_weight_kg')}
+            />
+          )}
+        </div>
+      </SectionCard>
+
+      {/* Nutrition targets */}
+      <SectionCard title="Nutrition targets" description="Auto mode calculates from your stats. Manual lets you override.">
+        <div className="space-y-4">
+          <div>
+            <label className="mb-2 block text-xs font-medium text-text-secondary">Mode</label>
+            <SegmentControl
+              options={[{ value: 'auto', label: 'Auto (TDEE)' }, { value: 'manual', label: 'Manual' }]}
+              value={form.nutrition_mode || 'auto'}
+              onChange={(v) => setAndSave({ nutrition_mode: v })}
+            />
+          </div>
+
+          {isAutoMode ? (
+            autoCalories ? (
+              <div className="rounded-xl bg-surface px-4 py-3 text-sm">
+                <div className="flex flex-wrap gap-x-6 gap-y-1">
+                  <span className="text-text-secondary">Calories: <strong className="text-text-primary">{autoCalories.toLocaleString()} kcal</strong></span>
+                  {autoMacros && (
+                    <>
+                      <span className="text-text-secondary">Protein: <strong className="text-text-primary">{autoMacros.protein_g}g</strong></span>
+                      <span className="text-text-secondary">Carbs: <strong className="text-text-primary">{autoMacros.carbs_g}g</strong></span>
+                      <span className="text-text-secondary">Fat: <strong className="text-text-primary">{autoMacros.fat_g}g</strong></span>
+                    </>
+                  )}
+                </div>
+                <p className="mt-1.5 text-xs text-text-muted">
+                  {form.goal_type === 'lose' ? '−500 kcal from TDEE' : form.goal_type === 'gain' ? '+500 kcal from TDEE' : 'Matches TDEE'}
+                  {' · '}macros split 30/40/30 (protein/carbs/fat)
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-text-muted">Fill in your body stats and activity level to see your calculated targets.</p>
+            )
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <NumericInput label="Calories" unit="kcal" min={800} max={6000} placeholder="2000" {...field('calories_target')} />
+              <NumericInput label="Protein" unit="g" min={0} max={500} placeholder="150" {...field('protein_target_g')} />
+              <NumericInput label="Carbs" unit="g" min={0} max={700} placeholder="200" {...field('carbs_target_g')} />
+              <NumericInput label="Fat" unit="g" min={0} max={400} placeholder="65" {...field('fat_target_g')} />
+            </div>
+          )}
+        </div>
+      </SectionCard>
+
+      {/* Dietary preferences */}
+      <SectionCard title="Dietary preferences" description="Applied at the profile level in addition to household member settings.">
+        <div className="space-y-4">
+          <div>
+            <label className="mb-2 block text-xs font-medium text-text-secondary">Dietary restrictions</label>
+            <ChipGroup
+              options={DIETARY_OPTIONS}
+              values={form.dietary_restrictions || []}
+              onToggle={(v) => toggleChip('dietary_restrictions', v)}
+            />
+          </div>
+          <div>
+            <label className="mb-2 block text-xs font-medium text-text-secondary">Allergies</label>
+            <ChipGroup
+              options={ALLERGY_OPTIONS}
+              values={form.allergies || []}
+              onToggle={(v) => toggleChip('allergies', v)}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-text-secondary">
+              Foods to avoid
+              <span className="ml-1 font-normal text-text-muted">(comma-separated)</span>
+            </label>
+            <textarea
+              className="input w-full resize-none"
+              rows={2}
+              placeholder="e.g. cilantro, blue cheese, anchovies"
+              value={foodsInput}
+              onChange={(e) => setFoodsInput(e.target.value)}
+              onBlur={commitFoodsToAvoid}
+            />
+          </div>
+        </div>
+      </SectionCard>
+
+      {saving && <p className="text-xs text-text-muted">Saving…</p>}
+    </section>
+  )
+}
+
 export function SettingsPage() {
   const { household, members, saveHousehold, repairMembers } = useHousehold()
   const { user, signOut } = useAuth()
   const [name, setName] = useState('')
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES)
   const [loadingPrefs, setLoadingPrefs] = useState(true)
+  const { lists: shoppingLists } = useShoppingLists(user?.id)
   const [saving, setSaving] = useState(false)
   const [savingMembers, setSavingMembers] = useState(false)
+  const { profile: nutritionProfile, loading: loadingNutrition, saving: savingNutrition, save: saveNutritionProfile } = useNutritionProfile()
+  const { theme, setTheme } = useTheme()
 
   useEffect(() => {
     setName(household?.name || household?.household_name || '')
@@ -100,6 +430,8 @@ export function SettingsPage() {
       product_updates: Boolean(next.product_updates),
       units: next.units === 'metric' ? 'metric' : 'imperial',
       default_servings: Math.min(12, Math.max(1, Number(next.default_servings) || 4)),
+      default_shopping_list_id: next.default_shopping_list_id || null,
+      always_ask_shopping_list: Boolean(next.always_ask_shopping_list),
     }
 
     const { error } = await supabase
@@ -150,7 +482,6 @@ export function SettingsPage() {
     try {
       await repairMembers()
       toast.success('Default family members restored')
-      setFamilyModalOpen(true)
     } catch (error) {
       toast.error(error?.message || 'Could not restore family members')
     } finally {
@@ -197,11 +528,23 @@ export function SettingsPage() {
           </div>
         </section>
 
+        {!loadingNutrition && (
+          <NutritionProfileSection
+            profile={nutritionProfile}
+            saving={savingNutrition}
+            onSave={saveNutritionProfile}
+          />
+        )}
+
         <section className="card p-5">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
-              <h2 className="font-display text-xl text-text-primary">Family demographics</h2>
-              <p className="mt-1 text-sm text-text-secondary">Manage member details from the dedicated family demographics page.</p>
+              <h2 className="font-display text-xl text-text-primary">Household summary</h2>
+              <p className="mt-1 text-sm text-text-secondary">
+                {members.length > 0
+                  ? `${members.length} member${members.length === 1 ? '' : 's'} — manage details on the family demographics page.`
+                  : 'Manage member details from the dedicated family demographics page.'}
+              </p>
             </div>
           </div>
           <div className="space-y-3 text-sm">
@@ -270,6 +613,54 @@ export function SettingsPage() {
                 className="input w-full max-w-[8rem]"
               />
             </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-text-primary">Default shopping list</label>
+              <select
+                className="input w-full max-w-sm"
+                value={preferences.default_shopping_list_id || ''}
+                onChange={(e) => persistPreferences({ ...preferences, default_shopping_list_id: e.target.value || null })}
+              >
+                <option value="">Use current default list</option>
+                {shoppingLists.map((list) => (
+                  <option key={list.id} value={list.id}>{list.name}{list.is_default ? ' • default' : ''}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-text-muted">This is the list planner-generated groceries should target by default.</p>
+            </div>
+
+            <ToggleRow
+              label="Always ask which list planner items should go to"
+              checked={Boolean(preferences.always_ask_shopping_list)}
+              onChange={() => persistPreferences({ ...preferences, always_ask_shopping_list: !preferences.always_ask_shopping_list })}
+            />
+          </div>
+        </section>
+
+        <section className="card p-5">
+          <h2 className="mb-4 font-display text-xl text-text-primary">Appearance</h2>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-text-primary">Theme</label>
+            <div className="inline-flex rounded-full bg-surface-muted p-1">
+              {[
+                { value: 'light', label: 'Light' },
+                { value: 'dark', label: 'Dark' },
+                { value: 'system', label: 'System' },
+              ].map(({ value, label }) => {
+                const active = theme === value
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setTheme(value)}
+                    className={`rounded-full px-4 py-2 text-sm font-medium transition ${active ? 'bg-white text-text-primary shadow-card' : 'text-text-secondary'}`}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="mt-2 text-xs text-text-muted">System follows your device's dark mode setting.</p>
           </div>
         </section>
 
@@ -283,7 +674,6 @@ export function SettingsPage() {
 
         {loadingPrefs ? <div className="text-sm text-text-muted">Loading settings…</div> : null}
       </div>
-
     </div>
   )
 }

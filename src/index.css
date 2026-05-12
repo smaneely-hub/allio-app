@@ -41,6 +41,7 @@ body {
   --color-text-primary: #0F172A;
   --color-text-secondary: #475569;
   --color-text-tertiary: #94A3B8;
+  --color-text-muted: #94A3B8;
   --color-text-inverse: #FFFFFF;
 
   --color-ink-primary: #0F172A;
@@ -51,12 +52,14 @@ body {
   --color-bg-soft: #F8FAFC;
   --color-bg-softer: #F1F5F9;
 
+  --color-surface: #F8FAFC;
   --color-surface-base: #F8FAFC;
   --color-surface-card: #FFFFFF;
   --color-surface-muted: #F1F5F9;
 
   --color-border: #E2E8F0;
   --color-border-focus: #7B8CF6;
+  --color-divider: #E2E8F0;
 
   --color-success: #22C55E;
   --color-warning: #F59E0B;
@@ -174,34 +177,98 @@ h1, h2, h3, h4 {
   border-color: var(--color-border-focus);
   box-shadow: var(--shadow-glow);
 }
-/* Dark Mode */
+/* Dark Mode — CSS variable overrides + structural overrides */
 .dark {
   color-scheme: dark;
+
+  /* Surface colors */
+  --color-bg-primary: #1e2028;
+  --color-bg-soft: #13151b;
+  --color-bg-softer: #0f1117;
+  --color-surface: #13151b;
+  --color-surface-base: #13151b;
+  --color-surface-card: #1e2028;
+  --color-surface-muted: #252830;
+
+  /* Text */
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-text-tertiary: #64748b;
+  --color-text-inverse: #0f172a;
+  --color-text-muted: #64748b;
+  --color-ink-primary: #f1f5f9;
+  --color-ink-secondary: #94a3b8;
+  --color-ink-tertiary: #64748b;
+
+  /* Borders */
+  --color-border: #2d3148;
+  --color-divider: #2d3148;
+
+  /* Warm palette (used for backgrounds, chips, dividers) */
+  --color-warm-50: #13151b;
+  --color-warm-100: #1e2028;
+  --color-warm-200: #2d3148;
+  --color-warm-400: #64748b;
+  --color-warm-700: #94a3b8;
+  --color-warm-900: #f1f5f9;
+
+  /* Primary tints (for subtle highlight areas) */
+  --color-primary-50: #1a1f3d;
+  --color-primary-100: #1f2549;
 }
+
 .dark body {
-  background-color: #1a1a1a;
-  color: #e5e5e5;
+  background-color: var(--color-bg-soft);
+  color: var(--color-text-primary);
 }
-.dark .bg-white { background-color: #2a2a2a; }
-.dark .bg-warm-50 { background-color: #252525; }
-.dark .bg-warm-100 { background-color: #333333; }
-.dark .border-warm-200 { border-color: #444; }
-.dark .border-stone-200 { border-color: #444; }
-.dark .text-warm-900 { color: #e5e5e5; }
-.dark .text-warm-700 { color: #ccc; }
-.dark .text-warm-500 { color: #999; }
-.dark .text-warm-400 { color: #777; }
-.dark .input, .dark select {
-  background-color: #333;
-  border-color: #444;
-  color: #e5e5e5;
-}
+
+/* Literal bg-white overrides (Tailwind doesn't generate var() for these) */
+.dark .bg-white { background-color: var(--color-surface-card) !important; }
+
+/* NavBar headers */
+.dark header { background-color: var(--color-surface-card) !important; }
+
+/* RecipeDetail hardcoded backgrounds */
+.dark .bg-\[\#faf7f2\] { background-color: #13151b !important; }
+.dark .bg-\[\#f4efe6\] { background-color: #252830 !important; }
+.dark .\[\#faf7f2\]\/90 { background-color: rgba(19, 21, 27, 0.9) !important; }
+
+/* Component overrides */
 .dark .card {
-  background-color: #2a2a2a;
-  border-color: #444;
+  background-color: var(--color-surface-card);
+  border-color: var(--color-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
-.dark .bg-gradient-to-br.from-primary-50.to-primary-100 {
-  background: linear-gradient(to bottom right, #1a3d2a, #1f4a35);
+
+.dark .input,
+.dark select {
+  background-color: var(--color-surface-card);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.dark .btn-secondary {
+  background-color: var(--color-surface-card);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.dark .btn-secondary:hover {
+  background-color: var(--color-surface-muted);
+}
+
+/* Inline shadow cards in RecipeDetail */
+.dark .shadow-\[0_18px_50px_rgba\(15\,23\,42\,0\.06\)\] {
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4) !important;
+}
+.dark .shadow-\[0_10px_30px_rgba\(15\,23\,42\,0\.05\)\] {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Gradient subtle background used in landing/cards */
+.dark .bg-gradient-to-br.from-primary-50 {
+  --tw-gradient-from: #1a1f3d;
+  --tw-gradient-to: #1a1f3d;
 }
 
 /* Page transition */

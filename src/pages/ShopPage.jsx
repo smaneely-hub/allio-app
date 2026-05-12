@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
@@ -10,7 +11,9 @@ import { EmptyState } from '../components/LoadingStates'
 import { UpgradePrompt } from '../components/UpgradePrompt'
 import { AdSlot } from '../components/AdSlot'
 import { useShoppingList } from '../hooks/useShoppingList'
+import { useShoppingLists } from '../hooks/useShoppingLists'
 import { CATEGORY_LABELS, CATEGORY_ORDER, categorizeIngredient } from '../lib/shoppingListUtils'
+import { getSourceBadgeLabel } from '../lib/shoppingLists'
 
 const categoryColors = {
   produce: { border: '#22C55E', bg: 'bg-green-50' },
@@ -22,30 +25,57 @@ const categoryColors = {
   other: { border: '#6B7280', bg: 'bg-gray-50' },
 }
 
-/** Render the household shopping list with grouped aisle sections. */
+function SourceBadge({ source }) {
+  const label = getSourceBadgeLabel(source)
+  const tone = String(source || '').toLowerCase() === 'planner'
+    ? 'bg-blue-100 text-blue-700'
+    : String(source || '').toLowerCase() === 'mixed'
+      ? 'bg-violet-100 text-violet-700'
+      : 'bg-slate-100 text-slate-700'
+
+  return <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${tone}`}>{label}</span>
+}
+
+/** Render household shopping lists with multi-list support and planner/manual source cues. */
 export function ShopPage() {
   useDocumentTitle('Shopping List | Allio')
   const { user } = useAuth()
   const { isPremium, trackUsage } = useSubscription()
-  const { shoppingList, items, loading, toggleItem, clearChecked, addItem, updateItem, deleteItem } = useShoppingList(user?.id)
-  const plannerItems = useMemo(() => (items || []).filter((item) => String(item?.source || '').trim().toLowerCase() === 'planner'), [items])
+  const [searchParams, setSearchParams] = useSearchParams()
+  const selectedListId = searchParams.get('list') || null
+  const { createList, makeDefault } = useShoppingLists(user?.id)
+  const { shoppingList, items, availableLists, loading, toggleItem, clearChecked, addItem, updateItem, deleteItem } = useShoppingList(user?.id, selectedListId)
+  const listLabel = shoppingList?.name || 'Shopping List'
   const [newItemName, setNewItemName] = useState('')
   const [newItemQuantity, setNewItemQuantity] = useState('')
+  const [newListName, setNewListName] = useState('')
+  const [creatingList, setCreatingList] = useState(false)
   const [editingItemId, setEditingItemId] = useState(null)
   const [editingName, setEditingName] = useState('')
   const [editingQuantity, setEditingQuantity] = useState('')
+  const [openCategories, setOpenCategories] = useState({})
+  const [emailing, setEmailing] = useState(false)
+  const [upgradeFeature, setUpgradeFeature] = useState(null)
+
   const displayGroups = useMemo(() => {
     return CATEGORY_ORDER.reduce((acc, category) => {
-      const grouped = (plannerItems || [])
+      const grouped = (items || [])
         .map((item) => ({ ...item, __itemKey: item.id }))
         .filter((item) => (item.category || 'other') === category)
       if (grouped.length) acc[category] = grouped
       return acc
     }, {})
-  }, [plannerItems])
-  const [openCategories, setOpenCategories] = useState({})
-  const [emailing, setEmailing] = useState(false)
-  const [upgradeFeature, setUpgradeFeature] = useState(null)
+  }, [items])
+
+  useEffect(() => {
+    if (!selectedListId && shoppingList?.id) {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('list', shoppingList.id)
+        return next
+      }, { replace: true })
+    }
+  }, [selectedListId, setSearchParams, shoppingList?.id])
 
   useEffect(() => {
     const categoriesWithItems = CATEGORY_ORDER.filter((category) => displayGroups[category]?.length)
@@ -64,14 +94,14 @@ export function ShopPage() {
   }, [displayGroups])
 
   const progress = useMemo(() => {
-    const checked = plannerItems.filter((item) => item.checked).length
+    const checked = (items || []).filter((item) => item.checked).length
     return {
       checked,
-      total: plannerItems.length,
-      percent: plannerItems.length > 0 ? Math.round((checked / plannerItems.length) * 100) : 0,
-      label: `${plannerItems.length} items (${checked} checked)`
+      total: items.length,
+      percent: items.length > 0 ? Math.round((checked / items.length) * 100) : 0,
+      label: `${items.length} items (${checked} checked)`
     }
-  }, [plannerItems])
+  }, [items])
 
   const clearAllChecks = async () => {
     await clearChecked()
@@ -92,6 +122,41 @@ export function ShopPage() {
     setNewItemName('')
     setNewItemQuantity('')
     toast.success('Item added')
+  }
+
+  const handleCreateList = async (event) => {
+    event.preventDefault()
+    if (!newListName.trim()) return
+    setCreatingList(true)
+    try {
+      const created = await createList(newListName.trim())
+      setNewListName('')
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('list', created.id)
+        return next
+      })
+      toast.success('Shopping list created')
+    } catch (error) {
+      toast.error(error?.message || 'Could not create shopping list')
+    } finally {
+      setCreatingList(false)
+    }
+  }
+
+  const handleSelectList = (event) => {
+    const nextId = event.target.value
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.set('list', nextId)
+      return next
+    })
+  }
+
+  const handleMakeDefault = async () => {
+    if (!shoppingList?.id) return
+    await makeDefault(shoppingList.id)
+    toast.success(`${shoppingList.name} is now your default list`)
   }
 
   const startEditingItem = (item) => {
@@ -128,7 +193,7 @@ export function ShopPage() {
       return
     }
 
-    const text = shareListAsText(plannerItems || [], shoppingList?.name || 'Shopping List')
+    const text = shareListAsText(items || [], listLabel)
     await navigator.clipboard.writeText(text)
     toast.success('Shopping list copied!')
   }
@@ -147,12 +212,10 @@ export function ShopPage() {
         return
       }
 
-      const weekLabel = shoppingList?.name || 'Shopping List'
-      const itemCount = plannerItems?.length || 0
-      const html = formatShoppingListEmail(plannerItems || [], weekLabel, 'My Household')
+      const html = formatShoppingListEmail(items || [], listLabel, 'My Household')
 
       const { error } = await supabase.functions.invoke('send-email', {
-        body: { to: authUser.email, subject: `Your Allio shopping list — ${itemCount} items`, html }
+        body: { to: authUser.email, subject: `Your Allio shopping list — ${items?.length || 0} items`, html }
       })
 
       if (error?.message?.includes('404') || error?.status === 404) {
@@ -188,15 +251,13 @@ export function ShopPage() {
     )
   }
 
-  if (!plannerItems?.length) {
+  if (!shoppingList?.id) {
     return (
       <div className="mx-auto max-w-6xl px-4 pb-24 pt-4 md:px-6 md:pt-6">
         <EmptyState
           emoji="🛒"
           headline="No shopping list yet"
-          body="Planned meals from Planner will populate your grocery list automatically."
-          ctaLabel="Open Planner"
-          ctaLink="/planner"
+          body="Create your first shopping list to start collecting planned and manual items together."
         />
       </div>
     )
@@ -204,12 +265,12 @@ export function ShopPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-24 pt-4 md:px-6 md:pt-6">
-      <div className="mb-4">
-        <div className="flex items-center justify-between">
+      <div className="mb-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="h-1 w-12 bg-gradient-to-r from-primary-400 via-teal-400 to-purple-400 rounded-full mb-2"></div>
-            <h1 className="font-display text-2xl md:text-3xl text-text-primary">{shoppingList?.name || 'Shopping List'}</h1>
-            <p className="text-sm text-text-muted">Your default grocery list</p>
+            <div className="h-1 w-12 rounded-full bg-gradient-to-r from-primary-400 via-teal-400 to-purple-400 mb-2"></div>
+            <h1 className="font-display text-2xl md:text-3xl text-text-primary">{listLabel}</h1>
+            <p className="text-sm text-text-muted">Planner items and manual items merge in the same list. Sharing is still copy or email for now.</p>
           </div>
           <button
             type="button"
@@ -219,6 +280,37 @@ export function ShopPage() {
           >
             {emailing ? 'Sending...' : 'Share'}
           </button>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+          <div className="rounded-2xl border border-divider bg-white p-3 shadow-sm">
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Current list</label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <select className="input flex-1" value={shoppingList?.id || ''} onChange={handleSelectList}>
+                {availableLists.map((list) => (
+                  <option key={list.id} value={list.id}>{list.name}{list.is_default ? ' • default' : ''}</option>
+                ))}
+              </select>
+              <button type="button" onClick={handleMakeDefault} className="btn-secondary whitespace-nowrap" disabled={shoppingList?.is_default}>
+                {shoppingList?.is_default ? 'Default list' : 'Set default'}
+              </button>
+            </div>
+          </div>
+
+          <form onSubmit={handleCreateList} className="rounded-2xl border border-divider bg-white p-3 shadow-sm">
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">New list</label>
+            <div className="flex gap-2">
+              <input
+                value={newListName}
+                onChange={(e) => setNewListName(e.target.value)}
+                className="input min-w-0"
+                placeholder="Weekly groceries"
+              />
+              <button type="submit" className="btn-primary whitespace-nowrap" disabled={creatingList}>
+                {creatingList ? 'Creating…' : 'Create'}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
 
@@ -267,11 +359,15 @@ export function ShopPage() {
         </div>
       )}
 
-      {CATEGORY_ORDER.filter((category) => displayGroups[category]?.length).map((category) => {
-        const items = displayGroups[category]
+      {!items?.length ? (
+        <div className="card p-6 text-sm text-text-muted">
+          This list is empty. Planner meals can flow here, and manual items can be added anytime.
+        </div>
+      ) : CATEGORY_ORDER.filter((category) => displayGroups[category]?.length).map((category) => {
+        const categoryItems = displayGroups[category]
         const colors = categoryColors[category] || categoryColors.other
         const isOpen = openCategories[category] !== false
-        const checkedCount = items.filter((item) => item.checked).length
+        const checkedCount = categoryItems.filter((item) => item.checked).length
 
         return (
           <div key={category} className="mb-3">
@@ -284,94 +380,97 @@ export function ShopPage() {
               <div className="flex items-center gap-2">
                 <span className="font-bold text-base text-text-primary">{CATEGORY_LABELS[category] || 'Other'}</span>
                 <span className="bg-green-100 text-green-700 rounded-full px-2 py-0.5 text-xs font-semibold">
-                  {items.length}
+                  {categoryItems.length}
                 </span>
               </div>
               <span className="text-text-muted text-sm font-medium">
-                {checkedCount}/{items.length} ✓
+                {checkedCount}/{categoryItems.length} ✓
               </span>
             </button>
 
             {isOpen && (
               <div className={`mt-1 rounded-xl ${colors.bg}`}>
-                {items.map((item) => {
-                    const isEditing = editingItemId === item.id
-                    return (
-                      <div
-                        key={item.__itemKey}
-                        className={`w-full border-b border-white/50 last:border-0 transition-all duration-150 ${
-                          item.checked ? 'opacity-60' : 'opacity-100'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 p-3">
-                          <button
-                            type="button"
-                            onClick={() => toggleItem(item.__itemKey)}
-                            className={`w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-150 ${
-                              item.checked ? 'bg-green-500 border-green-500 scale-90' : 'border-warm-300'
-                            }`}
-                          >
-                            {item.checked && <span className="text-white text-xs">✓</span>}
-                          </button>
-                          <div className="flex-1 min-w-0">
-                            {isEditing ? (
-                              <div className="space-y-2">
-                                <input
-                                  value={editingName}
-                                  onChange={(e) => setEditingName(e.target.value)}
-                                  className="input w-full"
-                                  placeholder="Item name"
-                                />
-                                <input
-                                  value={editingQuantity}
-                                  onChange={(e) => setEditingQuantity(e.target.value)}
-                                  className="input w-full"
-                                  placeholder="Qty"
-                                />
-                              </div>
-                            ) : (
-                              <>
+                {categoryItems.map((item) => {
+                  const isEditing = editingItemId === item.id
+                  return (
+                    <div
+                      key={item.__itemKey}
+                      className={`w-full border-b border-white/50 last:border-0 transition-all duration-150 ${
+                        item.checked ? 'opacity-60' : 'opacity-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 p-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleItem(item.__itemKey)}
+                          className={`w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-150 ${
+                            item.checked ? 'bg-green-500 border-green-500 scale-90' : 'border-warm-300'
+                          }`}
+                        >
+                          {item.checked && <span className="text-white text-xs">✓</span>}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          {isEditing ? (
+                            <div className="space-y-2">
+                              <input
+                                value={editingName}
+                                onChange={(e) => setEditingName(e.target.value)}
+                                className="input w-full"
+                                placeholder="Item name"
+                              />
+                              <input
+                                value={editingQuantity}
+                                onChange={(e) => setEditingQuantity(e.target.value)}
+                                className="input w-full"
+                                placeholder="Qty"
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex flex-wrap items-center gap-2">
                                 <div className={`text-base font-semibold ${item.checked ? 'line-through text-text-muted' : 'text-text-primary'}`}>
                                   {item.name}
                                 </div>
-                                {item.used_in?.length > 0 && (
-                                  <div className="text-xs text-text-muted capitalize">
-                                    {item.used_in.map((usage) => usage.replace('_', ' ')).join(', ')}
-                                  </div>
-                                )}
-                              </>
-                            )}
-                          </div>
-                          {!isEditing && (item.quantity || '').trim() ? (
-                            <div className="text-sm text-warm-500 bg-warm-100 rounded-full px-2 flex-shrink-0">
-                              {item.quantity}
-                            </div>
-                          ) : null}
-                        </div>
-                        <div className="flex gap-2 px-3 pb-3">
-                          {isEditing ? (
-                            <>
-                              <button type="button" onClick={() => saveEditingItem(item)} className="rounded-full bg-primary-500 px-3 py-1.5 text-sm font-medium text-white">
-                                Save
-                              </button>
-                              <button type="button" onClick={cancelEditingItem} className="rounded-full border border-divider bg-white px-3 py-1.5 text-sm font-medium text-text-secondary">
-                                Cancel
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button type="button" onClick={() => startEditingItem(item)} className="rounded-full border border-divider bg-white px-3 py-1.5 text-sm font-medium text-text-secondary">
-                                Edit
-                              </button>
-                              <button type="button" onClick={() => handleDeleteItem(item)} className="rounded-full border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-600">
-                                Delete
-                              </button>
+                                <SourceBadge source={item.source} />
+                              </div>
+                              {item.used_in?.length > 0 && (
+                                <div className="text-xs text-text-muted capitalize">
+                                  {item.used_in.map((usage) => usage.replace('_', ' ')).join(', ')}
+                                </div>
+                              )}
                             </>
                           )}
                         </div>
+                        {!isEditing && (item.quantity || '').trim() ? (
+                          <div className="text-sm text-warm-500 bg-warm-100 rounded-full px-2 flex-shrink-0">
+                            {item.quantity}
+                          </div>
+                        ) : null}
                       </div>
-                    )
-                  })}
+                      <div className="flex gap-2 px-3 pb-3">
+                        {isEditing ? (
+                          <>
+                            <button type="button" onClick={() => saveEditingItem(item)} className="rounded-full bg-primary-500 px-3 py-1.5 text-sm font-medium text-white">
+                              Save
+                            </button>
+                            <button type="button" onClick={cancelEditingItem} className="rounded-full border border-divider bg-white px-3 py-1.5 text-sm font-medium text-text-secondary">
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button type="button" onClick={() => startEditingItem(item)} className="rounded-full border border-divider bg-white px-3 py-1.5 text-sm font-medium text-text-secondary">
+                              Edit
+                            </button>
+                            <button type="button" onClick={() => handleDeleteItem(item)} className="rounded-full border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-600">
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -390,16 +489,13 @@ export function ShopPage() {
         </div>
       )}
 
-      <div className="mt-6 pt-6 border-t border-divider">
-        <div className="text-center mb-4">
-          <div className="text-sm font-medium text-text-secondary mb-3">Shop these ingredients</div>
-          <div className="flex justify-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">Kroger</div>
-            <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">Instacart</div>
-            <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">Walmart</div>
-          </div>
-        </div>
-        <p className="text-xs text-text-muted text-center">Grocery ordering coming soon</p>
+      <div className="mt-6 rounded-3xl border border-divider bg-surface-card p-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-text-primary">What’s next</h2>
+        <ul className="mt-3 space-y-2 text-sm text-text-secondary">
+          <li>• Planner destination picker, so meals can be sent to a chosen list before sync</li>
+          <li>• List-sharing with household members, instead of copy or email only</li>
+          <li>• Shared plan collaboration built on the same household permissions model</li>
+        </ul>
       </div>
 
       <UpgradePrompt

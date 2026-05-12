@@ -34,7 +34,7 @@ function Chevron({ expanded }) {
 
 function CollapsibleSection({ title, expanded, onToggle, children }) {
   return (
-    <section className="rounded-[24px] border border-divider bg-white shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+    <section className="rounded-[24px] border border-divider bg-surface-card shadow-sm">
       <button
         type="button"
         onClick={onToggle}
@@ -50,7 +50,21 @@ function CollapsibleSection({ title, expanded, onToggle, children }) {
   )
 }
 
-export function RecipeDetail({ meal, onClose }) {
+function formatRelativeDate(dateStr) {
+  if (!dateStr) return null
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now - date
+  const diffDays = Math.floor(diffMs / 86400000)
+  if (diffDays === 0) return 'today'
+  if (diffDays === 1) return 'yesterday'
+  if (diffDays < 7) return `${diffDays} days ago`
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) === 1 ? '' : 's'} ago`
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)} month${Math.floor(diffDays / 30) === 1 ? '' : 's'} ago`
+  return `${Math.floor(diffDays / 365)} year${Math.floor(diffDays / 365) === 1 ? '' : 's'} ago`
+}
+
+export function RecipeDetail({ meal, onClose, onSaved }) {
   const recipe = useMemo(() => normalizeRecipe({
     ...meal,
     title: meal?.title || meal?.name,
@@ -72,7 +86,8 @@ export function RecipeDetail({ meal, onClose }) {
 
   const [isFavorite, setIsFavorite] = useState(Boolean(meal?.is_favorite ?? meal?.isFavorite))
   const [rating, setRating] = useState(meal?.rating ?? null)
-  const [cookedAt, setCookedAt] = useState(meal?.cooked_at || meal?.cookedAt || '')
+  const [lastCookedAt, setLastCookedAt] = useState(meal?.last_cooked_at || meal?.cooked_at || meal?.cookedAt || '')
+  const [timesCooked, setTimesCooked] = useState(meal?.times_cooked ?? 0)
   const [ratingFocus, setRatingFocus] = useState(false)
   const [sections, setSections] = useState({
     ingredients: true,
@@ -95,8 +110,8 @@ export function RecipeDetail({ meal, onClose }) {
   ].filter(Boolean)
 
   return (
-    <div className="min-h-screen bg-[#faf7f2] text-text-primary">
-      <div className="sticky top-0 z-20 border-b border-black/5 bg-[#faf7f2]/90 px-4 py-3 backdrop-blur-sm">
+    <div className="min-h-screen bg-bg-soft text-text-primary">
+      <div className="sticky top-0 z-20 border-b border-divider bg-bg-soft/90 px-4 py-3 backdrop-blur-sm">
         <div className="mx-auto flex max-w-2xl items-center justify-between">
           <button type="button" onClick={onClose} className="text-sm font-semibold text-text-primary">← Back</button>
           <div className="text-xs font-semibold uppercase tracking-[0.22em] text-text-muted">Recipe</div>
@@ -105,7 +120,7 @@ export function RecipeDetail({ meal, onClose }) {
       </div>
 
       <div className="mx-auto max-w-2xl px-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] pt-5">
-        <header className="rounded-[28px] bg-white px-5 py-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+        <header className="rounded-[28px] bg-surface-card px-5 py-5 shadow-lg">
           {recipe.imageUrl ? (
             <div className="mb-4 overflow-hidden rounded-2xl">
               <img src={recipe.imageUrl} alt={recipe.title} className="h-56 w-full object-cover" loading="lazy" />
@@ -128,7 +143,7 @@ export function RecipeDetail({ meal, onClose }) {
                   setIsFavorite(!next)
                 }
               }}
-              className="rounded-full border border-divider bg-white p-3 text-primary-500 shadow-sm"
+              className={`rounded-full border border-divider bg-surface-card p-3 shadow-sm transition ${isFavorite ? 'text-red-400' : 'text-text-muted hover:text-red-400'}`}
             >
               <HeartIcon filled={isFavorite} />
             </button>
@@ -136,50 +151,65 @@ export function RecipeDetail({ meal, onClose }) {
           {recipe.description ? <p className="mt-3 text-[15px] leading-7 text-text-secondary">{recipe.description}</p> : null}
 
           <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-text-secondary">
-            <span className="rounded-full bg-warm-50 px-3 py-1.5">Prep {recipe.prepTime || 0} min</span>
-            <span className="rounded-full bg-warm-50 px-3 py-1.5">Cook {recipe.cookTime || 0} min</span>
-            <span className="rounded-full bg-warm-50 px-3 py-1.5">Total {recipe.totalTime || recipe.prepTime + recipe.cookTime} min</span>
-            {recipe.yield ? <span className="rounded-full bg-warm-50 px-3 py-1.5">{recipe.yield}</span> : null}
+            <span className="rounded-full bg-warm-100 px-3 py-1.5">Prep {recipe.prepTime || 0} min</span>
+            <span className="rounded-full bg-warm-100 px-3 py-1.5">Cook {recipe.cookTime || 0} min</span>
+            <span className="rounded-full bg-warm-100 px-3 py-1.5">Total {recipe.totalTime || (recipe.prepTime + recipe.cookTime)} min</span>
+            {recipe.yield ? <span className="rounded-full bg-warm-100 px-3 py-1.5">{recipe.yield}</span> : null}
             <span className="rounded-full border border-primary-100 bg-primary-50 px-3 py-1.5 font-semibold text-primary-700">{recipe.difficulty}</span>
           </div>
+
+          {/* Cook history summary */}
+          {(timesCooked > 0 || lastCookedAt) ? (
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-text-muted">
+              {timesCooked > 0 && <span>Cooked <strong className="text-text-primary">{timesCooked}×</strong></span>}
+              {lastCookedAt && <span>Last cooked <strong className="text-text-primary">{formatRelativeDate(lastCookedAt)}</strong></span>}
+            </div>
+          ) : null}
 
           <div className="mt-4 flex flex-wrap gap-3">
             <button
               type="button"
               onClick={async () => {
                 await markCooked(recipe.id)
-                setCookedAt(new Date().toISOString())
+                const now = new Date().toISOString()
+                setLastCookedAt(now)
+                setTimesCooked((c) => c + 1)
                 setRatingFocus(true)
+                onSaved?.()
               }}
-              className="rounded-full border border-divider bg-white px-4 py-2 text-sm font-medium text-text-primary"
+              className="rounded-full border border-divider bg-surface-card px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-warm-100"
             >
-              {cookedAt ? 'Cooked again' : 'I cooked this'}
+              {lastCookedAt ? 'Cooked again' : 'I cooked this'}
             </button>
           </div>
 
-          {(cookedAt || ratingFocus) ? (
-            <div className="mt-4 flex items-center gap-2">
-              {[1, 2, 3, 4, 5].map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={async () => {
-                    setRating(value)
-                    await rateRecipe(recipe.id, value)
-                  }}
-                  className="text-amber-500"
-                  aria-label={`Rate ${value} stars`}
-                >
-                  <StarIcon filled={(rating || 0) >= value} />
-                </button>
-              ))}
+          {(lastCookedAt || ratingFocus) ? (
+            <div className="mt-4">
+              <p className="mb-1.5 text-xs font-medium text-text-muted">Your rating</p>
+              <div className="flex items-center gap-2">
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={async () => {
+                      setRating(value)
+                      await rateRecipe(recipe.id, value)
+                    }}
+                    className="text-amber-500"
+                    aria-label={`Rate ${value} stars`}
+                  >
+                    <StarIcon filled={(rating || 0) >= value} />
+                  </button>
+                ))}
+                {rating ? <span className="ml-1 text-sm text-text-muted">{rating}/5</span> : null}
+              </div>
             </div>
           ) : null}
 
           {tagPills.length > 0 ? (
             <div className="mt-4 flex flex-wrap gap-2">
               {tagPills.map((tag) => (
-                <span key={tag} className="rounded-full border border-divider bg-white px-3 py-1 text-xs font-medium text-text-secondary">{tag}</span>
+                <span key={tag} className="rounded-full border border-divider bg-surface-card px-3 py-1 text-xs font-medium text-text-secondary">{tag}</span>
               ))}
             </div>
           ) : null}
@@ -203,7 +233,7 @@ export function RecipeDetail({ meal, onClose }) {
                             onClick={() => toggleIngredient(key)}
                             className={`flex w-full items-start gap-3 rounded-2xl px-1 py-1 text-left transition ${checked ? 'opacity-45' : 'opacity-100'}`}
                           >
-                            <span className={`mt-1 h-5 w-5 shrink-0 rounded-full border ${checked ? 'border-primary-500 bg-primary-500' : 'border-divider bg-white'}`} />
+                            <span className={`mt-1 h-5 w-5 shrink-0 rounded-full border ${checked ? 'border-primary-500 bg-primary-500' : 'border-divider bg-surface-card'}`} />
                             <span className={`block text-[15px] leading-7 ${checked ? 'line-through' : ''}`}>
                               <strong className="font-semibold text-text-primary">{[amountText, ingredient.unit].filter(Boolean).join(' ')}</strong>
                               {amountText || ingredient.unit ? ' ' : ''}
@@ -237,8 +267,8 @@ export function RecipeDetail({ meal, onClose }) {
                             <div className="min-w-0 flex-1">
                               <p className="text-[15px] leading-7 text-text-primary">{step.text}</p>
                               {step.tip ? (
-                                <div className="mt-3 rounded-2xl bg-[#f4efe6] px-4 py-3 text-sm leading-6 text-text-secondary">
-                                  <div className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">💡 Tip</div>
+                                <div className="mt-3 rounded-2xl bg-warm-100 px-4 py-3 text-sm leading-6 text-text-secondary">
+                                  <div className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Tip</div>
                                   {step.tip}
                                 </div>
                               ) : null}
@@ -257,7 +287,7 @@ export function RecipeDetail({ meal, onClose }) {
             <CollapsibleSection title="Substitutions" expanded={sections.substitutions} onToggle={() => toggleSection('substitutions')}>
               <ul className="space-y-3 text-[15px] leading-7 text-text-primary">
                 {recipe.substitutions.map((substitution, index) => (
-                  <li key={`${substitution.original}-${index}`} className="rounded-2xl bg-warm-50 px-4 py-3">
+                  <li key={`${substitution.original}-${index}`} className="rounded-2xl bg-warm-100 px-4 py-3">
                     Instead of <span className="font-semibold">{substitution.original}</span>, use <span className="font-semibold">{substitution.substitute}</span>
                     {substitution.note ? <span className="text-text-secondary"> ({substitution.note})</span> : null}
                   </li>
@@ -267,7 +297,7 @@ export function RecipeDetail({ meal, onClose }) {
           ) : null}
 
           {recipe.tips?.length > 0 ? (
-            <CollapsibleSection title="Cook’s Notes" expanded={sections.notes} onToggle={() => toggleSection('notes')}>
+            <CollapsibleSection title="Cook's Notes" expanded={sections.notes} onToggle={() => toggleSection('notes')}>
               <ul className="space-y-3 pl-5 text-[15px] leading-7 text-text-primary">
                 {recipe.tips.map((tip, index) => (
                   <li key={`${tip}-${index}`} className="list-disc marker:text-text-muted">{tip}</li>
@@ -279,10 +309,10 @@ export function RecipeDetail({ meal, onClose }) {
           {recipe.nutrition ? (
             <CollapsibleSection title="Nutrition (per serving)" expanded={sections.nutrition} onToggle={() => toggleSection('nutrition')}>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-2xl bg-warm-50 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Calories</div><div className="mt-1 text-lg font-semibold text-text-primary">{recipe.nutrition.calories || '—'}</div></div>
-                <div className="rounded-2xl bg-warm-50 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Protein</div><div className="mt-1 text-lg font-semibold text-text-primary">{recipe.nutrition.protein || '—'}</div></div>
-                <div className="rounded-2xl bg-warm-50 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Carbs</div><div className="mt-1 text-lg font-semibold text-text-primary">{recipe.nutrition.carbs || '—'}</div></div>
-                <div className="rounded-2xl bg-warm-50 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Fat</div><div className="mt-1 text-lg font-semibold text-text-primary">{recipe.nutrition.fat || '—'}</div></div>
+                <div className="rounded-2xl bg-warm-100 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Calories</div><div className="mt-1 text-lg font-semibold text-text-primary">{recipe.nutrition.calories || '—'}</div></div>
+                <div className="rounded-2xl bg-warm-100 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Protein</div><div className="mt-1 text-lg font-semibold text-text-primary">{recipe.nutrition.protein || '—'}</div></div>
+                <div className="rounded-2xl bg-warm-100 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Carbs</div><div className="mt-1 text-lg font-semibold text-text-primary">{recipe.nutrition.carbs || '—'}</div></div>
+                <div className="rounded-2xl bg-warm-100 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Fat</div><div className="mt-1 text-lg font-semibold text-text-primary">{recipe.nutrition.fat || '—'}</div></div>
               </div>
               <p className="mt-3 text-xs text-text-muted">Approximate values</p>
             </CollapsibleSection>

@@ -7,6 +7,7 @@ import { invokePlannerFunction } from '../lib/plannerFunction'
 import { upsertShoppingListForDate } from '../lib/tonightPersistence'
 import { calculateServings } from './useServings'
 import { useAuth } from './useAuth'
+import { useNutritionProfile } from './useNutritionProfile'
 
 async function invokeGeneratePlan(payload, { timeoutMs = 45000 } = {}) {
   return invokePlannerFunction(payload, { timeoutMs })
@@ -122,8 +123,29 @@ async function loadRecentPlanMealNames(userId) {
   }
 }
 
+// Build a compact nutrition_profile object to include in plan payloads.
+// Returns undefined if the profile has no meaningful data.
+function buildNutritionPayload(profile, derivedTargets) {
+  if (!profile) return undefined
+  const targets = derivedTargets
+  const avoidList = [
+    ...(profile.foods_to_avoid || []),
+    ...(profile.dietary_restrictions || []),
+    ...(profile.allergies || []),
+  ].filter(Boolean)
+  if (!targets && avoidList.length === 0) return undefined
+  return {
+    calories_target: targets?.calories || null,
+    protein_target_g: targets?.protein_g || null,
+    carbs_target_g: targets?.carbs_g || null,
+    fat_target_g: targets?.fat_g || null,
+    foods_to_avoid: avoidList,
+  }
+}
+
 export function useMealPlan(scheduleId) {
   const { user } = useAuth()
+  const { profile: nutritionProfile, derivedTargets: nutritionTargets } = useNutritionProfile()
   const [mealPlan, setMealPlan] = useState(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
@@ -235,6 +257,7 @@ export function useMealPlan(scheduleId) {
         })).filter((slot) => slot.day && slot.meal),
         week_notes: schedule?.week_notes || '',
         locked_meals: validLockedMeals,
+        nutrition_profile: buildNutritionPayload(nutritionProfile, nutritionTargets),
       }
 
       let { data: generated, error: functionError } = await invokeGeneratePlan(payload, { timeoutMs: 45000 })
@@ -338,6 +361,7 @@ export function useMealPlan(scheduleId) {
           refinement_notes: preferenceSignals.refinementNotes,
         },
         replace_slot: { day: mealToReplace.day, meal: mealToReplace.meal, suggestion, reason: suggestion ? `user wants: ${suggestion}` : 'user requested swap', current_meal_name: mealToReplace.name || '' },
+        nutrition_profile: buildNutritionPayload(nutritionProfile, nutritionTargets),
       }
 
       let { data: generated, error: functionError } = await invokeGeneratePlan(payload)
@@ -456,6 +480,7 @@ export function useMealPlan(scheduleId) {
           disliked_meals: preferenceSignals.dislikedMeals,
           refinement_notes: preferenceSignals.refinementNotes,
         },
+        nutrition_profile: buildNutritionPayload(nutritionProfile, nutritionTargets),
       }
 
       let { data: generated, error: functionError } = await invokeGeneratePlan(payload, { timeoutMs: 45000 })

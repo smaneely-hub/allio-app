@@ -9,8 +9,11 @@ import { supabase } from '../lib/supabase'
 import { normalizeMealRecord } from '../lib/mealSchema'
 import { getLocalDateString } from '../lib/date'
 import { invokePlannerFunction, refineMeal } from '../lib/plannerFunction'
-import { upsertShoppingListForDate } from '../lib/tonightPersistence'
-import { ensureDefaultShoppingList } from '../lib/shoppingLists'
+import { upsertShoppingListForDate, buildShoppingItemsFromMeal } from '../lib/tonightPersistence'
+import { addItemsToShoppingList } from '../lib/shoppingLists'
+import { useShoppingListPreferences } from '../hooks/useShoppingListPreferences'
+import { useShoppingLists } from '../hooks/useShoppingLists'
+import { ShoppingListPickerModal } from '../components/ShoppingListPickerModal'
 import { calculateServings, logServingsCalculation, getDemographicBucket } from '../hooks/useServings'
 import { CookingMode } from '../components/CookingMode'
 import { MealDetailBody } from '../components/MealDetailBody'
@@ -392,6 +395,8 @@ export function TonightPage() {
   const initialDataLoadedRef = useRef(false)
   const savedMealsLoadedRef = useRef(false)
   const { members } = useHouseholdMembers(user?.id)
+  const { defaultListId, alwaysAsk } = useShoppingListPreferences(user?.id)
+  const { lists, createList } = useShoppingLists(user?.id)
 
   const [selectedMembers, setSelectedMembers] = useState([])
   const [effort, setEffort] = useState('medium')
@@ -423,24 +428,31 @@ export function TonightPage() {
     strongAvoidSignals: [],
   })
   const [cookingMode, setCookingMode] = useState(false)
+  const [listPickerOpen, setListPickerOpen] = useState(false)
+  const [pendingMealForList, setPendingMealForList] = useState(null)
 
   const activeMeal = mealQueue[0] || meal
 
-  async function mergeMealIntoShoppingList(targetMeal, successMessage = 'Added to shopping list ✓') {
-    if (!user?.id || !targetMeal) return null
-
+  async function addMealToShoppingList(targetMeal, targetListId, successMessage = 'Added to shopping list') {
+    if (!user?.id || !targetMeal) return
     const household = await getHousehold(user.id)
     const nextItems = buildShoppingItemsFromMeal(targetMeal, staplesOnHand || household?.staples_on_hand || '')
-    const defaultList = await ensureDefaultShoppingList(user.id)
-    const mergedItems = await addItemsToShoppingList({
+    await addItemsToShoppingList({
       userId: user.id,
-      listId: defaultList?.id || null,
+      listId: targetListId || null,
       items: nextItems,
       source: 'tonight',
     })
-
     toast.success(successMessage)
-    return mergedItems
+  }
+
+  function requestAddToList(targetMeal, successMessage) {
+    if (alwaysAsk && lists.length > 0) {
+      setPendingMealForList({ meal: targetMeal, message: successMessage || 'Added to shopping list' })
+      setListPickerOpen(true)
+    } else {
+      addMealToShoppingList(targetMeal, defaultListId, successMessage || 'Added to shopping list')
+    }
   }
 
   const mealFitReasons = useMemo(() => {
@@ -810,7 +822,7 @@ export function TonightPage() {
       normalized = presentation.meal
       setMeal(normalized)
       setMealQueue([{ meal: normalized, image: presentation.image }])
-      await mergeMealIntoShoppingList(normalized, 'Shopping list updated ✓')
+      await addMealToShoppingList(normalized, defaultListId, 'Shopping list updated ✓')
       setFeedback('')
       setRefinementChanges([])  // Clear refinement state on new generation
       setMealInstanceId(null)   // Clear old instance ID for new meal
@@ -985,7 +997,7 @@ export function TonightPage() {
       normalized = presentation.meal
       setMeal(normalized)
       setMealQueue([{ meal: normalized, image: presentation.image }])
-      await mergeMealIntoShoppingList(normalized, 'Shopping list updated ✓')
+      await addMealToShoppingList(normalized, defaultListId, 'Shopping list updated ✓')
       setFeedback('')
       setCooked(false)
       setRefinementChanges([])  // Clear refinement state on swap
@@ -1629,11 +1641,11 @@ export function TonightPage() {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => mergeMealIntoShoppingList(activeMeal)}
+              onClick={() => requestAddToList(activeMeal)}
               disabled={generating || !activeMeal}
               className="flex-1 rounded-full bg-warm-100 px-4 py-2 text-sm font-semibold text-text-primary shadow-sm disabled:opacity-50 hover:bg-warm-200"
             >
-              Add to Shopping List
+              Add to list
             </button>
             <button
               type="button"
@@ -1711,6 +1723,28 @@ export function TonightPage() {
             ))}
           </div>
         </div>
+      )}
+
+      {listPickerOpen && lists.length > 0 && (
+        <ShoppingListPickerModal
+          lists={lists}
+          onSelect={async (id) => {
+            setListPickerOpen(false)
+            if (pendingMealForList) {
+              await addMealToShoppingList(pendingMealForList.meal, id, pendingMealForList.message)
+              setPendingMealForList(null)
+            }
+          }}
+          onCreateAndSelect={async (name) => {
+            const created = await createList(name)
+            setListPickerOpen(false)
+            if (pendingMealForList) {
+              await addMealToShoppingList(pendingMealForList.meal, created.id, pendingMealForList.message)
+              setPendingMealForList(null)
+            }
+          }}
+          onClose={() => { setListPickerOpen(false); setPendingMealForList(null) }}
+        />
       )}
 
       {showFeedbackModal && (

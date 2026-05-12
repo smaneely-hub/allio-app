@@ -21,23 +21,62 @@ export type Recipe = {
   rating?: number | null
   is_favorite?: boolean | null
   cooked_at?: string | null
+  last_cooked_at?: string | null
+  times_cooked?: number | null
   category?: string[] | null
   created_at?: string | null
   updated_at?: string | null
 }
 
+async function getAuthUserId(): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  return user.id
+}
+
 export async function toggleFavorite(recipeId: string, isFavorite: boolean): Promise<void> {
-  const { error } = await supabase.from('recipes').update({ is_favorite: isFavorite }).eq('id', recipeId)
+  const userId = await getAuthUserId()
+  const { error } = await supabase
+    .from('recipe_interactions')
+    .upsert(
+      { user_id: userId, recipe_id: recipeId, is_favorite: isFavorite, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id,recipe_id' },
+    )
   if (error) throw error
 }
 
 export async function rateRecipe(recipeId: string, rating: number): Promise<void> {
-  const { error } = await supabase.from('recipes').update({ rating }).eq('id', recipeId)
+  const userId = await getAuthUserId()
+  const { error } = await supabase
+    .from('recipe_interactions')
+    .upsert(
+      { user_id: userId, recipe_id: recipeId, rating, updated_at: new Date().toISOString() },
+      { onConflict: 'user_id,recipe_id' },
+    )
   if (error) throw error
 }
 
 export async function markCooked(recipeId: string): Promise<void> {
-  const { error } = await supabase.from('recipes').update({ cooked_at: new Date().toISOString() }).eq('id', recipeId)
+  const userId = await getAuthUserId()
+  const now = new Date().toISOString()
+  const { data: existing } = await supabase
+    .from('recipe_interactions')
+    .select('times_cooked')
+    .eq('user_id', userId)
+    .eq('recipe_id', recipeId)
+    .maybeSingle()
+  const { error } = await supabase
+    .from('recipe_interactions')
+    .upsert(
+      {
+        user_id: userId,
+        recipe_id: recipeId,
+        times_cooked: (existing?.times_cooked ?? 0) + 1,
+        last_cooked_at: now,
+        updated_at: now,
+      },
+      { onConflict: 'user_id,recipe_id' },
+    )
   if (error) throw error
 }
 
@@ -63,32 +102,54 @@ export async function listUserRecipes(opts: {
   minRating?: number
   category?: string
   favoritesOnly?: boolean
-  sortBy?: 'newest' | 'rating' | 'favorites'
+  sortBy?: 'newest' | 'rating' | 'favorites' | 'most_cooked' | 'az'
   search?: string
 } = {}): Promise<Recipe[]> {
   let query = supabase
     .from('recipes')
-    .select('*')
+    .select('*, recipe_interactions(is_favorite, rating, times_cooked, last_cooked_at)')
     .eq('active', true)
 
   if (opts.userId) query = query.eq('user_id', opts.userId)
-
   if (opts.cuisine) query = query.eq('cuisine', opts.cuisine)
   if (opts.mealType) query = query.eq('meal_type', opts.mealType)
-  if (opts.minRating) query = query.gte('rating', opts.minRating)
   if (opts.category) query = query.contains('category', [opts.category])
-  if (opts.favoritesOnly) query = query.eq('is_favorite', true)
   if (opts.search?.trim()) query = query.ilike('title', `%${opts.search.trim()}%`)
 
-  if (opts.sortBy === 'rating') {
-    query = query.order('rating', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false })
-  } else if (opts.sortBy === 'favorites') {
-    query = query.order('is_favorite', { ascending: false }).order('created_at', { ascending: false })
+  if (opts.sortBy === 'az') {
+    query = query.order('title', { ascending: true })
   } else {
     query = query.order('created_at', { ascending: false })
   }
 
   const { data, error } = await query
   if (error) throw error
-  return (data || []) as Recipe[]
+
+  let results = ((data || []) as any[]).map((row) => {
+    const interaction = Array.isArray(row.recipe_interactions) ? row.recipe_interactions[0] : null
+    return {
+      ...row,
+      is_favorite: interaction?.is_favorite ?? row.is_favorite ?? false,
+      rating: interaction?.rating ?? row.rating ?? null,
+      times_cooked: interaction?.times_cooked ?? 0,
+      last_cooked_at: interaction?.last_cooked_at ?? row.cooked_at ?? null,
+    }
+  })
+
+  if (opts.minRating) {
+    results = results.filter((r) => (r.rating ?? 0) >= (opts.minRating ?? 0))
+  }
+  if (opts.favoritesOnly) {
+    results = results.filter((r) => r.is_favorite)
+  }
+
+  if (opts.sortBy === 'rating') {
+    results = results.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0))
+  } else if (opts.sortBy === 'favorites') {
+    results = results.sort((a, b) => (b.is_favorite ? 1 : 0) - (a.is_favorite ? 1 : 0))
+  } else if (opts.sortBy === 'most_cooked') {
+    results = results.sort((a, b) => (b.times_cooked ?? 0) - (a.times_cooked ?? 0))
+  }
+
+  return results as Recipe[]
 }

@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { isAdminEmail } from '../lib/admin'
 import { Logo } from './Logo'
 
 function HomeIcon(props) {
@@ -81,6 +82,7 @@ export function NavBar() {
   const { user } = useAuth()
   const location = useLocation()
   const userInitial = user?.email?.charAt(0).toUpperCase() || '?'
+  const showAdminLink = isAdminEmail(user?.email)
 
   const isActive = (link) => {
     const paths = [link.to, ...(link.aliases || [])]
@@ -100,6 +102,11 @@ export function NavBar() {
                     {link.label}
                   </Link>
                 ))}
+                {showAdminLink ? (
+                  <Link to="/admin" className={isActive({ to: '/admin', aliases: ['/admin/users'] }) ? 'text-accent-blue' : 'text-ink-secondary hover:text-ink-primary'}>
+                    Admin
+                  </Link>
+                ) : null}
               </nav>
               <Link to="/settings" className="flex items-center gap-2 text-sm text-ink-secondary hover:text-ink-primary">
                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-primary-400 to-teal-400 text-sm font-semibold text-white">

@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ClipRecipeModal } from '../components/ClipRecipeModal'
-import { FilterBar } from '../components/FilterBar'
 import { RecipeDetail } from '../components/RecipeDetail'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useAuth } from '../hooks/useAuth'
 import { deleteRecipe } from '../hooks/useRecipeMutations'
-import { filterRecipesByTags, getAvailableTags } from '../lib/recipeFilters'
 import { normalizeRecipe } from '../lib/recipeSchema'
 import { supabase } from '../lib/supabase'
 
-/** Render a minimal browse view for recipes with tag-based filtering. */
+/** Handles /recipes/:recipeId — shows detail view for a single recipe. */
 export function RecipesPage() {
   useDocumentTitle('Recipes | Allio')
   const navigate = useNavigate()
@@ -18,8 +16,6 @@ export function RecipesPage() {
   const { user } = useAuth()
   const [recipes, setRecipes] = useState([])
   const [loading, setLoading] = useState(true)
-  const [selectedTags, setSelectedTags] = useState([])
-  const [showClipModal, setShowClipModal] = useState(false)
   const [editingRecipe, setEditingRecipe] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
 
@@ -33,34 +29,44 @@ export function RecipesPage() {
 
     const { data } = await supabase
       .from('recipes')
-      .select('id, user_id, title, slug, description, cuisine, meal_type, prep_time_minutes, cook_time_minutes, total_time_minutes, servings, yield_text, difficulty, ingredients_json, instructions_json, ingredient_groups_json, instruction_groups_json, nutrition_json, tips_json, substitutions_json, tags_json, tags_v2_json, source_note, source_domain, source_url, image_prompt, created_at, updated_at, active, is_favorite, cooked_at, image_url')
+      .select(`
+        id, user_id, title, slug, description, cuisine, meal_type,
+        prep_time_minutes, cook_time_minutes, total_time_minutes, servings,
+        yield_text, difficulty, ingredients_json, instructions_json,
+        ingredient_groups_json, instruction_groups_json, nutrition_json,
+        tips_json, substitutions_json, tags_json, tags_v2_json,
+        source_note, source_domain, source_url, image_prompt,
+        created_at, updated_at, active, is_favorite, cooked_at, image_url, category,
+        recipe_interactions(is_favorite, rating, times_cooked, last_cooked_at)
+      `)
       .eq('active', true)
       .eq('user_id', user.id)
       .order('title', { ascending: true })
 
-    setRecipes(data || [])
+    const rows = (data || []).map((row) => {
+      const interaction = Array.isArray(row.recipe_interactions) ? row.recipe_interactions[0] : null
+      return {
+        ...row,
+        is_favorite: interaction?.is_favorite ?? row.is_favorite ?? false,
+        rating: interaction?.rating ?? null,
+        times_cooked: interaction?.times_cooked ?? 0,
+        last_cooked_at: interaction?.last_cooked_at ?? row.cooked_at ?? null,
+      }
+    })
+
+    setRecipes(rows)
     setLoading(false)
-  }, [])
+  }, [user?.id])
 
   useEffect(() => {
     loadRecipes()
   }, [loadRecipes])
 
-  const availableTags = useMemo(() => getAvailableTags(recipes), [recipes])
-  const filteredRecipes = useMemo(() => filterRecipesByTags(recipes, selectedTags), [recipes, selectedTags])
-
-  const toggleTag = (tag) => {
-    setSelectedTags((current) => current.includes(tag)
-      ? current.filter((entry) => entry !== tag)
-      : [...current, tag]
-    )
-  }
-
-  async function handleDelete(recipeId, title) {
-    if (!window.confirm(`Remove “${title}” from your recipes?`)) return
-    setDeletingId(recipeId)
+  async function handleDelete(id, title) {
+    if (!window.confirm(`Remove "${title}" from your recipes?`)) return
+    setDeletingId(id)
     try {
-      await deleteRecipe(recipeId)
+      await deleteRecipe(id)
       await loadRecipes()
     } finally {
       setDeletingId(null)
@@ -83,152 +89,41 @@ export function RecipesPage() {
         instructions: recipeRow.instructions_json,
         substitutions: recipeRow.substitutions_json,
         tags: recipeRow.tags_v2_json,
-        dietary_flags_json: recipeRow.dietary_flags_json,
         sourceNote: recipeRow.source_note,
         imagePrompt: recipeRow.image_prompt,
+        is_favorite: recipeRow.is_favorite,
+        rating: recipeRow.rating,
+        times_cooked: recipeRow.times_cooked,
+        last_cooked_at: recipeRow.last_cooked_at,
       }))
       .find((recipe) => String(recipe.id) === String(recipeId) || String(recipe.slug) === String(recipeId)) || null
   }, [recipeId, recipes])
 
+  if (loading && recipeId) {
+    return <div className="p-6 text-center text-sm text-text-muted">Loading recipe…</div>
+  }
+
   if (selectedRecipe) {
-    return <RecipeDetail meal={selectedRecipe} onClose={() => navigate('/recipes')} />
+    return (
+      <RecipeDetail
+        meal={selectedRecipe}
+        onClose={() => navigate('/recipes')}
+        onSaved={loadRecipes}
+      />
+    )
+  }
+
+  if (!recipeId) {
+    navigate('/recipes', { replace: true })
+    return null
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pb-24 pt-4 md:px-6 md:pt-6">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <div className="h-1 w-12 rounded-full bg-gradient-to-r from-primary-400 via-teal-400 to-purple-400 mb-2" />
-          <h1 className="font-display text-2xl text-text-primary md:text-3xl">Recipes</h1>
-          <p className="text-sm text-text-muted">See only the recipes you’ve imported, cooked, or favorited.</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowClipModal(true)}
-          className="btn-primary shrink-0 text-sm"
-        >
-          + Add Recipe
-        </button>
-      </div>
-
-      <div className="mb-4 rounded-2xl border border-divider bg-surface p-3 shadow-sm">
-        <FilterBar tags={availableTags} selectedTags={selectedTags} onToggleTag={toggleTag} />
-      </div>
-
-      {loading ? (
-        <div className="card p-6 text-sm text-text-muted">Loading recipes...</div>
-      ) : (
-        <div className="space-y-3">
-          {filteredRecipes.map((recipeRow) => {
-            const recipe = normalizeRecipe({
-              ...recipeRow,
-              yield: recipeRow.yield_text,
-              prepTime: recipeRow.prep_time_minutes,
-              cookTime: recipeRow.cook_time_minutes,
-              totalTime: recipeRow.total_time_minutes,
-              image_url: recipeRow.image_url,
-              ingredientGroups: recipeRow.ingredient_groups_json,
-              instructionGroups: recipeRow.instruction_groups_json,
-              ingredients: recipeRow.ingredients_json,
-              instructions: recipeRow.instructions_json,
-              substitutions: recipeRow.substitutions_json,
-              tags: recipeRow.tags_v2_json,
-              dietary_flags_json: recipeRow.dietary_flags_json,
-              sourceNote: recipeRow.source_note,
-              imagePrompt: recipeRow.image_prompt,
-            })
-            const tags = [recipe.tags.cuisine, recipe.tags.mealType, ...recipe.tags.dietary, ...(recipe.tags.cookingMethod || [])].filter(Boolean)
-
-            return (
-              <div key={recipe.id} className="card w-full p-4 text-left shadow-sm transition-shadow duration-200 hover:shadow-md">
-                <button
-                  type="button"
-                  onClick={() => navigate(`/recipes/${recipe.slug || recipe.id}`)}
-                  className="block w-full text-left"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start gap-3">
-                        {recipe.imageUrl ? (
-                          <img src={recipe.imageUrl} alt={recipe.title} className="h-16 w-16 shrink-0 rounded-2xl object-cover" />
-                        ) : null}
-                        <div className="min-w-0 flex-1">
-                          <h2 className="font-display text-xl text-text-primary">{recipe.title}</h2>
-                          <p className="mt-1 text-sm text-text-secondary">{recipe.description}</p>
-                          {recipe.sourceNote ? <p className="mt-2 text-xs text-text-muted">{recipe.sourceNote}</p> : null}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary-600">
-                      {recipe.difficulty}
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-text-muted">
-                    {recipe.tags.cuisine ? <span className="rounded-full bg-warm-100 px-3 py-1">{recipe.tags.cuisine}</span> : null}
-                    <span className="rounded-full bg-warm-100 px-3 py-1">Prep {recipe.prepTime} min</span>
-                    <span className="rounded-full bg-warm-100 px-3 py-1">Cook {recipe.cookTime} min</span>
-                    <span className="rounded-full bg-warm-100 px-3 py-1">Total {recipe.totalTime} min</span>
-                    <span className="rounded-full bg-warm-100 px-3 py-1">{recipe.yield || 'Yield varies'}</span>
-                  </div>
-
-                  {recipe.tips.length > 0 ? <p className="mt-3 text-sm text-text-secondary">{recipe.tips[0]}</p> : null}
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {tags.map((tag) => (
-                      <span key={tag} className="rounded-full border border-divider bg-white px-3 py-1 text-xs font-medium text-text-secondary">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </button>
-
-                <div className="mt-4 flex gap-3 border-t border-divider pt-3">
-                  <button
-                    type="button"
-                    onClick={() => setEditingRecipe(recipe)}
-                    className="text-sm font-medium text-text-primary"
-                  >
-                    Edit recipe
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(recipe.id, recipe.title)}
-                    disabled={deletingId === recipe.id}
-                    className="text-sm font-medium text-red-600 disabled:opacity-50"
-                  >
-                    {deletingId === recipe.id ? 'Removing…' : 'Remove recipe'}
-                  </button>
-                </div>
-              </div>
-            )
-          })}
-
-          {!filteredRecipes.length && (
-            <div className="card p-6 text-sm text-text-muted">
-              No recipes match the selected tags.
-            </div>
-          )}
-        </div>
-      )}
-
-      {showClipModal && (
-        <ClipRecipeModal
-          onClose={() => setShowClipModal(false)}
-          onSaved={loadRecipes}
-        />
-      )}
-
-      {editingRecipe && (
-        <ClipRecipeModal
-          initialRecipe={editingRecipe}
-          onClose={() => setEditingRecipe(null)}
-          onSaved={() => {
-            setEditingRecipe(null)
-            loadRecipes()
-          }}
-        />
-      )}
+    <div className="p-6 text-center text-sm text-text-muted">
+      Recipe not found.{' '}
+      <button type="button" onClick={() => navigate('/recipes')} className="font-medium text-primary-500 underline">
+        Back to recipes
+      </button>
     </div>
   )
 }

@@ -12,10 +12,10 @@ import { LoginPage } from './pages/LoginPage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { SchedulePage } from './pages/SchedulePage'
-import { PlanPage } from './pages/PlanPage'
 import { PlannerPage } from './pages/PlannerPage'
 import { TonightPage } from './pages/TonightPage'
 import { RecipesPage } from './pages/RecipesPage'
+import { Catalog } from './pages/Catalog'
 import { HouseholdPage } from './pages/HouseholdPage'
 import { ShopPage } from './pages/ShopPage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -24,6 +24,10 @@ import { PublicMealGeneratorPage } from './pages/PublicMealGeneratorPage'
 import { PrivacyPage } from './pages/PrivacyPage'
 import { TermsPage } from './pages/TermsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { AdminRoute } from './components/AdminRoute'
+import { AdminPage } from './pages/AdminPage'
+import { AdminUsersPage } from './pages/AdminUsersPage'
+import { AdminUserDetailPage } from './pages/AdminUserDetailPage'
 
 function ConnectionCheck({ children }) {
   return children
@@ -111,7 +115,7 @@ export default function App() {
                   path="/recipes"
                   element={
                     <ProtectedRoute>
-                      <RecipesPage />
+                      <Catalog />
                     </ProtectedRoute>
                   }
                 />
@@ -119,7 +123,7 @@ export default function App() {
                   path="/search"
                   element={
                     <ProtectedRoute>
-                      <RecipesPage />
+                      <Catalog />
                     </ProtectedRoute>
                   }
                 />
@@ -161,6 +165,36 @@ export default function App() {
                 <Route path="/cook" element={<Navigate to="/tonight" replace />} />
                 <Route path="/cooking" element={<Navigate to="/tonight" replace />} />
                 <Route path="/meals" element={<Navigate to="/recipes" replace />} />
+                <Route
+                  path="/admin"
+                  element={
+                    <ProtectedRoute>
+                      <AdminRoute>
+                        <AdminPage />
+                      </AdminRoute>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/users"
+                  element={
+                    <ProtectedRoute>
+                      <AdminRoute>
+                        <AdminUsersPage />
+                      </AdminRoute>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/users/:userId"
+                  element={
+                    <ProtectedRoute>
+                      <AdminRoute>
+                        <AdminUserDetailPage />
+                      </AdminRoute>
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="/pricing" element={<PricingPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/terms" element={<TermsPage />} />

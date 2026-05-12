@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { useAuth } from '../hooks/useAuth'
 import { useHousehold } from '../hooks/useHousehold'
 import { useSchedule } from '../hooks/useSchedule'
 import { useMealPlan } from '../hooks/useMealPlan'
 import { useSubscription } from '../hooks/useSubscription'
+import { useShoppingListPreferences } from '../hooks/useShoppingListPreferences'
+import { useShoppingLists } from '../hooks/useShoppingLists'
+import { ShoppingListPickerModal } from '../components/ShoppingListPickerModal'
 import { ScheduleSkeleton, EmptyState } from '../components/LoadingStates'
 import { MealPlanWorkspace } from '../components/plan/MealPlanWorkspace'
 import { PlannerActionSheet } from '../components/plan/PlannerActionSheet'
@@ -16,16 +20,16 @@ import { RecurrencePicker } from '../components/planner/RecurrencePicker'
 import { HouseholdMembersModal } from '../components/planner/HouseholdMembersModal'
 import { aggregateShoppingList } from '../lib/aggregateShoppingList'
 import { addDays, DAY_ORDER, formatIsoLocalDate, parseIsoLocalDate } from '../lib/planner'
-
-function toIsoLocalDate(date) {
-  return formatIsoLocalDate(date)
-}
 import { normalizeMealRecord } from '../lib/mealSchema'
 import { normalizeRecipe } from '../lib/recipeSchema'
 import { upsertShoppingListForDate } from '../lib/tonightPersistence'
 import { refineMeal } from '../lib/plannerFunction'
 import { groupByCategory } from '../utils/groceryCategories'
 import { supabase } from '../lib/supabase'
+
+function toIsoLocalDate(date) {
+  return formatIsoLocalDate(date)
+}
 
 const days = DAY_ORDER
 
@@ -113,9 +117,12 @@ function MemberEmptyState({ onOpen }) {
 
 export function PlannerPage() {
   useDocumentTitle('Weekly Plan | Allio')
+  const { user } = useAuth()
   const { household, members, loading: householdLoading, saveMembers, reloadHousehold } = useHousehold()
   const { schedule, slots, loading: scheduleLoading, saveSchedule, loadSchedule } = useSchedule()
   const { isPremium } = useSubscription()
+  const { defaultListId, alwaysAsk } = useShoppingListPreferences(user?.id)
+  const { lists, createList } = useShoppingLists(user?.id)
   const {
     mealPlan,
     generating,
@@ -148,6 +155,7 @@ export function PlannerPage() {
   const [reviewLoading, setReviewLoading] = useState(false)
   const [generatingSlotKey, setGeneratingSlotKey] = useState(null)
   const [recurrenceTarget, setRecurrenceTarget] = useState(null)
+  const [plannerPickerOpen, setPlannerPickerOpen] = useState(false)
 
   useEffect(() => {
     localStorage.setItem(PLANNER_VIEW_MODE_KEY, viewMode)
@@ -259,6 +267,7 @@ export function PlannerPage() {
           householdId: household.id,
           weekOf: new Date().toISOString().split('T')[0],
           items,
+          listId: defaultListId || null,
         })
       }
     } catch {
@@ -283,6 +292,7 @@ export function PlannerPage() {
           householdId: household.id,
           weekOf: new Date().toISOString().split('T')[0],
           items: [],
+          listId: defaultListId || null,
         })
       }
       setSlotState({})
@@ -425,6 +435,7 @@ export function PlannerPage() {
           householdId: household.id,
           weekOf: new Date().toISOString().split('T')[0],
           items,
+          listId: defaultListId || null,
         })
       }
     }
@@ -449,6 +460,7 @@ export function PlannerPage() {
           householdId: household.id,
           weekOf: new Date().toISOString().split('T')[0],
           items,
+          listId: defaultListId || null,
         })
       }
     }
@@ -478,6 +490,7 @@ export function PlannerPage() {
             householdId: household.id,
             weekOf: new Date().toISOString().split('T')[0],
             items,
+            listId: defaultListId || null,
           })
         }
         // Show review sheet for the regenerated meal
@@ -511,6 +524,7 @@ export function PlannerPage() {
             householdId: household.id,
             weekOf: new Date().toISOString().split('T')[0],
             items,
+            listId: defaultListId || null,
           })
         }
         toast.success('Meal removed.')
@@ -546,6 +560,7 @@ export function PlannerPage() {
             householdId: household.id,
             weekOf: new Date().toISOString().split('T')[0],
             items,
+            listId: defaultListId || null,
           })
         }
         toast.success('Occurrence removed.')
@@ -574,6 +589,7 @@ export function PlannerPage() {
             householdId: household.id,
             weekOf: new Date().toISOString().split('T')[0],
             items,
+            listId: defaultListId || null,
           })
         }
         toast.success('Series removed.')
@@ -632,6 +648,7 @@ export function PlannerPage() {
           householdId: household.id,
           weekOf: new Date().toISOString().split('T')[0],
           items,
+          listId: defaultListId || null,
         })
       }
 
@@ -680,6 +697,7 @@ export function PlannerPage() {
           householdId: household.id,
           weekOf: new Date().toISOString().split('T')[0],
           items,
+          listId: defaultListId || null,
         })
       }
     } catch {
@@ -913,6 +931,7 @@ export function PlannerPage() {
               householdId: household.id,
               weekOf: new Date().toISOString().split('T')[0],
               items,
+              listId: defaultListId || null,
             })
 
             setSlotState(nextSlotState)
@@ -979,6 +998,45 @@ export function PlannerPage() {
           onSelect={(type) => handleSetRecurrence(recurrenceTarget, type)}
         />
 
+        {plannerPickerOpen && lists.length > 0 && (
+          <ShoppingListPickerModal
+            lists={lists}
+            onSelect={async (id) => {
+              setPlannerPickerOpen(false)
+              try {
+                await upsertShoppingListForDate({
+                  userId: household.user_id,
+                  householdId: household.id,
+                  weekOf: new Date().toISOString().split('T')[0],
+                  items: shoppingItems,
+                  listId: id,
+                })
+                const list = lists.find((l) => l.id === id)
+                toast.success(list ? `Groceries sent to "${list.name}"` : 'Groceries synced')
+              } catch {
+                toast.error('Could not sync groceries.')
+              }
+            }}
+            onCreateAndSelect={async (name) => {
+              try {
+                const created = await createList(name)
+                setPlannerPickerOpen(false)
+                await upsertShoppingListForDate({
+                  userId: household.user_id,
+                  householdId: household.id,
+                  weekOf: new Date().toISOString().split('T')[0],
+                  items: shoppingItems,
+                  listId: created.id,
+                })
+                toast.success(`Groceries sent to "${created.name}"`)
+              } catch {
+                toast.error('Could not create list or sync groceries.')
+              }
+            }}
+            onClose={() => setPlannerPickerOpen(false)}
+          />
+        )}
+
         <PlannerGenerationFlow
           open={Boolean(generateFlowTarget)}
           onClose={() => setGenerateFlowTarget(null)}
@@ -1004,7 +1062,35 @@ export function PlannerPage() {
         )}
 
         <div className="card mt-4">
-          <div className="mb-3 font-display text-xl text-text-primary">Shopping List</div>
+          <div className="mb-3 flex items-center justify-between">
+            <div className="font-display text-xl text-text-primary">Shopping List</div>
+            {shoppingItems.length > 0 && !generating && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (alwaysAsk && lists.length > 0) {
+                    setPlannerPickerOpen(true)
+                  } else {
+                    upsertShoppingListForDate({
+                      userId: household.user_id,
+                      householdId: household.id,
+                      weekOf: new Date().toISOString().split('T')[0],
+                      items: shoppingItems,
+                      listId: defaultListId || null,
+                    })
+                      .then(() => {
+                        const list = lists.find((l) => l.id === defaultListId) || null
+                        toast.success(list ? `Groceries sent to "${list.name}"` : 'Groceries synced')
+                      })
+                      .catch(() => toast.error('Could not sync groceries.'))
+                  }
+                }}
+                className="text-sm text-primary-600 hover:underline"
+              >
+                Send to list →
+              </button>
+            )}
+          </div>
           {generating ? <div className="rounded-2xl border border-surface-muted bg-white px-4 py-6 text-sm text-ink-secondary">Updating your shopping list…</div> : shoppingItems.length === 0 ? <EmptyState emoji="🛒" headline="Shopping list will appear automatically" body="Add or generate meals and we'll build the list automatically." ctaLabel={null} /> : (
             <div className="rounded-xl border border-divider bg-white p-4">
               {groupedShopping.map(({ category, items }, groupIndex) => (
