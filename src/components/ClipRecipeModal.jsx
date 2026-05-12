@@ -86,8 +86,8 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
         body: JSON.stringify({ url: trimmed }),
       })
       const data = await res.json()
-      if (!res.ok || !data?.recipe) throw new Error(data.error || 'Could not extract a recipe from this URL')
-      const r = data.recipe
+      if (!res.ok) throw new Error(data.error || 'Could not extract a recipe from this URL')
+      const r = data.recipe || {}
       setForm({
         title: r.title || '',
         description: r.description || '',
@@ -96,7 +96,7 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
         cook_time_minutes: r.cook_time_minutes ?? '',
         servings: r.servings ?? '',
         image_url: r.image_url || '',
-        source_url: r.source_url || '',
+        source_url: r.source_url || trimmed,
         source_domain: r.source_domain || '',
         ingredients_text: (r.ingredients || []).join('\n'),
         steps_text: (r.steps || []).join('\n'),

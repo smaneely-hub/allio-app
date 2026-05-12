@@ -32,6 +32,44 @@ const SEX_OPTIONS = [
 const DIETARY_OPTIONS = ['vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'halal', 'kosher']
 const ALLERGY_OPTIONS = ['peanut', 'tree nut', 'egg', 'dairy', 'soy', 'shellfish', 'sesame']
 
+function getIsMetric() {
+  return typeof window !== 'undefined' && localStorage.getItem('allio-unit-preference') === 'metric'
+}
+// NutritionProfile form stores display units; convert to/from metric (kg, cm) for persistence
+function kgToDisplay(kg, isMetric) {
+  if (kg == null || kg === '') return ''
+  return isMetric ? kg : +(Number(kg) * 2.20462).toFixed(1)
+}
+function displayToKg(val, isMetric) {
+  if (val === '' || val == null) return ''
+  return isMetric ? Number(val) : +(Number(val) / 2.20462).toFixed(2)
+}
+function cmToDisplay(cm, isMetric) {
+  if (cm == null || cm === '') return ''
+  return isMetric ? cm : +(Number(cm) / 2.54).toFixed(1)
+}
+function displayToCm(val, isMetric) {
+  if (val === '' || val == null) return ''
+  return isMetric ? Number(val) : +(Number(val) * 2.54).toFixed(1)
+}
+// Member form stores display units; convert to/from imperial (inches, lbs) for persistence
+function inchesToDisplay(inches, isMetric) {
+  if (inches == null || inches === '') return ''
+  return isMetric ? +(Number(inches) * 2.54).toFixed(1) : Number(inches)
+}
+function displayToInches(val, isMetric) {
+  if (val === '' || val == null) return null
+  return isMetric ? +(Number(val) / 2.54).toFixed(1) : Number(val)
+}
+function lbsToDisplay(lbs, isMetric) {
+  if (lbs == null || lbs === '') return ''
+  return isMetric ? +(Number(lbs) / 2.20462).toFixed(1) : Number(lbs)
+}
+function displayToLbs(val, isMetric) {
+  if (val === '' || val == null) return null
+  return isMetric ? +(Number(val) * 2.20462).toFixed(1) : Number(val)
+}
+
 function ChevronIcon({ open }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`h-5 w-5 transition-transform ${open ? 'rotate-180' : ''}`}>
@@ -129,16 +167,32 @@ function SegmentControl({ options, value, onChange, className = '' }) {
 }
 
 function NutritionProfileSection({ profile, saving, onSave }) {
-  const [form, setForm] = useState(profile)
+  const isMetric = getIsMetric()
+
+  const toDisplay = (p) => ({
+    ...p,
+    weight_kg: kgToDisplay(p.weight_kg, isMetric),
+    height_cm: cmToDisplay(p.height_cm, isMetric),
+    target_weight_kg: kgToDisplay(p.target_weight_kg, isMetric),
+  })
+
+  const toMetric = (f) => ({
+    ...f,
+    weight_kg: displayToKg(f.weight_kg, isMetric),
+    height_cm: displayToCm(f.height_cm, isMetric),
+    target_weight_kg: displayToKg(f.target_weight_kg, isMetric),
+  })
+
+  const [form, setForm] = useState(() => toDisplay(profile))
 
   useEffect(() => {
-    setForm(profile)
+    setForm(toDisplay(profile))
   }, [profile])
 
   const field = (name) => ({
     value: form[name] ?? '',
     onChange: (e) => setForm((f) => ({ ...f, [name]: e.target.value })),
-    onBlur: () => onSave(form),
+    onBlur: () => onSave(toMetric(form)),
   })
 
   const toggleChip = (fieldName, value) => {
@@ -146,17 +200,18 @@ function NutritionProfileSection({ profile, saving, onSave }) {
     const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value]
     const updated = { ...form, [fieldName]: next }
     setForm(updated)
-    onSave(updated)
+    onSave(toMetric(updated))
   }
 
   const setAndSave = (patch) => {
     const updated = { ...form, ...patch }
     setForm(updated)
-    onSave(updated)
+    onSave(toMetric(updated))
   }
 
-  const tdee = calculateTDEE(form)
-  const autoCalories = calculateTargetCalories(form)
+  const metricForm = toMetric(form)
+  const tdee = calculateTDEE(metricForm)
+  const autoCalories = calculateTargetCalories(metricForm)
   const autoMacros = autoCalories ? calculateMacros(autoCalories) : null
   const isAutoMode = form.nutrition_mode !== 'manual'
 
@@ -181,8 +236,8 @@ function NutritionProfileSection({ profile, saving, onSave }) {
 
       <SectionCard title="Body stats">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <NumericInput label="Weight" unit="kg" min={30} max={300} placeholder="70" {...field('weight_kg')} />
-          <NumericInput label="Height" unit="cm" min={100} max={250} placeholder="170" {...field('height_cm')} />
+          <NumericInput label="Weight" unit={isMetric ? 'kg' : 'lbs'} min={isMetric ? 30 : 66} max={isMetric ? 300 : 661} placeholder={isMetric ? '70' : '154'} {...field('weight_kg')} />
+          <NumericInput label="Height" unit={isMetric ? 'cm' : 'in'} min={isMetric ? 100 : 39} max={isMetric ? 250 : 98} placeholder={isMetric ? '170' : '67'} {...field('height_cm')} />
           <NumericInput label="Age" unit="yrs" min={10} max={120} placeholder="35" {...field('age_years')} />
           <div>
             <label className="mb-1 block text-xs font-medium text-text-secondary">Sex</label>
@@ -215,7 +270,7 @@ function NutritionProfileSection({ profile, saving, onSave }) {
             <SegmentControl options={NUTRITION_GOAL_OPTIONS} value={form.goal_type || 'maintain'} onChange={(v) => setAndSave({ goal_type: v })} />
           </div>
           {form.goal_type !== 'maintain' && (
-            <NumericInput label="Target weight" unit="kg" min={30} max={300} placeholder="65" {...field('target_weight_kg')} />
+            <NumericInput label="Target weight" unit={isMetric ? 'kg' : 'lbs'} min={isMetric ? 30 : 66} max={isMetric ? 300 : 661} placeholder={isMetric ? '65' : '143'} {...field('target_weight_kg')} />
           )}
         </div>
       </SectionCard>
@@ -331,10 +386,19 @@ function EmptyMemberForm() {
 }
 
 function MemberForm({ title, submitLabel, initialMember, onSubmit, saving }) {
-  const [form, setForm] = useState(() => ({ ...EmptyMemberForm(), ...initialMember }))
+  const isMetric = getIsMetric()
+
+  const memberToDisplay = (m) => ({
+    ...EmptyMemberForm(),
+    ...m,
+    height_inches: inchesToDisplay(m.height_inches, isMetric),
+    weight_lbs: lbsToDisplay(m.weight_lbs, isMetric),
+  })
+
+  const [form, setForm] = useState(() => memberToDisplay(initialMember))
 
   useEffect(() => {
-    setForm({ ...EmptyMemberForm(), ...initialMember })
+    setForm(memberToDisplay(initialMember))
   }, [initialMember])
 
   const toggleArrayValue = (field, value) => {
@@ -351,7 +415,12 @@ function MemberForm({ title, submitLabel, initialMember, onSubmit, saving }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    await onSubmit(normalizeMember(form, 'Member 1'))
+    const imperial = {
+      ...form,
+      height_inches: displayToInches(form.height_inches, isMetric),
+      weight_lbs: displayToLbs(form.weight_lbs, isMetric),
+    }
+    await onSubmit(normalizeMember(imperial, 'Member 1'))
   }
 
   return (
@@ -378,12 +447,12 @@ function MemberForm({ title, submitLabel, initialMember, onSubmit, saving }) {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-text-primary">Height (inches)</label>
-          <input type="number" min="20" max="96" className="input w-full" value={form.height_inches} onChange={(event) => setForm((current) => ({ ...current, height_inches: event.target.value }))} placeholder="e.g. 68" />
+          <label className="mb-1 block text-sm font-medium text-text-primary">{isMetric ? 'Height (cm)' : 'Height (inches)'}</label>
+          <input type="number" min={isMetric ? 100 : 20} max={isMetric ? 250 : 96} className="input w-full" value={form.height_inches} onChange={(event) => setForm((current) => ({ ...current, height_inches: event.target.value }))} placeholder={isMetric ? 'e.g. 170' : 'e.g. 68'} />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-text-primary">Weight (lb)</label>
-          <input type="number" min="10" max="700" className="input w-full" value={form.weight_lbs} onChange={(event) => setForm((current) => ({ ...current, weight_lbs: event.target.value }))} placeholder="e.g. 165" />
+          <label className="mb-1 block text-sm font-medium text-text-primary">{isMetric ? 'Weight (kg)' : 'Weight (lb)'}</label>
+          <input type="number" min={isMetric ? 5 : 10} max={isMetric ? 300 : 700} className="input w-full" value={form.weight_lbs} onChange={(event) => setForm((current) => ({ ...current, weight_lbs: event.target.value }))} placeholder={isMetric ? 'e.g. 70' : 'e.g. 165'} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-text-primary">Activity level</label>
@@ -419,30 +488,24 @@ function MemberForm({ title, submitLabel, initialMember, onSubmit, saving }) {
 }
 
 function MemberCard({ member, index, open, onToggle, onSave, saving }) {
-  const [form, setForm] = useState({
-    name: member.name || member.label || '',
-    age: member.age ?? '',
-    sex: member.sex || member.gender || '',
-    height_inches: member.height_inches ?? '',
-    weight_lbs: member.weight_lbs ?? '',
-    activity_level: member.activity_level || 'moderate',
-    goal: member.goal || 'maintain',
-    dietary_restrictions: Array.isArray(member.dietary_restrictions) ? member.dietary_restrictions : [],
-    allergies: Array.isArray(member.allergies) ? member.allergies : (Array.isArray(member.food_preferences) ? member.food_preferences : []),
+  const isMetric = getIsMetric()
+
+  const memberToDisplay = (m) => ({
+    name: m.name || m.label || '',
+    age: m.age ?? '',
+    sex: m.sex || m.gender || '',
+    height_inches: inchesToDisplay(m.height_inches, isMetric),
+    weight_lbs: lbsToDisplay(m.weight_lbs, isMetric),
+    activity_level: m.activity_level || 'moderate',
+    goal: m.goal || 'maintain',
+    dietary_restrictions: Array.isArray(m.dietary_restrictions) ? m.dietary_restrictions : [],
+    allergies: Array.isArray(m.allergies) ? m.allergies : (Array.isArray(m.food_preferences) ? m.food_preferences : []),
   })
 
+  const [form, setForm] = useState(() => memberToDisplay(member))
+
   useEffect(() => {
-    setForm({
-      name: member.name || member.label || '',
-      age: member.age ?? '',
-      sex: member.sex || member.gender || '',
-      height_inches: member.height_inches ?? '',
-      weight_lbs: member.weight_lbs ?? '',
-      activity_level: member.activity_level || 'moderate',
-      goal: member.goal || 'maintain',
-      dietary_restrictions: Array.isArray(member.dietary_restrictions) ? member.dietary_restrictions : [],
-      allergies: Array.isArray(member.allergies) ? member.allergies : (Array.isArray(member.food_preferences) ? member.food_preferences : []),
-    })
+    setForm(memberToDisplay(member))
   }, [member])
 
   const toggleArrayValue = (field, value) => {
@@ -459,14 +522,23 @@ function MemberCard({ member, index, open, onToggle, onSave, saving }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    await onSave(member.id, normalizeMember(form, `Member ${index + 1}`))
+    const imperial = {
+      ...form,
+      height_inches: displayToInches(form.height_inches, isMetric),
+      weight_lbs: displayToLbs(form.weight_lbs, isMetric),
+    }
+    await onSave(member.id, normalizeMember(imperial, `Member ${index + 1}`))
   }
 
   const intakeSummary = [
     member.age != null && member.age !== '' ? `Age ${member.age}` : null,
     member.sex ? member.sex : null,
-    member.height_inches ? `${member.height_inches}"` : null,
-    member.weight_lbs ? `${member.weight_lbs} lb` : null,
+    member.height_inches
+      ? (isMetric ? `${+(member.height_inches * 2.54).toFixed(0)} cm` : `${member.height_inches}"`)
+      : null,
+    member.weight_lbs
+      ? (isMetric ? `${+(member.weight_lbs / 2.20462).toFixed(1)} kg` : `${member.weight_lbs} lb`)
+      : null,
   ].filter(Boolean).join(' • ')
 
   return (
@@ -503,12 +575,12 @@ function MemberCard({ member, index, open, onToggle, onSave, saving }) {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-text-primary">Height (inches)</label>
-              <input type="number" min="20" max="96" className="input w-full" value={form.height_inches} onChange={(event) => setForm((current) => ({ ...current, height_inches: event.target.value }))} placeholder="e.g. 68" />
+              <label className="mb-1 block text-sm font-medium text-text-primary">{isMetric ? 'Height (cm)' : 'Height (inches)'}</label>
+              <input type="number" min={isMetric ? 100 : 20} max={isMetric ? 250 : 96} className="input w-full" value={form.height_inches} onChange={(event) => setForm((current) => ({ ...current, height_inches: event.target.value }))} placeholder={isMetric ? 'e.g. 170' : 'e.g. 68'} />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-text-primary">Weight (lb)</label>
-              <input type="number" min="10" max="700" className="input w-full" value={form.weight_lbs} onChange={(event) => setForm((current) => ({ ...current, weight_lbs: event.target.value }))} placeholder="e.g. 165" />
+              <label className="mb-1 block text-sm font-medium text-text-primary">{isMetric ? 'Weight (kg)' : 'Weight (lb)'}</label>
+              <input type="number" min={isMetric ? 5 : 10} max={isMetric ? 300 : 700} className="input w-full" value={form.weight_lbs} onChange={(event) => setForm((current) => ({ ...current, weight_lbs: event.target.value }))} placeholder={isMetric ? 'e.g. 70' : 'e.g. 165'} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-text-primary">Activity level</label>
