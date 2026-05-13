@@ -516,8 +516,8 @@ function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionPr
               <input className="input w-full" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Name" />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-text-primary">Age</label>
-              <input type="number" min="0" max="120" className="input w-full" value={form.age} onChange={(event) => setForm((current) => ({ ...current, age: event.target.value }))} placeholder="Age" />
+              <label className="mb-1 block text-sm font-medium text-text-primary">Birthday</label>
+              <input type="date" className="input w-full" value={form.date_of_birth || ''} onChange={(event) => setForm((current) => ({ ...current, date_of_birth: event.target.value, age: calculateAgeFromBirthDate(event.target.value) }))} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-text-primary">Sex</label>
@@ -527,8 +527,15 @@ function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionPr
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-text-primary">{isMetric ? 'Height (cm)' : 'Height (inches)'}</label>
-              <input type="number" min={isMetric ? 100 : 20} max={isMetric ? 250 : 96} className="input w-full" value={form.height_inches} onChange={(event) => setForm((current) => ({ ...current, height_inches: event.target.value }))} placeholder={isMetric ? 'e.g. 170' : 'e.g. 68'} />
+              <label className="mb-1 block text-sm font-medium text-text-primary">{isMetric ? 'Height (cm)' : 'Height'}</label>
+              {isMetric ? (
+                <input type="number" min={100} max={250} className="input w-full" value={form.height_inches} onChange={(event) => setForm((current) => ({ ...current, height_inches: event.target.value }))} placeholder="e.g. 170" />
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="number" min={1} max={8} className="input w-full" value={form.height_feet || ''} onChange={(event) => setForm((current) => ({ ...current, height_feet: event.target.value }))} placeholder="ft" />
+                  <input type="number" min={0} max={11} className="input w-full" value={form.height_only_inches || ''} onChange={(event) => setForm((current) => ({ ...current, height_only_inches: event.target.value }))} placeholder="in" />
+                </div>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-text-primary">{isMetric ? 'Weight (kg)' : 'Weight (lb)'}</label>
