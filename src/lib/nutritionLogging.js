@@ -1,6 +1,8 @@
 import { supabase } from './supabase'
 import { getLocalDateString } from './date'
 
+const VALID_MEAL_SLOTS = ['breakfast', 'lunch', 'dinner', 'snack']
+
 function toNumber(value) {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0
   if (typeof value === 'string') {
@@ -34,9 +36,22 @@ export function buildMealNutritionSnapshot(meal = {}) {
       carbs_g,
       fat_g,
       nutrition_source: 'recipe',
+      status: hasNutrition ? 'final' : 'estimate_required',
       notes: null,
     },
   }
+}
+
+function normalizeMealSlot(value = 'dinner') {
+  return VALID_MEAL_SLOTS.includes(value) ? value : 'dinner'
+}
+
+async function recomputeDaily(userId, logDate) {
+  const { error } = await supabase.rpc('recompute_daily_nutrition_log', {
+    p_user_id: userId,
+    p_log_date: logDate,
+  })
+  if (error) throw error
 }
 
 export function isNutritionLoggingUnavailable(error) {
@@ -50,9 +65,6 @@ export function isNutritionLoggingUnavailable(error) {
 
 export async function autoLogCookedMealNutrition({ userId, mealInstanceId, meal }) {
   const snapshot = buildMealNutritionSnapshot(meal)
-  if (!snapshot.hasNutrition) {
-    return { ok: false, reason: 'missing_nutrition' }
-  }
 
   const payload = {
     user_id: userId,
@@ -70,12 +82,70 @@ export async function autoLogCookedMealNutrition({ userId, mealInstanceId, meal 
 
   if (error) throw error
 
-  const { error: recomputeError } = await supabase.rpc('recompute_daily_nutrition_log', {
-    p_user_id: userId,
-    p_log_date: payload.log_date,
-  })
+  await recomputeDaily(userId, payload.log_date)
 
-  if (recomputeError) throw recomputeError
+  if (!snapshot.hasNutrition) {
+    return { ok: false, reason: 'missing_nutrition_logged', calories: 0, logDate: payload.log_date }
+  }
 
   return { ok: true, calories: data?.calories || payload.calories || 0, logDate: payload.log_date }
+}
+
+export async function addManualMealLog({ user_id, log_date, meal_slot, name, calories, protein_g = 0, carbs_g = 0, fat_g = 0, recipe_id = null, notes = null }) {
+  const payload = {
+    user_id,
+    log_date: log_date || getLocalDateString(),
+    meal_slot: normalizeMealSlot(meal_slot),
+    entry_name: String(name || '').trim() || 'Manual entry',
+    source_type: 'manual',
+    recipe_id,
+    recipe_name: null,
+    servings: 1,
+    calories: toNumber(calories),
+    protein_g: toNumber(protein_g),
+    carbs_g: toNumber(carbs_g),
+    fat_g: toNumber(fat_g),
+    nutrition_source: recipe_id ? 'recipe' : 'manual',
+    status: 'final',
+    notes,
+    logged_at: new Date().toISOString(),
+  }
+
+  const { data, error } = await supabase.from('meal_nutrition_logs').insert(payload).select('*').single()
+  if (error) throw error
+  await recomputeDaily(user_id, payload.log_date)
+  return data
+}
+
+export async function updateMealLog(id, patch) {
+  const { data: existing, error: loadError } = await supabase.from('meal_nutrition_logs').select('*').eq('id', id).single()
+  if (loadError) throw loadError
+  if (existing.source_type === 'planner' && Object.prototype.hasOwnProperty.call(patch, 'meal_instance_id')) {
+    throw new Error('Cannot modify planner meal_instance_id')
+  }
+
+  const next = {
+    ...patch,
+    meal_slot: patch.meal_slot ? normalizeMealSlot(patch.meal_slot) : existing.meal_slot,
+    calories: patch.calories != null ? toNumber(patch.calories) : existing.calories,
+    protein_g: patch.protein_g != null ? toNumber(patch.protein_g) : existing.protein_g,
+    carbs_g: patch.carbs_g != null ? toNumber(patch.carbs_g) : existing.carbs_g,
+    fat_g: patch.fat_g != null ? toNumber(patch.fat_g) : existing.fat_g,
+    updated_at: new Date().toISOString(),
+  }
+
+  const { data, error } = await supabase.from('meal_nutrition_logs').update(next).eq('id', id).select('*').single()
+  if (error) throw error
+  await recomputeDaily(existing.user_id, data.log_date)
+  if (data.log_date !== existing.log_date) await recomputeDaily(existing.user_id, existing.log_date)
+  return data
+}
+
+export async function deleteMealLog(id) {
+  const { data: existing, error: loadError } = await supabase.from('meal_nutrition_logs').select('*').eq('id', id).single()
+  if (loadError) throw loadError
+  const { error } = await supabase.from('meal_nutrition_logs').delete().eq('id', id)
+  if (error) throw error
+  await recomputeDaily(existing.user_id, existing.log_date)
+  return existing
 }

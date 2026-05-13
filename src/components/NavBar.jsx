@@ -32,6 +32,17 @@ function BookIcon(props) {
   )
 }
 
+function ChartIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
+      <path d="M4 20V10" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 20V4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M16 20v-7" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M22 20V8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 function ShoppingCartIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
@@ -64,6 +75,7 @@ const desktopLinks = [
   { to: '/dashboard', label: 'Home', icon: HomeIcon, aliases: ['/dashboard'] },
   { to: '/tonight', label: 'Quick Meal', icon: SparklesIcon, aliases: ['/tonight', '/cook', '/cooking'] },
   { to: '/planner', label: 'Planner', icon: CalendarDaysIcon, aliases: ['/planner'] },
+  { to: '/nutrition', label: 'Nutrition', icon: ChartIcon, aliases: ['/nutrition'] },
   { to: '/recipes', label: 'Recipes', icon: BookIcon, aliases: ['/recipes', '/search', '/find'] },
   { to: '/groceries', label: 'Groceries', icon: ShoppingCartIcon, aliases: ['/groceries'] },
   { to: '/settings', label: 'Settings', icon: SettingsIcon, aliases: ['/profile'] },
@@ -73,6 +85,7 @@ const mobileLinks = [
   { to: '/dashboard', label: 'Home', icon: HomeIcon, aliases: ['/dashboard'] },
   { to: '/tonight', label: 'Quick Meal', icon: SparklesIcon, aliases: ['/tonight', '/cook', '/cooking'] },
   { to: '/planner', label: 'Planner', icon: CalendarDaysIcon, aliases: ['/planner'] },
+  { to: '/nutrition', label: 'Nutrition', icon: ChartIcon, aliases: ['/nutrition'] },
   { to: '/recipes', label: 'Recipes', icon: BookIcon, aliases: ['/recipes', '/search', '/find'] },
   { to: '/groceries', label: 'Groceries', icon: ShoppingCartIcon, aliases: ['/groceries'] },
   { to: '/settings', label: 'Settings', icon: SettingsIcon, aliases: ['/profile'] },

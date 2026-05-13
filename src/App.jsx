@@ -19,6 +19,7 @@ import { Catalog } from './pages/Catalog'
 import { HouseholdPage } from './pages/HouseholdPage'
 import { ShopPage } from './pages/ShopPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { NutritionPage } from './pages/NutritionPage'
 import { PricingPage } from './pages/PricingPage'
 import { PublicMealGeneratorPage } from './pages/PublicMealGeneratorPage'
 import { PrivacyPage } from './pages/PrivacyPage'
@@ -140,6 +141,14 @@ export default function App() {
                   element={
                     <ProtectedRoute>
                       <SettingsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/nutrition"
+                  element={
+                    <ProtectedRoute>
+                      <NutritionPage />
                     </ProtectedRoute>
                   }
                 />
