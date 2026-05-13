@@ -8,6 +8,7 @@ import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { normalizeMealRecord } from '../lib/mealSchema'
 import { getLocalDateString } from '../lib/date'
+import { autoLogCookedMealNutrition, isNutritionLoggingUnavailable } from '../lib/nutritionLogging'
 import { invokePlannerFunction, refineMeal } from '../lib/plannerFunction'
 import { upsertShoppingListForDate, buildShoppingItemsFromMeal } from '../lib/tonightPersistence'
 import { addItemsToShoppingList } from '../lib/shoppingLists'
@@ -1207,6 +1208,26 @@ export function TonightPage() {
           .eq('id', instanceId)
 
         if (error) throw error
+      }
+
+      try {
+        const nutritionResult = await autoLogCookedMealNutrition({
+          userId: user.id,
+          mealInstanceId: instanceId,
+          meal: activeMeal,
+        })
+
+        if (nutritionResult?.ok) {
+          toast.success(`${Math.round(nutritionResult.calories || 0)} cal added`)
+        } else if (nutritionResult?.reason === 'missing_nutrition') {
+          toast('No nutrition found for this meal yet. We can add estimate flow next.')
+        }
+      } catch (nutritionError) {
+        if (isNutritionLoggingUnavailable(nutritionError)) {
+          console.warn('[TonightPage] nutrition logging unavailable:', nutritionError)
+        } else {
+          console.warn('[TonightPage] nutrition auto-log failed:', nutritionError)
+        }
       }
 
       setCooked(true)
