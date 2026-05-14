@@ -4,7 +4,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { getDailyTargets } from '../lib/nutritionTargets'
-import { addManualMealLog, deleteMealLog, updateMealLog } from '../lib/nutritionLogging'
+import { addManualMealLog, addPlannedMealLog, deleteMealLog, updateMealLog } from '../lib/nutritionLogging'
 import { TodayProgressCard } from '../components/nutrition/TodayProgressCard'
 import { MacroBars } from '../components/nutrition/MacroBars'
 import { MealSlotGroup } from '../components/nutrition/MealSlotGroup'
@@ -30,7 +30,34 @@ export function NutritionPage() {
   const [selectedSlot, setSelectedSlot] = useState('breakfast')
   const [editingItem, setEditingItem] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [hydratingPlan, setHydratingPlan] = useState(false)
   const today = new Date().toISOString().slice(0, 10)
+
+  const ensurePlannedMealsLogged = async (existingEntries = []) => {
+    if (!user?.id) return
+
+    const { data: mealPlan } = await supabase
+      .from('meal_plans')
+      .select('draft_plan, plan')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const plannedMeals = (mealPlan?.draft_plan?.meals || mealPlan?.plan?.meals || []).filter((meal) => meal?.date === today)
+    if (!plannedMeals.length) return
+
+    const existingKeys = new Set(existingEntries.filter((entry) => entry.notes === 'Auto-added from meal plan').map((entry) => `${entry.recipe_id || ''}::${entry.entry_name}::${entry.meal_slot}`))
+
+    const missingMeals = plannedMeals.filter((meal) => {
+      const key = `${meal.recipe_id || ''}::${meal.name || meal.title || ''}::${meal.meal || meal.slot || 'dinner'}`
+      return !existingKeys.has(key)
+    })
+
+    for (const meal of missingMeals) {
+      await addPlannedMealLog({ user_id: user.id, log_date: today, meal })
+    }
+  }
 
   const load = async () => {
     if (!user?.id) return
@@ -42,6 +69,21 @@ export function NutritionPage() {
         supabase.from('meal_nutrition_logs').select('*').eq('user_id', user.id).eq('log_date', today).order('logged_at', { ascending: true }),
       ])
 
+      if (!hydratingPlan) {
+        setHydratingPlan(true)
+        await ensurePlannedMealsLogged(entriesResult.data || [])
+        const [refreshedDaily, refreshedEntries] = await Promise.all([
+          supabase.from('daily_nutrition_logs').select('*').eq('user_id', user.id).eq('log_date', today).maybeSingle(),
+          supabase.from('meal_nutrition_logs').select('*').eq('user_id', user.id).eq('log_date', today).order('logged_at', { ascending: true }),
+        ])
+        setTargets(targetData)
+        setDailyLog(refreshedDaily.data || dailyResult.data || null)
+        setEntries(refreshedEntries.data || entriesResult.data || [])
+        setHydratingPlan(false)
+        setLoading(false)
+        return
+      }
+
       setTargets(targetData)
       setDailyLog(dailyResult.data || null)
       setEntries(entriesResult.data || [])
@@ -49,6 +91,7 @@ export function NutritionPage() {
       console.error('[NutritionPage] load error', error)
       toast.error('Could not load nutrition logs')
     } finally {
+      setHydratingPlan(false)
       setLoading(false)
     }
   }

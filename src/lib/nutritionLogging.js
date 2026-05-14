@@ -91,6 +91,39 @@ export async function autoLogCookedMealNutrition({ userId, mealInstanceId, meal 
   return { ok: true, calories: data?.calories || payload.calories || 0, logDate: payload.log_date }
 }
 
+export async function addPlannedMealLog({ user_id, log_date, meal }) {
+  const snapshot = buildMealNutritionSnapshot({
+    ...meal,
+    meal: meal.meal || meal.slot || 'dinner',
+    servings: 1,
+  })
+
+  const payload = {
+    user_id,
+    log_date: log_date || getLocalDateString(),
+    meal_slot: normalizeMealSlot(meal.meal || meal.slot || 'dinner'),
+    entry_name: meal.name || meal.title || 'Planned meal',
+    source_type: 'planner',
+    meal_instance_id: null,
+    recipe_id: meal.recipe_id || null,
+    recipe_name: meal.name || meal.title || null,
+    servings: 1,
+    calories: snapshot.payload.calories,
+    protein_g: snapshot.payload.protein_g,
+    carbs_g: snapshot.payload.carbs_g,
+    fat_g: snapshot.payload.fat_g,
+    nutrition_source: snapshot.payload.nutrition_source,
+    status: snapshot.hasNutrition ? 'final' : 'estimate_required',
+    notes: 'Auto-added from meal plan',
+    logged_at: new Date().toISOString(),
+  }
+
+  const { data, error } = await supabase.from('meal_nutrition_logs').insert(payload).select('*').single()
+  if (error) throw error
+  await recomputeDaily(user_id, payload.log_date)
+  return data
+}
+
 export async function addManualMealLog({ user_id, log_date, meal_slot, name, calories, protein_g = 0, carbs_g = 0, fat_g = 0, recipe_id = null, notes = null }) {
   const payload = {
     user_id,
