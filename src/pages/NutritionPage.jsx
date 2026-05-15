@@ -10,6 +10,7 @@ import { MacroBars } from '../components/nutrition/MacroBars'
 import { MealSlotGroup } from '../components/nutrition/MealSlotGroup'
 import { EmptyState } from '../components/nutrition/EmptyState'
 import { ManualLogModal } from '../components/nutrition/ManualLogModal'
+import { FoodPickerModal } from '../components/nutrition/FoodPickerModal'
 
 const SLOT_ORDER = ['breakfast', 'lunch', 'dinner', 'snack']
 const SLOT_LABELS = {
@@ -31,6 +32,7 @@ export function NutritionPage() {
   const [editingItem, setEditingItem] = useState(null)
   const [saving, setSaving] = useState(false)
   const [hydratingPlan, setHydratingPlan] = useState(false)
+  const [foodModalOpen, setFoodModalOpen] = useState(false)
   const today = new Date().toISOString().slice(0, 10)
 
   const ensurePlannedMealsLogged = async (existingEntries = []) => {
@@ -119,6 +121,11 @@ export function NutritionPage() {
     setModalOpen(true)
   }
 
+  const openFoodPicker = (slot) => {
+    setSelectedSlot(slot)
+    setFoodModalOpen(true)
+  }
+
   const handleSave = async (form) => {
     if (!user?.id) return
     setSaving(true)
@@ -176,6 +183,35 @@ export function NutritionPage() {
     }
   }
 
+  const handleAddFood = async (food) => {
+    if (!user?.id) return
+    setSaving(true)
+    try {
+      await addManualMealLog({
+        user_id: user.id,
+        log_date: today,
+        meal_slot: food.meal_slot,
+        name: food.name,
+        calories: food.calories,
+        protein_g: food.protein_g,
+        carbs_g: food.carbs_g,
+        fat_g: food.fat_g,
+        food_item_id: food.food_item_id,
+        notes: food.notes,
+        source_type: food.source_type,
+        serving_count: food.serving_count,
+      })
+      toast.success('Food added')
+      setFoodModalOpen(false)
+      await load()
+    } catch (error) {
+      console.error('[NutritionPage] add food error', error)
+      toast.error('Could not add food')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading) {
     return <div className="mx-auto max-w-5xl px-4 pb-24 pt-6 text-text-secondary">Loading nutrition…</div>
   }
@@ -195,7 +231,7 @@ export function NutritionPage() {
 
         <div className="grid gap-4">
           {SLOT_ORDER.map((slot) => (
-            <MealSlotGroup key={slot} title={SLOT_LABELS[slot]} items={grouped[slot] || []} onAdd={() => openAdd(slot)} onEdit={openEdit} />
+            <MealSlotGroup key={slot} title={SLOT_LABELS[slot]} items={grouped[slot] || []} onAdd={() => openAdd(slot)} onAddFood={() => openFoodPicker(slot)} onEdit={openEdit} />
           ))}
         </div>
       </div>
@@ -208,6 +244,14 @@ export function NutritionPage() {
         onSave={handleSave}
         onDelete={handleDelete}
         saving={saving}
+      />
+
+      <FoodPickerModal
+        open={foodModalOpen}
+        userId={user?.id}
+        initialSlot={selectedSlot}
+        onClose={() => setFoodModalOpen(false)}
+        onPick={handleAddFood}
       />
     </div>
   )

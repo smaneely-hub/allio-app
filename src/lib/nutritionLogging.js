@@ -124,21 +124,22 @@ export async function addPlannedMealLog({ user_id, log_date, meal }) {
   return data
 }
 
-export async function addManualMealLog({ user_id, log_date, meal_slot, name, calories, protein_g = 0, carbs_g = 0, fat_g = 0, recipe_id = null, notes = null }) {
+export async function addManualMealLog({ user_id, log_date, meal_slot, name, calories, protein_g = 0, carbs_g = 0, fat_g = 0, recipe_id = null, food_item_id = null, notes = null, source_type = 'manual', serving_count = 1 }) {
   const payload = {
     user_id,
     log_date: log_date || getLocalDateString(),
     meal_slot: normalizeMealSlot(meal_slot),
     entry_name: String(name || '').trim() || 'Manual entry',
-    source_type: 'manual',
+    source_type,
     recipe_id,
+    food_item_id,
     recipe_name: null,
-    servings: 1,
+    servings: toNumber(serving_count) || 1,
     calories: toNumber(calories),
     protein_g: toNumber(protein_g),
     carbs_g: toNumber(carbs_g),
     fat_g: toNumber(fat_g),
-    nutrition_source: recipe_id ? 'recipe' : 'manual',
+    nutrition_source: recipe_id ? 'recipe' : food_item_id ? 'food_item' : 'manual',
     status: 'final',
     notes,
     logged_at: new Date().toISOString(),
