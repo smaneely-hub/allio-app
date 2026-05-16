@@ -3,6 +3,7 @@ import toast from 'react-hot-toast'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useHousehold } from '../hooks/useHousehold'
 import { useNutritionProfile } from '../hooks/useNutritionProfile'
+import { WeightTrendCard } from '../components/health/WeightTrendCard'
 import {
   ACTIVITY_LABELS,
   calculateTDEE,
@@ -455,6 +456,8 @@ function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionPr
   }
 
   const [foodsInput, setFoodsInput] = useState('')
+  const [weightLogValue, setWeightLogValue] = useState('')
+  const [weightLogDate, setWeightLogDate] = useState(() => new Date().toISOString().slice(0, 10))
   useEffect(() => {
     setFoodsInput((nutritionForm.foods_to_avoid || []).join(', '))
   }, [nutritionForm.foods_to_avoid])
@@ -665,6 +668,8 @@ export function HouseholdPage() {
     saving: savingNutrition,
     save: saveNutritionProfile,
     derivedTargets: nutritionTargets,
+    weightHistory,
+    logWeight,
   } = useNutritionProfile()
   const [savingMembers, setSavingMembers] = useState(false)
   const [openMemberId, setOpenMemberId] = useState(null)
@@ -749,6 +754,22 @@ export function HouseholdPage() {
 
   const primaryMemberName = primaryMember?.name || primaryMember?.label || 'you'
   const primaryProfileMemberId = primaryMember?.id || null
+  const isMetric = household?.unit_system === 'metric'
+
+  const handleLogWeight = async (value, recordedOn) => {
+    const numeric = Number(value)
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+      toast.error('Enter a valid weight')
+      return
+    }
+    const valueKg = isMetric ? numeric : numeric / 2.20462
+    try {
+      await logWeight({ valueKg, recorded_on: recordedOn })
+      toast.success('Weight logged')
+    } catch (error) {
+      toast.error(error?.message || 'Could not log weight')
+    }
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 pb-24 pt-4 md:px-6 md:pt-6">
@@ -838,6 +859,33 @@ export function HouseholdPage() {
         {!loadingNutrition && savingNutrition ? (
           <p className="text-xs text-text-muted">Saving nutrition profile…</p>
         ) : null}
+
+        <section className="card p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="lg:max-w-md">
+              <h2 className="font-display text-xl text-text-primary">Weight & health progress</h2>
+              <p className="mt-1 text-sm text-text-secondary">Log your weight over time and compare it against your target weight.</p>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-text-primary">Weight</label>
+                  <input type="number" min={isMetric ? 5 : 10} max={isMetric ? 300 : 700} step="0.1" className="input w-full" value={weightLogValue} onChange={(e) => setWeightLogValue(e.target.value)} placeholder={isMetric ? '70.0' : '165.0'} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-text-primary">Date</label>
+                  <input type="date" className="input w-full" value={weightLogDate} onChange={(e) => setWeightLogDate(e.target.value)} />
+                </div>
+                <div className="flex items-end">
+                  <button type="button" onClick={() => handleLogWeight(weightLogValue, weightLogDate)} className="btn-primary w-full text-sm">Log weight</button>
+                </div>
+              </div>
+            </div>
+
+            <div className="w-full lg:max-w-2xl">
+              <WeightTrendCard entries={weightHistory} targetWeightKg={nutritionProfile?.target_weight_kg} isMetric={isMetric} />
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   )

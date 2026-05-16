@@ -3,6 +3,7 @@ import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './useAuth'
 import { deriveNutritionTargets } from '../lib/nutrition'
+import { addMetricLog, loadMetricHistory } from '../lib/healthMetrics'
 
 const NUTRITION_DEFAULTS = {
   profile_member_id: null,
@@ -67,6 +68,7 @@ export function useNutritionProfile() {
   const [profile, setProfile] = useState(NUTRITION_DEFAULTS)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [weightHistory, setWeightHistory] = useState([])
 
   const load = useCallback(async () => {
     if (!user?.id) { setLoading(false); return }
@@ -118,6 +120,8 @@ export function useNutritionProfile() {
       }
 
       setProfile(mergeProfileWithMember(data, profileMember))
+      const history = await loadMetricHistory(user.id, 'weight_kg').catch(() => [])
+      setWeightHistory(history)
     } finally {
       setLoading(false)
     }
@@ -202,5 +206,12 @@ export function useNutritionProfile() {
 
   const derivedTargets = deriveNutritionTargets(profile)
 
-  return { profile, loading, saving, save, derivedTargets, reload: load }
+  const logWeight = useCallback(async ({ valueKg, recorded_on, notes = null }) => {
+    if (!user?.id) return
+    await addMetricLog({ user_id: user.id, metric_type: 'weight_kg', value: valueKg, recorded_on, notes })
+    const history = await loadMetricHistory(user.id, 'weight_kg').catch(() => [])
+    setWeightHistory(history)
+  }, [user?.id])
+
+  return { profile, loading, saving, save, derivedTargets, reload: load, weightHistory, logWeight }
 }
