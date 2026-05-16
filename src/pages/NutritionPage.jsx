@@ -5,6 +5,8 @@ import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { getDailyTargets } from '../lib/nutritionTargets'
 import { addManualMealLog, addPlannedMealLog, deleteMealLog, updateMealLog } from '../lib/nutritionLogging'
+import { formatIsoLocalDate, getStartOfWeek, normalizeDayName } from '../lib/planner'
+import { normalizeMealRecord } from '../lib/mealSchema'
 import { TodayProgressCard } from '../components/nutrition/TodayProgressCard'
 import { MacroBars } from '../components/nutrition/MacroBars'
 import { MealSlotGroup } from '../components/nutrition/MealSlotGroup'
@@ -35,6 +37,30 @@ export function NutritionPage() {
   const [foodModalOpen, setFoodModalOpen] = useState(false)
   const today = new Date().toISOString().slice(0, 10)
 
+  const getTodayPlannedMeals = (mealPlan) => {
+    const rawMeals = mealPlan?.draft_plan?.meals || mealPlan?.plan?.meals || []
+    if (!rawMeals.length) return []
+
+    const todayDate = new Date()
+    todayDate.setHours(0, 0, 0, 0)
+    const todayDayName = normalizeDayName(todayDate.toLocaleDateString('en-US', { weekday: 'long' }))
+    const todayShort = todayDayName.slice(0, 3).toLowerCase()
+    const normalizedMeals = rawMeals.map((meal) => normalizeMealRecord(meal))
+
+    const exactDateMeals = normalizedMeals.filter((meal) => meal?.date === today)
+    if (exactDateMeals.length) return exactDateMeals
+
+    const currentWeekStart = formatIsoLocalDate(getStartOfWeek(todayDate))
+    const planDates = normalizedMeals.map((meal) => meal?.date).filter(Boolean)
+    const planLooksCurrentWeek = planDates.some((date) => String(date) >= currentWeekStart)
+
+    if (planLooksCurrentWeek) {
+      return normalizedMeals.filter((meal) => meal?.day === todayShort)
+    }
+
+    return []
+  }
+
   const ensurePlannedMealsLogged = async (existingEntries = []) => {
     if (!user?.id) return
 
@@ -46,7 +72,7 @@ export function NutritionPage() {
       .limit(1)
       .maybeSingle()
 
-    const plannedMeals = (mealPlan?.draft_plan?.meals || mealPlan?.plan?.meals || []).filter((meal) => meal?.date === today)
+    const plannedMeals = getTodayPlannedMeals(mealPlan)
     if (!plannedMeals.length) return
 
     const existingKeys = new Set(existingEntries.filter((entry) => entry.notes === 'Auto-added from meal plan').map((entry) => `${entry.recipe_id || ''}::${entry.entry_name}::${entry.meal_slot}`))
@@ -231,9 +257,15 @@ export function NutritionPage() {
 
         <div className="grid gap-4">
           {SLOT_ORDER.map((slot) => (
-            <MealSlotGroup key={slot} title={SLOT_LABELS[slot]} items={grouped[slot] || []} onAdd={() => openAdd(slot)} onAddFood={() => openFoodPicker(slot)} onEdit={openEdit} />
+            <MealSlotGroup key={slot} title={SLOT_LABELS[slot]} items={grouped[slot] || []} onAdd={() => openFoodPicker(slot)} onAddFood={() => openFoodPicker(slot)} onEdit={openEdit} />
           ))}
         </div>
+      </div>
+
+      <div className="mt-4 flex justify-end">
+        <button type="button" onClick={() => openAdd('breakfast')} className="text-sm font-medium text-text-secondary underline underline-offset-2">
+          Need a custom manual entry instead?
+        </button>
       </div>
 
       <ManualLogModal
