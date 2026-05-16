@@ -21,6 +21,29 @@ function mapFood(row) {
 
 export async function searchFoodItems(query = '') {
   const normalized = String(query || '').trim()
+  if (normalized.length >= 3) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/search-food`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ query: normalized }),
+      })
+      if (res.ok) {
+        const payload = await res.json()
+        if (Array.isArray(payload?.items) && payload.items.length) {
+          return payload.items.map(mapFood).filter(Boolean)
+        }
+      }
+    } catch {
+      // fall back to local search
+    }
+  }
+
   let builder = supabase
     .from('food_items')
     .select('*')
