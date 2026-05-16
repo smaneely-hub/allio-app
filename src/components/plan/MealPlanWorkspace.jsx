@@ -52,6 +52,16 @@ function PlusIcon(props) {
   )
 }
 
+function CalendarCheckIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
+      <path d="M8 2v4M16 2v4M3 10h18" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="3" y="4" width="18" height="17" rx="2" />
+      <path d="m9 16 2 2 4-5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 function DonutMacro({ nutrition }) {
   const carbs = Number(nutrition?.carbs || 0)
   const fat = Number(nutrition?.fat || 0)
@@ -295,6 +305,34 @@ function DaySection({ day, expanded, onToggle, collapsible, onOpenMeal, onOpenDa
   )
 }
 
+function ShoppingDayStrip({ shoppingDay, onSelectShoppingDay }) {
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+  return (
+    <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3">
+      <div className="flex items-center gap-2 text-emerald-900">
+        <CalendarCheckIcon className="h-4 w-4" />
+        <div className="text-sm font-semibold">Weekly shopping day</div>
+      </div>
+      <div className="mt-1 text-sm text-emerald-800">Current grocery window runs from <strong>{shoppingDay}</strong> to the day before your next {shoppingDay.toLowerCase()}.</div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {days.map((day) => {
+          const active = day === shoppingDay
+          return (
+            <button
+              key={day}
+              type="button"
+              onClick={() => onSelectShoppingDay(day)}
+              className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${active ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-emerald-900 ring-1 ring-emerald-200 hover:bg-emerald-100'}`}
+            >
+              {day}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function formatWeekRange(days) {
   const start = days[0]?.date
   const end = days[days.length - 1]?.date
@@ -366,6 +404,7 @@ export function MealPlanWorkspace({
   onSelectMonthDay,
   generatingSlotKey = null,
   shoppingDay = null,
+  onSelectShoppingDay,
 }) {
   const windowStart = useMemo(() => {
     const next = new Date(selectedDate)
@@ -445,6 +484,10 @@ export function MealPlanWorkspace({
               <ChevronRightIcon className="h-5 w-5" />
             </button>
           </div>
+
+          {shoppingDay && onSelectShoppingDay ? (
+            <ShoppingDayStrip shoppingDay={shoppingDay} onSelectShoppingDay={onSelectShoppingDay} />
+          ) : null}
         </div>
       </div>
 

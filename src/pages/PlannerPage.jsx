@@ -194,7 +194,7 @@ export function PlannerPage() {
       return
     }
     setShoppingItems(aggregateShoppingList({ meals }, household?.staples_on_hand || '', { shoppingDay }))
-  }, [mealPlan, household])
+  }, [mealPlan, household, shoppingDay])
 
   const memberOptions = useMemo(() => members.map((member, index) => ({ id: member.id || `member-${index}`, label: member.name || member.label || `Member ${index + 1}` })), [members])
   const planMeals = useMemo(() => (mealPlan?.draft_plan?.meals || mealPlan?.plan?.meals || []).map((meal) => normalizeMealRecord(meal)), [mealPlan])
@@ -231,6 +231,7 @@ export function PlannerPage() {
   }
 
   const handleChangeShoppingDay = async (nextDay) => {
+    if (nextDay === shoppingDay) return
     setShoppingDay(nextDay)
     if (!household?.id) return
     try {
@@ -756,34 +757,11 @@ export function PlannerPage() {
 
         {members.length === 0 ? <div className="mt-3 text-sm text-ink-secondary">Meal generation stays disabled until you add at least one household member.</div> : <div className="mt-3 text-sm text-ink-secondary">Generate meals one slot at a time from each day card, or add meals manually.</div>}
 
-        <div className="mt-4 rounded-2xl border border-surface-muted bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-sm font-semibold text-ink-primary">Shopping day</div>
-              <div className="text-sm text-ink-secondary">Your grocery list covers meals from this shopping day until the next one, so future meals stay out until they’re relevant.</div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {SHOPPING_DAY_OPTIONS.map((day) => {
-                const active = shoppingDay === day
-                return (
-                  <button
-                    key={day}
-                    type="button"
-                    onClick={() => handleChangeShoppingDay(day)}
-                    className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-150 ${active ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200' : 'border border-surface-muted bg-surface-card text-ink-secondary hover:bg-stone-100'}`}
-                  >
-                    {day}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-
         {loading ? <ScheduleSkeleton /> : (
           <MealPlanWorkspace
             meals={planMeals}
             shoppingDay={shoppingDay}
+            onSelectShoppingDay={handleChangeShoppingDay}
             selectedDate={selectedDate}
             viewMode={viewMode}
             onChangeViewMode={(newMode) => {
