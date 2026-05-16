@@ -103,7 +103,11 @@ const SLOT_DOT_COLOR = {
   snack: 'bg-stone-400',
 }
 
-function MonthView({ selectedDate, meals, onSelectDay }) {
+function shoppingDayKeyFromDate(date) {
+  return date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
+}
+
+function MonthView({ selectedDate, meals, onSelectDay, shoppingDay = null }) {
   const today = useMemo(() => {
     const t = new Date()
     t.setHours(0, 0, 0, 0)
@@ -153,13 +157,14 @@ function MonthView({ selectedDate, meals, onSelectDay }) {
               const isToday = date.toDateString() === today.toDateString()
               const dateStr = formatIsoLocalDate(date)
               const filledSlots = mealCoverage[dateStr] || new Set()
+              const isShoppingDay = shoppingDay && shoppingDayKeyFromDate(date) === String(shoppingDay).toLowerCase()
 
               return (
                 <button
                   key={dayIndex}
                   type="button"
                   onClick={() => onSelectDay(date)}
-                  className={`flex cursor-pointer flex-col items-center rounded-xl py-2 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 ${isToday ? 'bg-primary-50 ring-1 ring-primary-200' : 'hover:bg-stone-50'} ${isInMonth ? '' : 'opacity-30'}`}
+                  className={`flex cursor-pointer flex-col items-center rounded-xl py-2 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 ${isToday ? 'bg-primary-50 ring-1 ring-primary-200' : 'hover:bg-stone-50'} ${isShoppingDay ? 'border border-emerald-200 bg-emerald-50/70' : ''} ${isInMonth ? '' : 'opacity-30'}`}
                 >
                   <span className={`text-sm leading-none ${isToday ? 'font-semibold text-primary-700' : 'font-medium text-ink-primary'}`}>
                     {date.getDate()}
@@ -225,11 +230,12 @@ function SlotGroup({ slotGroup, day, onOpenAddMeal, onOpenMealActions, onOpenMea
   )
 }
 
-function DaySection({ day, expanded, onToggle, collapsible, onOpenMeal, onOpenDayActions, onOpenMealActions, onOpenAddMeal, generatingSlotKey, showHeaderActions = true }) {
+function DaySection({ day, expanded, onToggle, collapsible, onOpenMeal, onOpenDayActions, onOpenMealActions, onOpenAddMeal, generatingSlotKey, showHeaderActions = true, shoppingDay = null }) {
   const isToday = day.date.toDateString() === new Date().toDateString()
+  const isShoppingDay = shoppingDay && day.dayName.toLowerCase() === String(shoppingDay).toLowerCase()
 
   return (
-    <section className="relative rounded-2xl bg-white px-3 py-2">
+    <section className={`relative rounded-2xl bg-white px-3 py-2 ${isShoppingDay ? 'ring-1 ring-emerald-200 bg-emerald-50/40' : ''}`}>
       {isToday ? <span className="absolute left-0 top-4 h-10 w-1 rounded-full bg-primary-400" /> : null}
       <div className="flex items-center gap-3">
         <button
@@ -238,7 +244,10 @@ function DaySection({ day, expanded, onToggle, collapsible, onOpenMeal, onOpenDa
           className={`flex flex-1 items-center gap-3 rounded-2xl text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 ${collapsible ? 'cursor-pointer hover:bg-stone-50' : 'cursor-default'}`}
         >
           <div className="min-w-0 flex-1">
-            <div className="font-display text-lg text-ink-primary">{day.dayName}</div>
+            <div className="flex items-center gap-2 font-display text-lg text-ink-primary">
+              <span>{day.dayName}</span>
+              {isShoppingDay ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Shopping day</span> : null}
+            </div>
             <div className="text-sm text-ink-secondary">{day.dateLabel}</div>
           </div>
           <div className="flex items-center gap-3">
@@ -356,6 +365,7 @@ export function MealPlanWorkspace({
   onOpenAddMeal,
   onSelectMonthDay,
   generatingSlotKey = null,
+  shoppingDay = null,
 }) {
   const windowStart = useMemo(() => {
     const next = new Date(selectedDate)
@@ -444,6 +454,7 @@ export function MealPlanWorkspace({
             <MonthView
               selectedDate={windowStart}
               meals={meals}
+              shoppingDay={shoppingDay}
               onSelectDay={onSelectMonthDay || (() => {})}
             />
           ) : (
@@ -462,6 +473,7 @@ export function MealPlanWorkspace({
                 onOpenMealActions={onOpenMealActions}
                 onOpenAddMeal={onOpenAddMeal}
                 generatingSlotKey={generatingSlotKey}
+                shoppingDay={shoppingDay}
               />
             ))
           )}

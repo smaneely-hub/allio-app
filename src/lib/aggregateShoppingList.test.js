@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { aggregateShoppingList } from './aggregateShoppingList.js'
+import { aggregateShoppingList, filterMealsForShoppingWindow } from './aggregateShoppingList.js'
 import { normalizeIngredientName } from './shoppingListUtils.js'
 
 const samplePlan = {
@@ -58,4 +58,28 @@ test('category assignment', () => {
 
 test('normalize ingredient removes adjectives and applies synonyms', () => {
   assert.equal(normalizeIngredientName('Fresh chicken breast'), 'chicken breasts')
+})
+
+test('shopping window excludes meals after next shopping day', () => {
+  const meals = [
+    { name: 'Near Meal', date: '2026-05-16', ingredients: [{ item: 'Milk', quantity: 1, unit: 'carton' }] },
+    { name: 'Far Meal', date: '2026-05-20', ingredients: [{ item: 'Bread', quantity: 1, unit: 'loaf' }] },
+  ]
+  const filtered = filterMealsForShoppingWindow(meals, {
+    shoppingDay: 'Friday',
+    referenceDate: new Date('2026-05-16T12:00:00Z'),
+  })
+  assert.equal(filtered.length, 1)
+  assert.equal(filtered[0].name, 'Near Meal')
+})
+
+test('aggregate shopping list respects shopping window option', () => {
+  const items = aggregateShoppingList({
+    meals: [
+      { name: 'Meal A', date: '2026-05-16', ingredients: [{ item: 'Eggs', quantity: 1, unit: 'dozen' }] },
+      { name: 'Meal B', date: '2026-05-19', ingredients: [{ item: 'Pasta', quantity: 1, unit: 'box' }] },
+    ],
+  }, '', { shoppingDay: 'Friday', referenceDate: new Date('2026-05-16T12:00:00Z') })
+  assert.equal(items.length, 1)
+  assert.equal(items[0].name, 'eggs')
 })

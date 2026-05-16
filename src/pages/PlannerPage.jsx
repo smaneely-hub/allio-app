@@ -65,6 +65,8 @@ const CATEGORY_EMOJI = {
   Other: '📦',
 }
 
+const SHOPPING_DAY_OPTIONS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
 const PLANNER_VIEW_MODE_KEY = 'planner.viewMode'
 
 function MemberSummary({ members, onOpen }) {
@@ -191,7 +193,7 @@ export function PlannerPage() {
       setShoppingItems([])
       return
     }
-    setShoppingItems(aggregateShoppingList({ meals }, household?.staples_on_hand || ''))
+    setShoppingItems(aggregateShoppingList({ meals }, household?.staples_on_hand || '', { shoppingDay }))
   }, [mealPlan, household])
 
   const memberOptions = useMemo(() => members.map((member, index) => ({ id: member.id || `member-${index}`, label: member.name || member.label || `Member ${index + 1}` })), [members])
@@ -228,6 +230,25 @@ export function PlannerPage() {
     setViewMode('day')
   }
 
+  const handleChangeShoppingDay = async (nextDay) => {
+    setShoppingDay(nextDay)
+    if (!household?.id) return
+    try {
+      const activeSlots = Object.values(slotState).filter((slot) => slot.active && slot.attendees?.length > 0)
+      await saveSchedule({
+        householdId: household.id,
+        shoppingDay: nextDay,
+        weekNotes,
+        slots: activeSlots,
+        validMemberIds: memberOptions.map((member) => member.id),
+      })
+      const nextMeals = mealPlan?.draft_plan?.meals || mealPlan?.plan?.meals || []
+      setShoppingItems(aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '', { shoppingDay: nextDay }))
+    } catch (error) {
+      toast.error(error?.message || 'Could not save shopping day.')
+    }
+  }
+
   const handleOpenAddMeal = (day, mealSlot = 'dinner', existingMealId = null, startOnGenerate = false) => {
     if (startOnGenerate) {
       const dayTargetDate = day?.date ? toIsoLocalDate(day.date) : toIsoLocalDate(new Date(selectedDate))
@@ -259,7 +280,7 @@ export function PlannerPage() {
     }
 
     try {
-      const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '')
+      const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '', { shoppingDay })
       setShoppingItems(items)
       if (household?.id) {
         await upsertShoppingListForDate({
@@ -427,7 +448,7 @@ export function PlannerPage() {
           : m
       )
       await persistPlan({ ...(mealPlan.draft_plan || {}), meals: nextMeals })
-      const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '')
+      const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '', { shoppingDay })
       setShoppingItems(items)
       if (household?.id) {
         await upsertShoppingListForDate({
@@ -452,7 +473,7 @@ export function PlannerPage() {
           : m
       )
       await persistPlan({ ...(mealPlan.draft_plan || {}), meals: nextMeals })
-      const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '')
+      const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '', { shoppingDay })
       setShoppingItems(items)
       if (household?.id) {
         await upsertShoppingListForDate({
@@ -482,7 +503,7 @@ export function PlannerPage() {
       try {
         const result = await swapMeal(meal, '')
         const resultMeals = result?.draft_plan?.meals || result?.plan?.meals || []
-        const items = aggregateShoppingList({ meals: resultMeals.map((m) => normalizeMealRecord(m)) }, household?.staples_on_hand || '')
+        const items = aggregateShoppingList({ meals: resultMeals.map((m) => normalizeMealRecord(m)) }, household?.staples_on_hand || '', { shoppingDay })
         setShoppingItems(items)
         if (household?.id) {
           await upsertShoppingListForDate({
@@ -516,7 +537,7 @@ export function PlannerPage() {
       setSaving(true)
       try {
         await persistPlan(nextPlan)
-        const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '')
+        const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '', { shoppingDay })
         setShoppingItems(items)
         if (household?.id) {
           await upsertShoppingListForDate({
@@ -552,7 +573,7 @@ export function PlannerPage() {
       setSaving(true)
       try {
         await persistPlan(nextPlan)
-        const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '')
+        const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '', { shoppingDay })
         setShoppingItems(items)
         if (household?.id) {
           await upsertShoppingListForDate({
@@ -581,7 +602,7 @@ export function PlannerPage() {
       setSaving(true)
       try {
         await persistPlan(nextPlan)
-        const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '')
+        const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '', { shoppingDay })
         setShoppingItems(items)
         if (household?.id) {
           await upsertShoppingListForDate({
@@ -640,7 +661,7 @@ export function PlannerPage() {
       const nextPlan = { ...(mealPlan.draft_plan || {}), meals: nextMeals }
       await persistPlan(nextPlan)
 
-      const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '')
+      const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '', { shoppingDay })
       setShoppingItems(items)
       if (household?.id) {
         await upsertShoppingListForDate({
@@ -689,7 +710,7 @@ export function PlannerPage() {
         setReviewMeal(normalizeMealRecord(newMeal))
       }
 
-      const items = aggregateShoppingList({ meals: resultMeals.map((m) => normalizeMealRecord(m)) }, household?.staples_on_hand || '')
+      const items = aggregateShoppingList({ meals: resultMeals.map((m) => normalizeMealRecord(m)) }, household?.staples_on_hand || '', { shoppingDay })
       setShoppingItems(items)
       if (household?.id) {
         await upsertShoppingListForDate({
@@ -735,9 +756,34 @@ export function PlannerPage() {
 
         {members.length === 0 ? <div className="mt-3 text-sm text-ink-secondary">Meal generation stays disabled until you add at least one household member.</div> : <div className="mt-3 text-sm text-ink-secondary">Generate meals one slot at a time from each day card, or add meals manually.</div>}
 
+        <div className="mt-4 rounded-2xl border border-surface-muted bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold text-ink-primary">Shopping day</div>
+              <div className="text-sm text-ink-secondary">Your grocery list covers meals from this shopping day until the next one, so future meals stay out until they’re relevant.</div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {SHOPPING_DAY_OPTIONS.map((day) => {
+                const active = shoppingDay === day
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => handleChangeShoppingDay(day)}
+                    className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors duration-150 ${active ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200' : 'border border-surface-muted bg-surface-card text-ink-secondary hover:bg-stone-100'}`}
+                  >
+                    {day}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
         {loading ? <ScheduleSkeleton /> : (
           <MealPlanWorkspace
             meals={planMeals}
+            shoppingDay={shoppingDay}
             selectedDate={selectedDate}
             viewMode={viewMode}
             onChangeViewMode={(newMode) => {
@@ -924,7 +970,7 @@ export function PlannerPage() {
               })
             }
 
-            const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '')
+            const items = aggregateShoppingList({ meals: nextMeals }, household?.staples_on_hand || '', { shoppingDay })
             setShoppingItems(items)
             await upsertShoppingListForDate({
               userId: household.user_id,
