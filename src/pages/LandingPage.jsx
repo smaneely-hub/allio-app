@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import { LogoText } from '../components/Logo'
 
 export function LandingPage() {
   const scrollToHowItWorks = () => {
@@ -13,7 +12,16 @@ export function LandingPage() {
     <div className="min-h-screen bg-bg-primary font-body text-text-primary">
       <header className="w-full border-b border-border bg-bg-primary/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <LogoText size="md" />
+          <Link to="/" className="inline-flex items-center gap-2">
+            <img
+              src="/allio-icon-mark.jpg"
+              alt="Allio"
+              className="h-12 w-auto shrink-0 rounded-2xl"
+            />
+            <span className="font-display text-2xl leading-none text-text-primary">
+              Allio<span className="text-primary-400">.</span><span className="font-body font-normal">life</span>
+            </span>
+          </Link>
           <Link to="/login" className="text-sm font-medium text-text-secondary transition-colors hover:text-text-primary">
             Log in
           </Link>
