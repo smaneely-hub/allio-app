@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Logo, LogoText } from '../components/Logo'
+import { LogoText } from '../components/Logo'
 
 export function LandingPage() {
   const scrollToHowItWorks = () => {
@@ -13,7 +13,7 @@ export function LandingPage() {
     <div className="min-h-screen bg-bg-primary font-body text-text-primary">
       <header className="w-full border-b border-border bg-bg-primary/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <Logo size="md" />
+          <LogoText size="md" />
           <Link to="/login" className="text-sm font-medium text-text-secondary transition-colors hover:text-text-primary">
             Log in
           </Link>
