@@ -13,6 +13,7 @@ const DAY_SHORT = {
 const DAY_FROM_SHORT = Object.fromEntries(Object.entries(DAY_SHORT).map(([full, short]) => [short, full]))
 
 export const MEAL_SLOTS = ['breakfast', 'lunch', 'dinner', 'snack']
+export const SHOPPING_EVENT_TYPE = 'shopping'
 
 export function getStartOfWeek(date = new Date()) {
   const next = new Date(date)
@@ -179,6 +180,34 @@ function flattenMealDirections(recipe) {
 }
 
 export function normalizeMeal(meal = {}, weekStart = getStartOfWeek()) {
+  if (meal?.event_type === SHOPPING_EVENT_TYPE) {
+    const existingDate = meal?.date ? parseIsoLocalDate(meal.date) : null
+    const mealDate = existingDate && !Number.isNaN(existingDate.getTime()) ? existingDate : weekStart
+    if (existingDate) existingDate.setHours(0, 0, 0, 0)
+    const dayName = normalizeDayName(mealDate.toLocaleDateString('en-US', { weekday: 'long' }))
+    return {
+      ...meal,
+      id: meal.id || `${formatIsoLocalDate(mealDate)}-shopping`,
+      event_type: SHOPPING_EVENT_TYPE,
+      day: DAY_SHORT[dayName],
+      day_name: dayName,
+      date: formatIsoLocalDate(mealDate),
+      meal: SHOPPING_EVENT_TYPE,
+      slot: SHOPPING_EVENT_TYPE,
+      title: meal.title || meal.name || 'Shopping day',
+      name: meal.name || meal.title || 'Shopping day',
+      notes: meal.notes || '',
+      recurring: Boolean(meal.recurring),
+      recurrence: meal.recurrence || { type: 'none' },
+      isGenerated: false,
+      calories: 0,
+      nutrition: { carbs: 0, fat: 0, protein: 0 },
+      items: [],
+      ingredients: [],
+      directions: [],
+    }
+  }
+
   const slot = normalizeMealSlotName(meal.meal || meal.meal_type || meal.slot || '')
   const existingDate = meal?.date ? parseIsoLocalDate(meal.date) : null
   const hasStoredDate = existingDate && !Number.isNaN(existingDate.getTime())
@@ -285,6 +314,7 @@ export function buildPlannerDays({ start = new Date(), count = 7, meals = [], da
       }
     })
 
+    const shopping = mealsForDay.find((meal) => meal.event_type === SHOPPING_EVENT_TYPE) || null
     const totalCalories = mealsForDay.reduce((sum, meal) => sum + getMealCalories(meal), 0)
     const nutrition = mealsForDay.reduce(
       (acc, meal) => ({
@@ -306,6 +336,7 @@ export function buildPlannerDays({ start = new Date(), count = 7, meals = [], da
       notes: dayNotes?.[short] || dayNotes?.[dayName] || '',
       mealGroups,
       meals: mealsForDay,
+      shopping,
       totalCalories,
       nutrition,
       plannedMealSlots: mealGroups.filter((group) => group.meals.length > 0).length,
@@ -473,6 +504,16 @@ export function expandRecurringMeals(meals, windowStart, count) {
     }
   }
   return result
+}
+
+export function getNextShoppingOccurrence(shoppingEvents = [], referenceDate = new Date()) {
+  const base = new Date(referenceDate)
+  base.setHours(0, 0, 0, 0)
+  const dated = expandRecurringMeals(shoppingEvents, base, 60)
+    .map((event) => ({ ...event, parsedDate: parseIsoLocalDate(event?.date) }))
+    .filter((event) => event.parsedDate && event.parsedDate >= base)
+    .sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime())
+  return dated[0] || null
 }
 
 export { DAY_ORDER, DAY_SHORT }

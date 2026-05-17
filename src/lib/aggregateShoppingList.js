@@ -1,4 +1,4 @@
-import { expandRecurringMeals, getStartOfWeek, parseIsoLocalDate } from './planner'
+import { expandRecurringMeals, getNextShoppingOccurrence, getStartOfWeek, parseIsoLocalDate, SHOPPING_EVENT_TYPE } from './planner'
 import { buildGroupedShoppingItems, CATEGORY_LABELS, CATEGORY_ORDER, groupItemsByCategory } from './shoppingListUtils'
 
 const DAY_TO_INDEX = {
@@ -16,9 +16,21 @@ function normalizeShoppingDay(value = 'Sunday') {
   return DAY_TO_INDEX[key] != null ? key : 'sunday'
 }
 
-function getShoppingWindow({ referenceDate = new Date(), shoppingDay = 'Sunday', nextShoppingDate = null } = {}) {
+function getShoppingWindow({ referenceDate = new Date(), shoppingDay = 'Sunday', nextShoppingDate = null, shoppingEvents = [] } = {}) {
   const base = new Date(referenceDate)
   base.setHours(0, 0, 0, 0)
+
+  const nextShoppingEvent = getNextShoppingOccurrence(shoppingEvents, base)
+  if (nextShoppingEvent?.date) {
+    const explicitDate = parseIsoLocalDate(nextShoppingEvent.date)
+    if (explicitDate) {
+      explicitDate.setHours(0, 0, 0, 0)
+      const windowStart = new Date(base)
+      const windowEnd = new Date(explicitDate)
+      windowEnd.setDate(windowEnd.getDate() + 1)
+      return { windowStart, windowEnd, nextShoppingEvent }
+    }
+  }
 
   if (nextShoppingDate) {
     const explicitDate = parseIsoLocalDate(nextShoppingDate)
@@ -44,9 +56,10 @@ function getShoppingWindow({ referenceDate = new Date(), shoppingDay = 'Sunday',
   return { windowStart, windowEnd }
 }
 
-export function filterMealsForShoppingWindow(meals = [], { shoppingDay = 'Sunday', nextShoppingDate = null, referenceDate = new Date() } = {}) {
-  const { windowStart, windowEnd } = getShoppingWindow({ shoppingDay, nextShoppingDate, referenceDate })
+export function filterMealsForShoppingWindow(meals = [], { shoppingDay = 'Sunday', nextShoppingDate = null, shoppingEvents = [], referenceDate = new Date() } = {}) {
+  const { windowStart, windowEnd } = getShoppingWindow({ shoppingDay, nextShoppingDate, shoppingEvents, referenceDate })
   return (meals || []).filter((meal) => {
+    if (meal?.event_type === SHOPPING_EVENT_TYPE) return false
     const date = parseIsoLocalDate(meal?.date)
     if (!date) return true
     return date >= windowStart && date < windowEnd
@@ -55,16 +68,18 @@ export function filterMealsForShoppingWindow(meals = [], { shoppingDay = 'Sunday
 
 export function aggregateShoppingList(mealPlan, staplesOnHand = '', options = {}) {
   const meals = mealPlan?.meals || mealPlan || []
+  const shoppingEvents = meals.filter((meal) => meal?.event_type === SHOPPING_EVENT_TYPE)
   const datedMeals = meals
     .map((meal) => parseIsoLocalDate(meal?.date))
     .filter(Boolean)
     .sort((a, b) => a.getTime() - b.getTime())
   const windowAnchor = datedMeals[0] || new Date()
   const expandedMeals = expandRecurringMeals(meals, getStartOfWeek(windowAnchor), 7)
-  const windowedMeals = (options?.shoppingDay || options?.nextShoppingDate)
+  const windowedMeals = (options?.shoppingDay || options?.nextShoppingDate || shoppingEvents.length)
     ? filterMealsForShoppingWindow(expandedMeals, {
         shoppingDay: options.shoppingDay,
         nextShoppingDate: options.nextShoppingDate,
+        shoppingEvents,
         referenceDate: options.referenceDate || new Date(),
       })
     : expandedMeals

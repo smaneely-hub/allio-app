@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { addDays, buildPlannerDays, expandRecurringMeals, formatIsoLocalDate, getStartOfWeek, MEAL_SLOTS, DAY_SHORT } from '../../lib/planner'
+import { addDays, buildPlannerDays, expandRecurringMeals, formatIsoLocalDate, getStartOfWeek, MEAL_SLOTS, DAY_SHORT, SHOPPING_EVENT_TYPE } from '../../lib/planner'
 import { MealCard } from './MealCard'
 
 function ChevronLeftIcon(props) {
@@ -113,11 +113,7 @@ const SLOT_DOT_COLOR = {
   snack: 'bg-stone-400',
 }
 
-function shoppingDayKeyFromDate(date) {
-  return date.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
-}
-
-function MonthView({ selectedDate, meals, onSelectDay, shoppingDay = null }) {
+function MonthView({ selectedDate, meals, onSelectDay, shoppingEventsByDate = {} }) {
   const today = useMemo(() => {
     const t = new Date()
     t.setHours(0, 0, 0, 0)
@@ -167,7 +163,7 @@ function MonthView({ selectedDate, meals, onSelectDay, shoppingDay = null }) {
               const isToday = date.toDateString() === today.toDateString()
               const dateStr = formatIsoLocalDate(date)
               const filledSlots = mealCoverage[dateStr] || new Set()
-              const isShoppingDay = shoppingDay && shoppingDayKeyFromDate(date) === String(shoppingDay).toLowerCase()
+              const isShoppingDay = Boolean(shoppingEventsByDate[dateStr])
 
               return (
                 <button
@@ -240,9 +236,9 @@ function SlotGroup({ slotGroup, day, onOpenAddMeal, onOpenMealActions, onOpenMea
   )
 }
 
-function DaySection({ day, expanded, onToggle, collapsible, onOpenMeal, onOpenDayActions, onOpenMealActions, onOpenAddMeal, generatingSlotKey, showHeaderActions = true, shoppingDay = null }) {
+function DaySection({ day, expanded, onToggle, collapsible, onOpenMeal, onOpenDayActions, onOpenMealActions, onOpenAddMeal, generatingSlotKey, showHeaderActions = true, shopping = null, shoppingSelected = false, onToggleShoppingDay, onOpenShoppingRecurrence }) {
   const isToday = day.date.toDateString() === new Date().toDateString()
-  const isShoppingDay = shoppingDay && day.dayName.toLowerCase() === String(shoppingDay).toLowerCase()
+  const isShoppingDay = Boolean(shopping)
 
   return (
     <section className={`relative rounded-2xl bg-white px-3 py-2 ${isShoppingDay ? 'ring-1 ring-emerald-200 bg-emerald-50/40' : ''}`}>
@@ -259,6 +255,27 @@ function DaySection({ day, expanded, onToggle, collapsible, onOpenMeal, onOpenDa
               {isShoppingDay ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Shopping day</span> : null}
             </div>
             <div className="text-sm text-ink-secondary">{day.dateLabel}</div>
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-emerald-900">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="shopping-day"
+                  checked={shoppingSelected}
+                  onChange={() => onToggleShoppingDay?.(day)}
+                  className="accent-emerald-600"
+                />
+                <span>Shop this day</span>
+              </label>
+              {isShoppingDay ? (
+                <button
+                  type="button"
+                  onClick={() => onOpenShoppingRecurrence?.(shopping, day)}
+                  className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-emerald-800 ring-1 ring-emerald-200 hover:bg-emerald-100"
+                >
+                  Repeat…
+                </button>
+              ) : null}
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <DonutMacro nutrition={day.nutrition} />
@@ -302,60 +319,6 @@ function DaySection({ day, expanded, onToggle, collapsible, onOpenMeal, onOpenDa
         </div>
       ) : null}
     </section>
-  )
-}
-
-function ShoppingDayStrip({ shoppingDay, nextShoppingDate, onSelectShoppingDay, onSelectNextShoppingDate }) {
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-  const hasOverride = Boolean(nextShoppingDate)
-  return (
-    <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3">
-      <div className="flex items-center gap-2 text-emerald-900">
-        <CalendarCheckIcon className="h-4 w-4" />
-        <div className="text-sm font-semibold">Shopping cadence</div>
-      </div>
-      <div className="mt-1 text-sm text-emerald-800">
-        {hasOverride
-          ? <>Current grocery window runs through <strong>{nextShoppingDate}</strong>, then falls back to your regular <strong>{shoppingDay}</strong> shopping day.</>
-          : <>Current grocery window runs from <strong>{shoppingDay}</strong> to the day before your next {shoppingDay.toLowerCase()}.</>}
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {days.map((day) => {
-          const active = day === shoppingDay
-          return (
-            <button
-              key={day}
-              type="button"
-              onClick={() => onSelectShoppingDay(day)}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${active ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-emerald-900 ring-1 ring-emerald-200 hover:bg-emerald-100'}`}
-            >
-              {day}
-            </button>
-          )
-        })}
-      </div>
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <label className="text-sm font-medium text-emerald-900" htmlFor="next-shopping-date">Next shopping date</label>
-        <div className="flex items-center gap-2">
-          <input
-            id="next-shopping-date"
-            type="date"
-            value={nextShoppingDate || ''}
-            onChange={(event) => onSelectNextShoppingDate?.(event.target.value)}
-            className="rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-          />
-          {hasOverride ? (
-            <button
-              type="button"
-              onClick={() => onSelectNextShoppingDate?.('')}
-              className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-emerald-900 ring-1 ring-emerald-200 hover:bg-emerald-100"
-            >
-              Clear
-            </button>
-          ) : null}
-        </div>
-      </div>
-    </div>
   )
 }
 
@@ -429,10 +392,9 @@ export function MealPlanWorkspace({
   onOpenAddMeal,
   onSelectMonthDay,
   generatingSlotKey = null,
-  shoppingDay = null,
-  nextShoppingDate = '',
-  onSelectShoppingDay,
-  onSelectNextShoppingDate,
+  shoppingEvents = [],
+  onToggleShoppingDay,
+  onOpenShoppingRecurrence,
 }) {
   const windowStart = useMemo(() => {
     const next = new Date(selectedDate)
@@ -448,6 +410,11 @@ export function MealPlanWorkspace({
 
   const [expandedDays, setExpandedDays] = useState({})
   const [animateKey, setAnimateKey] = useState(0)
+  const shoppingEventsByDate = useMemo(() => Object.fromEntries(
+    (shoppingEvents || [])
+      .filter((event) => event?.event_type === SHOPPING_EVENT_TYPE && event?.date)
+      .map((event) => [event.date, event]),
+  ), [shoppingEvents])
 
   useEffect(() => {
     setExpandedDays((current) => {
@@ -513,14 +480,6 @@ export function MealPlanWorkspace({
             </button>
           </div>
 
-          {shoppingDay && onSelectShoppingDay ? (
-            <ShoppingDayStrip
-              shoppingDay={shoppingDay}
-              nextShoppingDate={nextShoppingDate}
-              onSelectShoppingDay={onSelectShoppingDay}
-              onSelectNextShoppingDate={onSelectNextShoppingDate}
-            />
-          ) : null}
         </div>
       </div>
 
@@ -530,7 +489,7 @@ export function MealPlanWorkspace({
             <MonthView
               selectedDate={windowStart}
               meals={meals}
-              shoppingDay={shoppingDay}
+              shoppingEventsByDate={shoppingEventsByDate}
               onSelectDay={onSelectMonthDay || (() => {})}
             />
           ) : (
@@ -549,7 +508,10 @@ export function MealPlanWorkspace({
                 onOpenMealActions={onOpenMealActions}
                 onOpenAddMeal={onOpenAddMeal}
                 generatingSlotKey={generatingSlotKey}
-                shoppingDay={shoppingDay}
+                shopping={day.shopping}
+                shoppingSelected={Boolean(shoppingEventsByDate[formatIsoLocalDate(day.date)])}
+                onToggleShoppingDay={onToggleShoppingDay}
+                onOpenShoppingRecurrence={onOpenShoppingRecurrence}
               />
             ))
           )}

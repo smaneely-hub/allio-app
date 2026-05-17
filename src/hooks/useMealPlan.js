@@ -566,7 +566,7 @@ export function useMealPlan(scheduleId) {
 
   const generateAndPersistShoppingList = useCallback(async ({ household, generatedMeals }) => {
     if (!user?.id || !household?.id || !generatedMeals?.length) return []
-    const items = aggregateShoppingList({ meals: generatedMeals }, household?.staples_on_hand || '', { shoppingDay: schedule?.shopping_day || 'Sunday' })
+    const items = aggregateShoppingList({ meals: generatedMeals }, household?.staples_on_hand || '', {})
     try {
       await upsertShoppingListForDate({ userId: user.id, householdId: household.id, weekOf: new Date().toISOString().split('T')[0], items })
     } catch (listError) {

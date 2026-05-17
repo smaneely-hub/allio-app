@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { aggregateShoppingList, filterMealsForShoppingWindow } from './aggregateShoppingList.js'
+import { SHOPPING_EVENT_TYPE } from './planner.js'
 import { normalizeIngredientName } from './shoppingListUtils.js'
 
 const samplePlan = {
@@ -96,4 +97,17 @@ test('explicit next shopping date overrides weekly shopping day window', () => {
   })
   assert.equal(filtered.length, 2)
   assert.deepEqual(filtered.map((meal) => meal.name), ['Today Meal', 'Before Override Date'])
+})
+
+test('shopping events determine shopping window before weekly fallback', () => {
+  const filtered = filterMealsForShoppingWindow([
+    { name: 'Keep Me', date: '2026-05-17', ingredients: [{ item: 'Eggs', quantity: 1, unit: 'dozen' }] },
+    { name: 'Keep Me Too', date: '2026-05-19', ingredients: [{ item: 'Bread', quantity: 1, unit: 'loaf' }] },
+    { name: 'Skip Me', date: '2026-05-21', ingredients: [{ item: 'Milk', quantity: 1, unit: 'carton' }] },
+    { event_type: SHOPPING_EVENT_TYPE, name: 'Shopping day', date: '2026-05-20', recurrence: { frequency: 'none', interval: 1, byWeekday: [], endType: 'never', endDate: null, endCount: null, exdates: [] } },
+  ], {
+    referenceDate: new Date('2026-05-17T12:00:00Z'),
+    shoppingEvents: [{ event_type: SHOPPING_EVENT_TYPE, name: 'Shopping day', date: '2026-05-20', recurrence: { frequency: 'none', interval: 1, byWeekday: [], endType: 'never', endDate: null, endCount: null, exdates: [] } }],
+  })
+  assert.deepEqual(filtered.map((meal) => meal.name), ['Keep Me', 'Keep Me Too'])
 })
