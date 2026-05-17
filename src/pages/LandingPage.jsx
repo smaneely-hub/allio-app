@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { LogoText } from '../components/Logo'
 
 export function LandingPage() {
   const scrollToHowItWorks = () => {
