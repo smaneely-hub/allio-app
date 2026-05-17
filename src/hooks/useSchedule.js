@@ -118,7 +118,7 @@ export function useSchedule() {
   }, [loadSchedule])
 
   const saveSchedule = useCallback(
-    async ({ householdId, shoppingDay, weekNotes, slots: activeSlots, validMemberIds = [] }) => {
+    async ({ householdId, shoppingDay, nextShoppingDate = null, weekNotes, slots: activeSlots, validMemberIds = [] }) => {
       if (!user) throw new Error('User is required to save a schedule.')
 
       setLoading(true)
@@ -140,6 +140,7 @@ export function useSchedule() {
           household_id: householdId,
           week_start_date: getWeekStartDate(),
           shopping_day: shoppingDay,
+          next_shopping_date: nextShoppingDate || null,
           week_notes: weekNotes || '',
           status: 'draft',
         }

@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS weekly_schedules (
   household_id UUID REFERENCES households(id) ON DELETE SET NULL,
   week_start_date DATE NOT NULL,
   shopping_day TEXT DEFAULT 'Sunday',
+  next_shopping_date DATE,
   week_notes TEXT DEFAULT '',
   status TEXT DEFAULT 'draft',
   created_at TIMESTAMPTZ DEFAULT NOW(),

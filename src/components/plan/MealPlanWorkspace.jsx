@@ -305,15 +305,20 @@ function DaySection({ day, expanded, onToggle, collapsible, onOpenMeal, onOpenDa
   )
 }
 
-function ShoppingDayStrip({ shoppingDay, onSelectShoppingDay }) {
+function ShoppingDayStrip({ shoppingDay, nextShoppingDate, onSelectShoppingDay, onSelectNextShoppingDate }) {
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+  const hasOverride = Boolean(nextShoppingDate)
   return (
     <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3">
       <div className="flex items-center gap-2 text-emerald-900">
         <CalendarCheckIcon className="h-4 w-4" />
-        <div className="text-sm font-semibold">Weekly shopping day</div>
+        <div className="text-sm font-semibold">Shopping cadence</div>
       </div>
-      <div className="mt-1 text-sm text-emerald-800">Current grocery window runs from <strong>{shoppingDay}</strong> to the day before your next {shoppingDay.toLowerCase()}.</div>
+      <div className="mt-1 text-sm text-emerald-800">
+        {hasOverride
+          ? <>Current grocery window runs through <strong>{nextShoppingDate}</strong>, then falls back to your regular <strong>{shoppingDay}</strong> shopping day.</>
+          : <>Current grocery window runs from <strong>{shoppingDay}</strong> to the day before your next {shoppingDay.toLowerCase()}.</>}
+      </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {days.map((day) => {
           const active = day === shoppingDay
@@ -328,6 +333,27 @@ function ShoppingDayStrip({ shoppingDay, onSelectShoppingDay }) {
             </button>
           )
         })}
+      </div>
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <label className="text-sm font-medium text-emerald-900" htmlFor="next-shopping-date">Next shopping date</label>
+        <div className="flex items-center gap-2">
+          <input
+            id="next-shopping-date"
+            type="date"
+            value={nextShoppingDate || ''}
+            onChange={(event) => onSelectNextShoppingDate?.(event.target.value)}
+            className="rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+          />
+          {hasOverride ? (
+            <button
+              type="button"
+              onClick={() => onSelectNextShoppingDate?.('')}
+              className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-emerald-900 ring-1 ring-emerald-200 hover:bg-emerald-100"
+            >
+              Clear
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   )
@@ -404,7 +430,9 @@ export function MealPlanWorkspace({
   onSelectMonthDay,
   generatingSlotKey = null,
   shoppingDay = null,
+  nextShoppingDate = '',
   onSelectShoppingDay,
+  onSelectNextShoppingDate,
 }) {
   const windowStart = useMemo(() => {
     const next = new Date(selectedDate)
@@ -486,7 +514,12 @@ export function MealPlanWorkspace({
           </div>
 
           {shoppingDay && onSelectShoppingDay ? (
-            <ShoppingDayStrip shoppingDay={shoppingDay} onSelectShoppingDay={onSelectShoppingDay} />
+            <ShoppingDayStrip
+              shoppingDay={shoppingDay}
+              nextShoppingDate={nextShoppingDate}
+              onSelectShoppingDay={onSelectShoppingDay}
+              onSelectNextShoppingDate={onSelectNextShoppingDate}
+            />
           ) : null}
         </div>
       </div>

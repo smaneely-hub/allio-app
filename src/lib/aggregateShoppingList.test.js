@@ -83,3 +83,17 @@ test('aggregate shopping list respects shopping window option', () => {
   assert.equal(items.length, 1)
   assert.equal(items[0].name, 'eggs')
 })
+
+test('explicit next shopping date overrides weekly shopping day window', () => {
+  const filtered = filterMealsForShoppingWindow([
+    { name: 'Today Meal', date: '2026-05-17', ingredients: [{ item: 'Apples', quantity: 2, unit: 'count' }] },
+    { name: 'Before Override Date', date: '2026-05-19', ingredients: [{ item: 'Bread', quantity: 1, unit: 'loaf' }] },
+    { name: 'After Override Date', date: '2026-05-21', ingredients: [{ item: 'Milk', quantity: 1, unit: 'carton' }] },
+  ], {
+    shoppingDay: 'Sunday',
+    nextShoppingDate: '2026-05-20',
+    referenceDate: new Date('2026-05-17T12:00:00Z'),
+  })
+  assert.equal(filtered.length, 2)
+  assert.deepEqual(filtered.map((meal) => meal.name), ['Today Meal', 'Before Override Date'])
+})
