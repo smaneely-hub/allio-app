@@ -121,7 +121,7 @@ export function LoginPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex justify-center">
-            <Logo size="lg" />
+            <Logo size="lg" className="flex-col gap-3" />
           </div>
           <p className="text-text-secondary mt-2 text-sm">
             Your household, simplified.
