@@ -456,8 +456,6 @@ function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionPr
   }
 
   const [foodsInput, setFoodsInput] = useState('')
-  const [weightLogValue, setWeightLogValue] = useState('')
-  const [weightLogDate, setWeightLogDate] = useState(() => new Date().toISOString().slice(0, 10))
   useEffect(() => {
     setFoodsInput((nutritionForm.foods_to_avoid || []).join(', '))
   }, [nutritionForm.foods_to_avoid])
@@ -674,6 +672,8 @@ export function HouseholdPage() {
   const [savingMembers, setSavingMembers] = useState(false)
   const [openMemberId, setOpenMemberId] = useState(null)
   const [showAddMemberForm, setShowAddMemberForm] = useState(false)
+  const [weightLogValue, setWeightLogValue] = useState('')
+  const [weightLogDate, setWeightLogDate] = useState(() => new Date().toISOString().slice(0, 10))
 
   useEffect(() => {
     if (!members.length) {
@@ -765,6 +765,7 @@ export function HouseholdPage() {
     const valueKg = isMetric ? numeric : numeric / 2.20462
     try {
       await logWeight({ valueKg, recorded_on: recordedOn })
+      setWeightLogValue('')
       toast.success('Weight logged')
     } catch (error) {
       toast.error(error?.message || 'Could not log weight')

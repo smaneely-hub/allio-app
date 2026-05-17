@@ -333,6 +333,18 @@ export async function addItemsToShoppingList({ userId, listId = null, items = []
   const targetList = listId ? { id: listId } : await ensureDefaultShoppingList(userId)
   if (!targetList?.id) throw new Error('No shopping list available.')
 
+  const { data: accessibleList, error: accessibleListError } = await withTransientRetry('shopping_lists verify target list', () => supabase
+    .from('shopping_lists')
+    .select('id')
+    .eq('id', targetList.id)
+    .eq('user_id', userId)
+    .maybeSingle())
+
+  if (accessibleListError) throw accessibleListError
+  if (!accessibleList?.id) {
+    throw new Error('Selected shopping list is unavailable. Refresh and try again.')
+  }
+
   const existingItems = await getShoppingListItems(targetList.id)
   const uncheckedMap = new Map()
   for (const item of existingItems) {

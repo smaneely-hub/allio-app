@@ -113,16 +113,20 @@ export function ShopPage() {
     event.preventDefault()
     if (!newItemName.trim()) return
 
-    await addItem(shoppingList?.id, {
-      name: newItemName.trim(),
-      quantity: newItemQuantity.trim(),
-      category: categorizeIngredient(newItemName),
-      source: 'manual',
-    })
+    try {
+      await addItem(shoppingList?.id, {
+        name: newItemName.trim(),
+        quantity: newItemQuantity.trim(),
+        category: categorizeIngredient(newItemName),
+        source: 'manual',
+      })
 
-    setNewItemName('')
-    setNewItemQuantity('')
-    toast.success('Item added')
+      setNewItemName('')
+      setNewItemQuantity('')
+      toast.success('Item added')
+    } catch (error) {
+      toast.error(error?.message || 'Could not add item')
+    }
   }
 
   const handleCreateList = async (event) => {
@@ -435,6 +439,7 @@ export function ShopPage() {
                         <button
                           type="button"
                           onClick={() => toggleItem(item.__itemKey)}
+                          aria-label={item.checked ? `Mark ${item.name} as not purchased` : `Mark ${item.name} as purchased`}
                           className={`w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-150 ${
                             item.checked ? 'bg-green-500 border-green-500 scale-90' : 'border-warm-300'
                           }`}

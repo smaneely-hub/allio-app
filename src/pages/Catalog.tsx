@@ -37,6 +37,12 @@ function StarIcon({ filled = false }: { filled?: boolean }) {
   )
 }
 
+const CORE_MEAL_TYPE_CHIPS = [
+  { value: 'breakfast', label: 'Breakfast' },
+  { value: 'lunch', label: 'Lunch' },
+  { value: 'dinner', label: 'Dinner' },
+]
+
 type SortOption = 'newest' | 'rating' | 'favorites' | 'most_cooked' | 'az'
 
 export function Catalog() {
@@ -131,6 +137,10 @@ export function Catalog() {
 
   const cuisines = useMemo(() => Array.from(new Set(normalized.map((r: any) => r.cuisine).filter(Boolean))).sort() as string[], [normalized])
   const mealTypes = useMemo(() => Array.from(new Set(normalized.map((r: any) => r.tags?.mealType).filter(Boolean))).sort() as string[], [normalized])
+  const availableMealTypes = useMemo(() => {
+    const set = new Set(mealTypes.map((entry) => String(entry).toLowerCase()))
+    return CORE_MEAL_TYPE_CHIPS.filter((chip) => set.has(chip.value))
+  }, [mealTypes])
 
   useEffect(() => {
     window.requestAnimationFrame(() => searchRef.current?.focus())
@@ -186,6 +196,24 @@ export function Catalog() {
           />
         </div>
       </div>
+
+      {availableMealTypes.length > 0 ? (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {availableMealTypes.map((chip) => {
+            const active = mealType.toLowerCase() === chip.value
+            return (
+              <button
+                key={chip.value}
+                type="button"
+                onClick={() => setMealType(active ? '' : chip.value)}
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${active ? 'bg-primary-500 text-white' : 'border border-divider bg-white text-text-secondary hover:bg-primary-50 hover:text-text-primary'}`}
+              >
+                {chip.label}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
 
       <div className="mb-4 rounded-2xl border border-divider bg-surface-card p-3 shadow-sm">
         <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
