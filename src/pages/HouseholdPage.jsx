@@ -590,7 +590,16 @@ function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionPr
                     />
                   </div>
 
-                  {form.goal !== 'maintain' ? (
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-text-primary">Goal type</label>
+                    <SegmentControl
+                      options={NUTRITION_GOAL_OPTIONS}
+                      value={nutritionForm.goal_type || form.goal || 'maintain'}
+                      onChange={(value) => setAndSaveNutrition({ goal_type: value })}
+                    />
+                  </div>
+
+                  {(nutritionForm.goal_type || form.goal) !== 'maintain' ? (
                     <NumericInput label="Target weight" unit={isMetric ? 'kg' : 'lbs'} min={isMetric ? 30 : 66} max={isMetric ? 300 : 661} placeholder={isMetric ? '65' : '143'} {...nutritionField('target_weight_kg')} />
                   ) : null}
 
