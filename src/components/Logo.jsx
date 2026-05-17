@@ -54,3 +54,21 @@ export function LogoText({ className = '', size = 'md' }) {
     </Link>
   )
 }
+
+export function LogoMark({ className = '', size = 'md' }) {
+  const sizeClasses = {
+    sm: 'h-10',
+    md: 'h-12',
+    lg: 'h-18',
+  }
+
+  return (
+    <Link to="/" className={`inline-flex items-center ${className}`}>
+      <img
+        src="/allio-icon-mark.jpg"
+        alt="Allio"
+        className={`${sizeClasses[size]} w-auto shrink-0 rounded-2xl`}
+      />
+    </Link>
+  )
+}
