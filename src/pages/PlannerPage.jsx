@@ -19,7 +19,7 @@ import { AddMealModal } from '../components/planner/AddMealModal'
 import { RecurrencePicker } from '../components/planner/RecurrencePicker'
 import { HouseholdMembersModal } from '../components/planner/HouseholdMembersModal'
 import { aggregateShoppingList } from '../lib/aggregateShoppingList'
-import { addDays, DAY_ORDER, formatIsoLocalDate, normalizeRecurrenceRule, parseIsoLocalDate, SHOPPING_EVENT_TYPE } from '../lib/planner'
+import { addDays, formatIsoLocalDate, normalizeRecurrenceRule, parseIsoLocalDate, SHOPPING_EVENT_TYPE } from '../lib/planner'
 import { normalizeMealRecord } from '../lib/mealSchema'
 import { normalizeRecipe } from '../lib/recipeSchema'
 import { upsertShoppingListForDate } from '../lib/tonightPersistence'
@@ -31,7 +31,6 @@ function toIsoLocalDate(date) {
   return formatIsoLocalDate(date)
 }
 
-const days = DAY_ORDER
 
 async function fetchPlannerMealImage(mealName) {
   try {
@@ -65,7 +64,6 @@ const CATEGORY_EMOJI = {
   Other: '📦',
 }
 
-const SHOPPING_DAY_OPTIONS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 const PLANNER_VIEW_MODE_KEY = 'planner.viewMode'
 
