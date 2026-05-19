@@ -301,9 +301,11 @@ export function buildPlannerDays({ start = new Date(), count = 7, meals = [], da
     const dayName = normalizeDayName(date.toLocaleDateString('en-US', { weekday: 'long' }))
     const short = DAY_SHORT[dayName]
     const dayDateStr = formatIsoLocalDate(date)
-    const mealsForDay = expandedMeals.filter((meal) =>
+    const eventsForDay = expandedMeals.filter((meal) =>
       meal.date ? meal.date === dayDateStr : meal.day === short
     )
+    const shopping = eventsForDay.find((meal) => meal.event_type === SHOPPING_EVENT_TYPE) || null
+    const mealsForDay = eventsForDay.filter((meal) => meal.event_type !== SHOPPING_EVENT_TYPE)
     const mealGroups = MEAL_SLOTS.map((slot) => {
       const slotMeals = mealsForDay.filter((meal) => meal.slot === slot)
       return {
@@ -314,7 +316,6 @@ export function buildPlannerDays({ start = new Date(), count = 7, meals = [], da
       }
     })
 
-    const shopping = mealsForDay.find((meal) => meal.event_type === SHOPPING_EVENT_TYPE) || null
     const totalCalories = mealsForDay.reduce((sum, meal) => sum + getMealCalories(meal), 0)
     const nutrition = mealsForDay.reduce(
       (acc, meal) => ({

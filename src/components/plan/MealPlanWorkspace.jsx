@@ -170,8 +170,9 @@ function MonthView({ selectedDate, meals, onSelectDay, shoppingEventsByDate = {}
                   key={dayIndex}
                   type="button"
                   onClick={() => onSelectDay(date)}
-                  className={`flex cursor-pointer flex-col items-center rounded-xl py-2 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 ${isToday ? 'bg-primary-50 ring-1 ring-primary-200' : 'hover:bg-stone-50'} ${isShoppingDay ? 'border border-emerald-200 bg-emerald-50/70' : ''} ${isInMonth ? '' : 'opacity-30'}`}
+                  className={`relative flex cursor-pointer flex-col items-center rounded-xl py-2 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 ${isToday ? 'bg-primary-50 ring-1 ring-primary-200' : 'hover:bg-stone-50'} ${isShoppingDay ? 'border border-emerald-200 bg-emerald-50/70' : ''} ${isInMonth ? '' : 'opacity-30'}`}
                 >
+                  {isShoppingDay ? <span className="absolute right-1 top-1 text-[10px] text-emerald-700">✓</span> : null}
                   <span className={`text-sm leading-none ${isToday ? 'font-semibold text-primary-700' : 'font-medium text-ink-primary'}`}>
                     {date.getDate()}
                   </span>
@@ -252,7 +253,7 @@ function DaySection({ day, expanded, onToggle, collapsible, onOpenMeal, onOpenDa
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 font-display text-lg text-ink-primary">
               <span>{day.dayName}</span>
-              {isShoppingDay ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Shopping day</span> : null}
+              {isShoppingDay ? <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">✓ Shopping</span> : null}
             </div>
             <div className="text-sm text-ink-secondary">{day.dateLabel}</div>
             <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-emerald-900">
