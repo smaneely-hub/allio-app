@@ -13,6 +13,7 @@ import { MealSlotGroup } from '../components/nutrition/MealSlotGroup'
 import { EmptyState } from '../components/nutrition/EmptyState'
 import { ManualLogModal } from '../components/nutrition/ManualLogModal'
 import { FoodPickerModal } from '../components/nutrition/FoodPickerModal'
+import { NutritionTrendsSection } from '../components/nutrition/NutritionTrendsSection'
 
 const SLOT_ORDER = ['breakfast', 'lunch', 'dinner', 'snack']
 const SLOT_LABELS = {
@@ -260,6 +261,8 @@ export function NutritionPage() {
             <MealSlotGroup key={slot} title={SLOT_LABELS[slot]} items={grouped[slot] || []} onAdd={() => openFoodPicker(slot)} onAddFood={() => openFoodPicker(slot)} onEdit={openEdit} />
           ))}
         </div>
+
+        <NutritionTrendsSection userId={user?.id} />
       </div>
 
       <div className="mt-4 flex justify-end">
