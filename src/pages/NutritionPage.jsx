@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { getDailyTargets } from '../lib/nutritionTargets'
 import { addManualMealLog, addPlannedMealLog, deleteMealLog, updateMealLog } from '../lib/nutritionLogging'
+import { addNutritionLogToPlanner } from '../lib/plannerSync'
 import { formatIsoLocalDate, getStartOfWeek, normalizeDayName } from '../lib/planner'
 import { normalizeMealRecord } from '../lib/mealSchema'
 import { TodayProgressCard } from '../components/nutrition/TodayProgressCard'
@@ -157,32 +158,56 @@ export function NutritionPage() {
     if (!user?.id) return
     setSaving(true)
     try {
+      const servings = Math.max(0.5, Number(form.servings) || 1)
+      const totalCalories = Math.round(Number(form.calories || 0) * servings)
+      const totalProtein = Math.round(Number(form.protein_g || 0) * servings * 10) / 10
+      const totalCarbs = Math.round(Number(form.carbs_g || 0) * servings * 10) / 10
+      const totalFat = Math.round(Number(form.fat_g || 0) * servings * 10) / 10
+
+      let savedEntry = null
       if (editingItem) {
-        await updateMealLog(editingItem.id, {
+        savedEntry = await updateMealLog(editingItem.id, {
           meal_slot: form.meal_slot,
           log_date: form.log_date,
           entry_name: form.name,
-          calories: form.calories,
-          protein_g: form.protein_g,
-          carbs_g: form.carbs_g,
-          fat_g: form.fat_g,
+          calories: totalCalories,
+          protein_g: totalProtein,
+          carbs_g: totalCarbs,
+          fat_g: totalFat,
           notes: form.notes,
+          servings,
         })
         toast.success('Meal log updated')
       } else {
-        await addManualMealLog({
+        savedEntry = await addManualMealLog({
           user_id: user.id,
           meal_slot: form.meal_slot,
           log_date: form.log_date,
           name: form.name,
-          calories: form.calories,
-          protein_g: form.protein_g,
-          carbs_g: form.carbs_g,
-          fat_g: form.fat_g,
+          calories: totalCalories,
+          protein_g: totalProtein,
+          carbs_g: totalCarbs,
+          fat_g: totalFat,
           notes: form.notes,
+          serving_count: servings,
         })
         toast.success('Meal logged')
       }
+
+      if (form.addToPlanner && savedEntry) {
+        try {
+          const result = await addNutritionLogToPlanner({ userId: user.id, logEntry: savedEntry })
+          if (result.alreadyExists) {
+            toast('Already in your planner')
+          } else {
+            toast.success('Also added to planner')
+          }
+        } catch (plannerErr) {
+          console.error('[NutritionPage] planner sync error', plannerErr)
+          toast.error(plannerErr.message || 'Could not add to planner')
+        }
+      }
+
       setModalOpen(false)
       setEditingItem(null)
       await load()
