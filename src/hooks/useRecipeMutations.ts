@@ -95,6 +95,20 @@ export async function updateCategories(recipeId: string, categories: string[]): 
   if (error) throw error
 }
 
+function applyRecipeFilters(query: any, opts: { userId?: string; cuisine?: string; mealType?: string; category?: string; search?: string; sortBy?: string }) {
+  if (opts.userId) query = query.eq('user_id', opts.userId)
+  if (opts.cuisine) query = query.eq('cuisine', opts.cuisine)
+  if (opts.mealType) query = query.eq('meal_type', opts.mealType)
+  if (opts.category) query = query.contains('category', [opts.category])
+  if (opts.search?.trim()) query = query.ilike('title', `%${opts.search.trim()}%`)
+  if (opts.sortBy === 'az') {
+    query = query.order('title', { ascending: true })
+  } else {
+    query = query.order('created_at', { ascending: false })
+  }
+  return query
+}
+
 export async function listUserRecipes(opts: {
   userId?: string
   cuisine?: string
@@ -105,25 +119,24 @@ export async function listUserRecipes(opts: {
   sortBy?: 'newest' | 'rating' | 'favorites' | 'most_cooked' | 'az'
   search?: string
 } = {}): Promise<Recipe[]> {
-  let query = supabase
-    .from('recipes')
-    .select('*, recipe_interactions(is_favorite, rating, times_cooked, last_cooked_at)')
-    .eq('active', true)
+  let query = applyRecipeFilters(
+    supabase.from('recipes').select('*, recipe_interactions(is_favorite, rating, times_cooked, last_cooked_at)').eq('active', true),
+    opts,
+  )
 
-  if (opts.userId) query = query.eq('user_id', opts.userId)
-  if (opts.cuisine) query = query.eq('cuisine', opts.cuisine)
-  if (opts.mealType) query = query.eq('meal_type', opts.mealType)
-  if (opts.category) query = query.contains('category', [opts.category])
-  if (opts.search?.trim()) query = query.ilike('title', `%${opts.search.trim()}%`)
+  let { data, error } = await query
 
-  if (opts.sortBy === 'az') {
-    query = query.order('title', { ascending: true })
-  } else {
-    query = query.order('created_at', { ascending: false })
+  if (error) {
+    // recipe_interactions relation may not exist in prod yet — fall back to plain query
+    const isRelationMissing = String(error.message || '').includes('recipe_interactions') || (error as any).code === 'PGRST200'
+    if (!isRelationMissing) throw error
+    const fallback = await applyRecipeFilters(
+      supabase.from('recipes').select('*').eq('active', true),
+      opts,
+    )
+    if (fallback.error) throw fallback.error
+    data = fallback.data
   }
-
-  const { data, error } = await query
-  if (error) throw error
 
   let results = ((data || []) as any[]).map((row) => {
     const interaction = Array.isArray(row.recipe_interactions) ? row.recipe_interactions[0] : null

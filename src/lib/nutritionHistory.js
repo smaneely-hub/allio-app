@@ -33,13 +33,26 @@ export async function loadWeightHistory(userId, days = 30) {
 
 export async function loadWeightPrefs(userId) {
   if (!userId) return { targetWeightKg: null, isMetric: false }
-  const { data } = await supabase
+  // target_weight_kg was added in a later migration; unit_system was never a real column (it's "units")
+  const { data, error } = await supabase
     .from('user_preferences')
-    .select('target_weight_kg, unit_system')
+    .select('target_weight_kg, units')
     .eq('user_id', userId)
     .maybeSingle()
+  if (error) {
+    // target_weight_kg may not exist in prod yet; fall back to units only
+    const fallback = await supabase
+      .from('user_preferences')
+      .select('units')
+      .eq('user_id', userId)
+      .maybeSingle()
+    return {
+      targetWeightKg: null,
+      isMetric: fallback.data?.units === 'metric',
+    }
+  }
   return {
     targetWeightKg: data?.target_weight_kg ?? null,
-    isMetric: data?.unit_system === 'metric',
+    isMetric: data?.units === 'metric',
   }
 }

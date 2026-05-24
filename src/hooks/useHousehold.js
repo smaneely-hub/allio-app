@@ -252,10 +252,22 @@ export function useHousehold() {
 
         for (const member of preparedMembers.filter((m) => m.id)) {
           const { id, ...payload } = member
-          const { error: updateError } = await supabase
+          let { error: updateError } = await supabase
             .from('household_members')
             .update(payload)
             .eq('id', id)
+          if (updateError) {
+            // date_of_birth column may not exist in prod yet; retry without it
+            const isDobMissing = String(updateError.message || '').includes('date_of_birth')
+            if (isDobMissing) {
+              const { date_of_birth: _dob, ...payloadWithoutDob } = payload
+              const { error: retryError } = await supabase
+                .from('household_members')
+                .update(payloadWithoutDob)
+                .eq('id', id)
+              updateError = retryError
+            }
+          }
           if (updateError) {
             console.error('[useHousehold.saveMembers] ERROR updating member:', updateError)
             throw updateError
@@ -264,9 +276,20 @@ export function useHousehold() {
 
         const newMembers = preparedMembers.filter((m) => !m.id)
         if (newMembers.length > 0) {
-          const { error: insertError } = await supabase
+          let { error: insertError } = await supabase
             .from('household_members')
             .insert(newMembers)
+          if (insertError) {
+            // date_of_birth column may not exist in prod yet; retry without it
+            const isDobMissing = String(insertError.message || '').includes('date_of_birth')
+            if (isDobMissing) {
+              const membersWithoutDob = newMembers.map(({ date_of_birth: _dob, ...m }) => m)
+              const { error: retryError } = await supabase
+                .from('household_members')
+                .insert(membersWithoutDob)
+              insertError = retryError
+            }
+          }
           if (insertError) {
             console.error('[useHousehold.saveMembers] ERROR inserting members:', insertError)
             throw insertError
