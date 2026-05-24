@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { normalizeRecipe } from '../lib/recipeSchema'
 import { markCooked, rateRecipe, toggleFavorite } from '../hooks/useRecipeMutations'
 import { formatIngredientAmount } from '../utils/formatFractions'
+import { CookingMode } from './CookingMode'
 
 function HeartIcon({ filled = false }) {
   return (
@@ -79,11 +81,12 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
     substitutions: meal?.substitutions ?? meal?.substitutions_json,
     tips: meal?.tips ?? meal?.tips_json,
     nutrition: meal?.nutrition ?? meal?.nutrition_json,
-    tags: meal?.recipeTags ?? meal?.tags_v2_json,
+    tags: meal?.recipeTags ?? meal?.tags ?? meal?.tags_v2_json,
     sourceNote: meal?.sourceNote ?? meal?.source_note,
     imagePrompt: meal?.imagePrompt ?? meal?.image_prompt,
   }), [meal])
 
+  const [cookingMode, setCookingMode] = useState(false)
   const [isFavorite, setIsFavorite] = useState(Boolean(meal?.is_favorite ?? meal?.isFavorite))
   const [rating, setRating] = useState(meal?.rating ?? null)
   const [lastCookedAt, setLastCookedAt] = useState(meal?.last_cooked_at || meal?.cooked_at || meal?.cookedAt || '')
@@ -111,6 +114,12 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
 
   return (
     <div className="min-h-screen bg-bg-soft text-text-primary">
+      {cookingMode ? createPortal(
+        <div className="fixed inset-0 z-[200] bg-bg-soft">
+          <CookingMode meal={recipe} onExit={() => setCookingMode(false)} />
+        </div>,
+        document.body,
+      ) : null}
       <div className="sticky top-0 z-20 border-b border-divider bg-bg-soft/90 px-4 py-3 backdrop-blur-sm">
         <div className="mx-auto flex max-w-2xl items-center justify-between">
           <button type="button" onClick={onClose} className="text-sm font-semibold text-text-primary">← Back</button>
@@ -167,6 +176,13 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
           ) : null}
 
           <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => setCookingMode(true)}
+              className="rounded-full bg-primary-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-600"
+            >
+              Cook this recipe
+            </button>
             <button
               type="button"
               onClick={async () => {

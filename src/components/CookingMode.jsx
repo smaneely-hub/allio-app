@@ -55,14 +55,14 @@ export function CookingMode({ meal, onExit }) {
   const recipe = useMemo(() => normalizeRecipe({
     ...meal,
     title: meal?.title || meal?.name,
-    prepTime: meal?.prep_time_minutes,
-    cookTime: meal?.cook_time_minutes,
-    totalTime: meal?.total_time_minutes,
+    prepTime: meal?.prepTime ?? meal?.prep_time_minutes,
+    cookTime: meal?.cookTime ?? meal?.cook_time_minutes,
+    totalTime: meal?.totalTime ?? meal?.total_time_minutes,
     ingredientGroups: meal?.ingredientGroups,
     instructionGroups: meal?.instructionGroups,
     substitutions: meal?.substitutions,
     nutrition: meal?.nutrition,
-    tags: meal?.recipeTags,
+    tags: meal?.tags ?? meal?.recipeTags,
     sourceNote: meal?.sourceNote,
   }), [meal])
 
