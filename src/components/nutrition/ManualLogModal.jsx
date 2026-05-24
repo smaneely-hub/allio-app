@@ -19,7 +19,7 @@ function totalValue(perServing, servings) {
   return Math.round(v * s * 10) / 10
 }
 
-export function ManualLogModal({ open, initialSlot = 'breakfast', item, onClose, onSave, onDelete, saving }) {
+export function ManualLogModal({ open, initialSlot = 'breakfast', initialName = '', item, onClose, onSave, onDelete, saving }) {
   const [form, setForm] = useState(DEFAULT_FORM)
 
   useEffect(() => {
@@ -41,9 +41,9 @@ export function ManualLogModal({ open, initialSlot = 'breakfast', item, onClose,
         addToPlanner: false,
       })
     } else {
-      setForm({ ...DEFAULT_FORM, meal_slot: initialSlot, log_date: new Date().toISOString().slice(0, 10) })
+      setForm({ ...DEFAULT_FORM, meal_slot: initialSlot, log_date: new Date().toISOString().slice(0, 10), name: initialName || '' })
     }
-  }, [open, item, initialSlot])
+  }, [open, item, initialSlot, initialName])
 
   if (!open) return null
 
