@@ -323,14 +323,16 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
           ) : null}
 
           {recipe.nutrition ? (
-            <CollapsibleSection title="Nutrition (per serving)" expanded={sections.nutrition} onToggle={() => toggleSection('nutrition')}>
+            <CollapsibleSection title={`Nutrition${recipe.nutrition.estimated ? ' (estimated)' : ''} (per serving)`} expanded={sections.nutrition} onToggle={() => toggleSection('nutrition')}>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-2xl bg-warm-100 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Calories</div><div className="mt-1 text-lg font-semibold text-text-primary">{recipe.nutrition.calories || '—'}</div></div>
                 <div className="rounded-2xl bg-warm-100 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Protein</div><div className="mt-1 text-lg font-semibold text-text-primary">{recipe.nutrition.protein || '—'}</div></div>
                 <div className="rounded-2xl bg-warm-100 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Carbs</div><div className="mt-1 text-lg font-semibold text-text-primary">{recipe.nutrition.carbs || '—'}</div></div>
                 <div className="rounded-2xl bg-warm-100 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Fat</div><div className="mt-1 text-lg font-semibold text-text-primary">{recipe.nutrition.fat || '—'}</div></div>
               </div>
-              <p className="mt-3 text-xs text-text-muted">Approximate values</p>
+              <p className="mt-3 text-xs text-text-muted">
+                {recipe.nutrition.estimated ? 'AI-estimated values — actual nutrition may vary.' : 'Approximate values'}
+              </p>
             </CollapsibleSection>
           ) : null}
         </div>

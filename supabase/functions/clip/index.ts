@@ -21,6 +21,7 @@ const UNIT_WORDS = new Set([
 ])
 
 type RecipeIngredient = { amount: string, unit: string, item: string }
+type NutritionInfo = { calories: number, protein: string, carbs: string, fat: string, estimated?: boolean }
 type NormalizedRecipe = {
   title: string,
   description: string,
@@ -33,6 +34,7 @@ type NormalizedRecipe = {
   image_url: string | null,
   source_url: string,
   source_domain: string,
+  nutrition: NutritionInfo | null,
 }
 
 function decodeHtmlEntities(text: string): string {
@@ -194,6 +196,7 @@ function mapJsonLdToRecipe(node: Record<string, unknown>, sourceUrl: string): No
     image_url: firstImageUrl(node.image),
     source_url: sourceUrl,
     source_domain: sourceDomain,
+    nutrition: parseJsonLdNutrition(node),
   }
 }
 
@@ -241,6 +244,7 @@ function mapLlmRecipeToNormalized(parsed: Record<string, unknown>, sourceUrl: st
     image_url: null,
     source_url: sourceUrl,
     source_domain: sourceDomain,
+    nutrition: null,
   }
 }
 
@@ -257,7 +261,96 @@ function buildSuccessRecipe(recipe: NormalizedRecipe) {
     source_domain: recipe.source_domain,
     ingredients: recipe.ingredients.map((ingredient) => [ingredient.amount, ingredient.unit, ingredient.item].filter(Boolean).join(' ').trim()),
     steps: recipe.instructions,
+    nutrition: recipe.nutrition ?? null,
   }
+}
+
+function parseJsonLdNutrition(node: Record<string, unknown>): NutritionInfo | null {
+  const raw = node.nutrition
+  if (!raw || typeof raw !== 'object') return null
+  const n = raw as Record<string, unknown>
+
+  const caloriesRaw = n.calories
+  const calories = typeof caloriesRaw === 'number'
+    ? caloriesRaw
+    : typeof caloriesRaw === 'string'
+      ? parseFloat(caloriesRaw.replace(/[^\d.]/g, ''))
+      : null
+  if (!calories || !Number.isFinite(calories) || calories <= 0) return null
+
+  function extractMass(val: unknown): string {
+    if (typeof val === 'string') return val.trim()
+    if (val && typeof val === 'object') {
+      const obj = val as Record<string, unknown>
+      if (typeof obj.value === 'string') return obj.value.trim()
+      if (typeof obj.value === 'number') return `${Math.round(obj.value)}g`
+    }
+    return ''
+  }
+
+  return {
+    calories: Math.round(calories),
+    protein: extractMass(n.proteinContent),
+    carbs: extractMass(n.carbohydrateContent),
+    fat: extractMass(n.fatContent),
+  }
+}
+
+async function estimateNutrition(
+  ingredients: string[],
+  servings: number | null,
+): Promise<NutritionInfo | null> {
+  if (!OPENROUTER_API_KEY || ingredients.length === 0) return null
+  const servingCount = servings && servings > 0 ? servings : 4
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content: 'Estimate per-serving macros for a recipe. Return ONLY valid JSON: {"calories":number,"protein":"Xg","carbs":"Xg","fat":"Xg"}. Round calories to nearest 5, macros to nearest gram.',
+          },
+          {
+            role: 'user',
+            content: `Servings: ${servingCount}\nIngredients:\n${ingredients.join('\n')}`,
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!response.ok) return null
+    const json = await response.json()
+    const content = json.choices?.[0]?.message?.content || '{}'
+    const parsed = JSON.parse(content)
+    const calories = typeof parsed.calories === 'number' ? parsed.calories : parseInt(String(parsed.calories), 10)
+    if (!calories || !Number.isFinite(calories) || calories <= 0) return null
+    return {
+      calories: Math.round(calories),
+      protein: typeof parsed.protein === 'string' ? parsed.protein : `${Math.round(Number(parsed.protein) || 0)}g`,
+      carbs: typeof parsed.carbs === 'string' ? parsed.carbs : `${Math.round(Number(parsed.carbs) || 0)}g`,
+      fat: typeof parsed.fat === 'string' ? parsed.fat : `${Math.round(Number(parsed.fat) || 0)}g`,
+      estimated: true,
+    }
+  } catch {
+    return null
+  }
+}
+
+async function addEstimatedNutrition(recipe: NormalizedRecipe): Promise<NormalizedRecipe> {
+  if (recipe.nutrition) return recipe
+  const ingredientStrings = recipe.ingredients.map(
+    (ing) => [ing.amount, ing.unit, ing.item].filter(Boolean).join(' ').trim(),
+  )
+  const nutrition = await estimateNutrition(ingredientStrings, recipe.servings)
+  if (nutrition) console.log('[clip] Nutrition estimated via LLM')
+  return { ...recipe, nutrition }
 }
 
 async function tryJsonLdFromHtml(html: string, sourceUrl: string): Promise<NormalizedRecipe | null> {
@@ -379,7 +472,8 @@ serve(async (req) => {
           const recipe = await tryJsonLdFromHtml(directHtml, url)
           if (recipe) {
             console.log('[clip] Step 1 succeeded: direct fetch JSON-LD')
-            return new Response(JSON.stringify({ recipe: buildSuccessRecipe(recipe) }), { status: 200, headers: corsHeaders })
+            const enriched = await addEstimatedNutrition(recipe)
+            return new Response(JSON.stringify({ recipe: buildSuccessRecipe(enriched) }), { status: 200, headers: corsHeaders })
           }
           console.log('[clip] Step 1 found no Recipe JSON-LD')
         } else {
@@ -395,7 +489,8 @@ serve(async (req) => {
           const recipe = await tryJsonLdFromHtml(jinaHtml, url)
           if (recipe) {
             console.log('[clip] Step 2 succeeded: Jina HTML JSON-LD')
-            return new Response(JSON.stringify({ recipe: buildSuccessRecipe(recipe) }), { status: 200, headers: corsHeaders })
+            const enriched = await addEstimatedNutrition(recipe)
+            return new Response(JSON.stringify({ recipe: buildSuccessRecipe(enriched) }), { status: 200, headers: corsHeaders })
           }
           console.log('[clip] Step 2 found no Recipe JSON-LD')
         } else {
@@ -411,7 +506,8 @@ serve(async (req) => {
           const recipe = await extractWithLlm(jinaMarkdown, url)
           if (recipe) {
             console.log('[clip] Step 3 succeeded: Jina markdown + LLM extraction')
-            return new Response(JSON.stringify({ recipe: buildSuccessRecipe(recipe) }), { status: 200, headers: corsHeaders })
+            const enriched = await addEstimatedNutrition(recipe)
+            return new Response(JSON.stringify({ recipe: buildSuccessRecipe(enriched) }), { status: 200, headers: corsHeaders })
           }
           console.warn('[clip] Step 3 returned no recipe')
         } else {

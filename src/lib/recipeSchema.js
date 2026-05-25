@@ -232,6 +232,7 @@ export function normalizeRecipe(recipe = {}) {
           fat: asString(recipe.nutrition.fat, ''),
           fiber: typeof recipe.nutrition.fiber === 'string' ? recipe.nutrition.fiber : undefined,
           sodium: typeof recipe.nutrition.sodium === 'string' ? recipe.nutrition.sodium : undefined,
+          estimated: Boolean(recipe.nutrition.estimated),
         }
       : undefined,
     sourceNote: typeof recipe.sourceNote === 'string' ? recipe.sourceNote : undefined,

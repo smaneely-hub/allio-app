@@ -66,6 +66,7 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
       steps_text: (initialRecipe.instructionGroups || []).flatMap((group) =>
         (group.steps || []).map((step) => step.text).filter(Boolean),
       ).join('\n'),
+      nutrition: initialRecipe.nutrition || null,
     })
   }, [initialRecipe])
 
@@ -101,6 +102,7 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
         source_domain: r.source_domain || '',
         ingredients_text: (r.ingredients || []).join('\n'),
         steps_text: (r.steps || []).join('\n'),
+        nutrition: r.nutrition || null,
       })
       setStep('preview')
       setIsFromImport(true)
@@ -164,6 +166,7 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
       image_url: formState.image_url || null,
       active: true,
       difficulty: 'medium',
+      ...(formState.nutrition ? { nutrition_json: formState.nutrition } : {}),
     }
   }
 
@@ -195,6 +198,7 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
         source_url: row.source_url,
         source_domain: row.source_domain,
         image_url: row.image_url,
+        ...(row.nutrition_json ? { nutrition_json: row.nutrition_json } : {}),
       })
       return
     }
