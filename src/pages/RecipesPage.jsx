@@ -27,21 +27,41 @@ export function RecipesPage() {
       return
     }
 
-    const { data } = await supabase
+    const PLAIN_SELECT = `
+      id, user_id, title, slug, description, cuisine, meal_type,
+      prep_time_minutes, cook_time_minutes, total_time_minutes, servings,
+      yield_text, difficulty, ingredients_json, instructions_json,
+      ingredient_groups_json, instruction_groups_json, nutrition_json,
+      tips_json, substitutions_json, tags_json, tags_v2_json,
+      source_note, source_domain, source_url, image_prompt,
+      created_at, updated_at, active, is_favorite, cooked_at, image_url, category
+    `
+
+    let { data, error } = await supabase
       .from('recipes')
-      .select(`
-        id, user_id, title, slug, description, cuisine, meal_type,
-        prep_time_minutes, cook_time_minutes, total_time_minutes, servings,
-        yield_text, difficulty, ingredients_json, instructions_json,
-        ingredient_groups_json, instruction_groups_json, nutrition_json,
-        tips_json, substitutions_json, tags_json, tags_v2_json,
-        source_note, source_domain, source_url, image_prompt,
-        created_at, updated_at, active, is_favorite, cooked_at, image_url, category,
-        recipe_interactions(is_favorite, rating, times_cooked, last_cooked_at)
-      `)
+      .select(PLAIN_SELECT + `, recipe_interactions(is_favorite, rating, times_cooked, last_cooked_at)`)
       .eq('active', true)
       .eq('user_id', user.id)
       .order('title', { ascending: true })
+
+    if (error) {
+      const isRelationMissing = String(error.message || '').includes('recipe_interactions') || error.code === 'PGRST200'
+      if (!isRelationMissing) {
+        setLoading(false)
+        return
+      }
+      const fallback = await supabase
+        .from('recipes')
+        .select(PLAIN_SELECT)
+        .eq('active', true)
+        .eq('user_id', user.id)
+        .order('title', { ascending: true })
+      if (fallback.error) {
+        setLoading(false)
+        return
+      }
+      data = fallback.data
+    }
 
     const rows = (data || []).map((row) => {
       const interaction = Array.isArray(row.recipe_interactions) ? row.recipe_interactions[0] : null
