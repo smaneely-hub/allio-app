@@ -1,4 +1,5 @@
 import { formatIngredientAmount } from '../utils/formatFractions'
+import { decodeHtmlEntities as dec } from '../utils/decodeHtml'
 
 function asArray(value) {
   return Array.isArray(value) ? value : []
@@ -79,14 +80,14 @@ function normalizeIngredientGroup(group, fallbackLabel = undefined) {
     return {
       amount: formatIngredientAmount(asString(ingredient?.amount ?? ingredient?.quantity, '')),
       unit: asString(ingredient?.unit, ''),
-      item: asString(ingredient?.item ?? ingredient?.name, ''),
-      note: typeof ingredient?.note === 'string' ? ingredient.note : undefined,
+      item: dec(asString(ingredient?.item ?? ingredient?.name, '')),
+      note: typeof ingredient?.note === 'string' ? dec(ingredient.note) : undefined,
       optional: Boolean(ingredient?.optional),
     }
   }).filter((ingredient) => ingredient.item)
 
   return {
-    label: typeof group?.label === 'string' && group.label.trim() ? group.label.trim() : fallbackLabel,
+    label: typeof group?.label === 'string' && group.label.trim() ? dec(group.label.trim()) : fallbackLabel,
     ingredients,
   }
 }
@@ -94,17 +95,17 @@ function normalizeIngredientGroup(group, fallbackLabel = undefined) {
 function normalizeInstructionGroup(group, fallbackLabel = undefined) {
   const steps = asArray(group?.steps).map((step) => {
     if (typeof step === 'string') {
-      return { text: step, tip: undefined }
+      return { text: dec(step), tip: undefined }
     }
 
     return {
-      text: asString(step?.text, ''),
-      tip: typeof step?.tip === 'string' ? step.tip : undefined,
+      text: dec(asString(step?.text, '')),
+      tip: typeof step?.tip === 'string' ? dec(step.tip) : undefined,
     }
   }).filter((step) => step.text)
 
   return {
-    label: typeof group?.label === 'string' && group.label.trim() ? group.label.trim() : fallbackLabel,
+    label: typeof group?.label === 'string' && group.label.trim() ? dec(group.label.trim()) : fallbackLabel,
     steps,
   }
 }
@@ -200,9 +201,9 @@ export function normalizeRecipe(recipe = {}) {
 
   return {
     id: asString(recipe.id, ''),
-    title: asString(recipe.title ?? recipe.name, 'Generated recipe'),
+    title: dec(asString(recipe.title ?? recipe.name, 'Generated recipe')),
     slug: asString(recipe.slug, ''),
-    description: asString(recipe.description, ''),
+    description: dec(asString(recipe.description, '')),
     cuisine: asString(recipe.cuisine, ''),
     yield: asString(recipe.yield, recipe.servings ? `${recipe.servings} servings` : ''),
     prepTime,
@@ -211,11 +212,11 @@ export function normalizeRecipe(recipe = {}) {
     difficulty: ['easy', 'medium', 'advanced'].includes(recipe.difficulty) ? recipe.difficulty : 'medium',
     ingredientGroups: ingredientGroups.filter((group) => group.ingredients.length > 0),
     instructionGroups: instructionGroups.filter((group) => group.steps.length > 0),
-    tips: asArray(recipe.tips).filter((tip) => typeof tip === 'string'),
+    tips: asArray(recipe.tips).filter((tip) => typeof tip === 'string').map(dec),
     substitutions: asArray(recipe.substitutions).map((substitution) => ({
-      original: asString(substitution?.original, ''),
-      substitute: asString(substitution?.substitute, ''),
-      note: typeof substitution?.note === 'string' ? substitution.note : undefined,
+      original: dec(asString(substitution?.original, '')),
+      substitute: dec(asString(substitution?.substitute, '')),
+      note: typeof substitution?.note === 'string' ? dec(substitution.note) : undefined,
     })).filter((substitution) => substitution.original && substitution.substitute),
     tags: {
       cuisine: asString(tags.cuisine, ''),
