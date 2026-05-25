@@ -460,6 +460,20 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
                 />
               </div>
 
+              <div>
+                <label className="mb-1 block text-sm font-medium text-text-primary">
+                  Source URL{' '}
+                  <span className="font-normal text-text-muted">(optional)</span>
+                </label>
+                <input
+                  type="url"
+                  value={form.source_url}
+                  onChange={(e) => set('source_url', e.target.value)}
+                  placeholder="https://..."
+                  className="w-full rounded-xl border border-divider bg-white px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary-400"
+                />
+              </div>
+
               {error && <p className="text-sm text-red-500">{error}</p>}
 
               <div className="flex gap-2 pb-2">
