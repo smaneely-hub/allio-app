@@ -35,6 +35,17 @@ type NormalizedRecipe = {
   source_domain: string,
 }
 
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+}
+
 function parseIsoDurationMinutes(iso: string | undefined | null): number | null {
   if (!iso || typeof iso !== 'string') return null
   const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?/i)
@@ -98,14 +109,14 @@ function parseIngredient(raw: string): RecipeIngredient {
 
 function flattenInstructions(input: unknown): string[] {
   if (typeof input === 'string') {
-    return input.split('\n').map((step) => step.trim()).filter(Boolean)
+    return input.split('\n').map((step) => decodeHtmlEntities(step.trim())).filter(Boolean)
   }
   if (!Array.isArray(input)) return []
 
   const steps: string[] = []
   for (const entry of input) {
     if (typeof entry === 'string') {
-      if (entry.trim()) steps.push(entry.trim())
+      if (entry.trim()) steps.push(decodeHtmlEntities(entry.trim()))
       continue
     }
     if (!entry || typeof entry !== 'object') continue
@@ -115,8 +126,8 @@ function flattenInstructions(input: unknown): string[] {
       steps.push(...flattenInstructions(node.itemListElement))
       continue
     }
-    const text = typeof node.text === 'string' ? node.text.trim() : ''
-    const name = typeof node.name === 'string' ? node.name.trim() : ''
+    const text = typeof node.text === 'string' ? decodeHtmlEntities(node.text.trim()) : ''
+    const name = typeof node.name === 'string' ? decodeHtmlEntities(node.name.trim()) : ''
     if (text) steps.push(text)
     else if (name) steps.push(name)
   }
@@ -154,11 +165,11 @@ function listRecipeNodesFromHtml(html: string): Record<string, unknown>[] {
 }
 
 function mapJsonLdToRecipe(node: Record<string, unknown>, sourceUrl: string): NormalizedRecipe | null {
-  const title = typeof node.name === 'string' ? node.name.trim() : ''
+  const title = typeof node.name === 'string' ? decodeHtmlEntities(node.name.trim()) : ''
   if (!title) return null
 
   const rawIngredients = Array.isArray(node.recipeIngredient)
-    ? (node.recipeIngredient as unknown[]).map((value) => String(value).trim()).filter(Boolean)
+    ? (node.recipeIngredient as unknown[]).map((value) => decodeHtmlEntities(String(value).trim())).filter(Boolean)
     : []
   if (rawIngredients.length === 0) return null
 
@@ -173,7 +184,7 @@ function mapJsonLdToRecipe(node: Record<string, unknown>, sourceUrl: string): No
 
   return {
     title,
-    description: typeof node.description === 'string' ? node.description.trim() : '',
+    description: typeof node.description === 'string' ? decodeHtmlEntities(node.description.trim()) : '',
     ingredients: rawIngredients.map(parseIngredient),
     instructions,
     prep_time_minutes: prepTime,
