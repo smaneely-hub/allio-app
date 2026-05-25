@@ -23,11 +23,55 @@ export async function addMetricLog({ user_id, metric_type, value, recorded_on, n
     source,
     updated_at: new Date().toISOString(),
   }
-  const { data, error } = await supabase
+
+  const attemptUpsert = async () => supabase
     .from('health_metric_logs')
     .upsert(payload, { onConflict: 'user_id,metric_type,recorded_on' })
     .select('*')
     .single()
+
+  let { data, error } = await attemptUpsert()
+
+  const conflictTargetMissing = String(error?.message || '').includes('there is no unique or exclusion constraint matching the ON CONFLICT specification')
+    || String(error?.message || '').includes('health_metric_logs_user_metric_date_key')
+    || error?.code === '42P10'
+
+  if (conflictTargetMissing) {
+    const { data: existing, error: selectError } = await supabase
+      .from('health_metric_logs')
+      .select('id')
+      .eq('user_id', user_id)
+      .eq('metric_type', metric_type)
+      .eq('recorded_on', recorded_on)
+      .maybeSingle()
+
+    if (selectError) throw selectError
+
+    if (existing?.id) {
+      const updateResult = await supabase
+        .from('health_metric_logs')
+        .update({
+          value: Number(value),
+          notes,
+          source,
+          updated_at: payload.updated_at,
+        })
+        .eq('id', existing.id)
+        .select('*')
+        .single()
+      data = updateResult.data
+      error = updateResult.error
+    } else {
+      const insertResult = await supabase
+        .from('health_metric_logs')
+        .insert(payload)
+        .select('*')
+        .single()
+      data = insertResult.data
+      error = insertResult.error
+    }
+  }
+
   if (error) throw error
   return data
 }
