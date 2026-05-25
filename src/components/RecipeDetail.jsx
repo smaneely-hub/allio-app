@@ -110,7 +110,7 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
   const toggleSection = (key) => setSections((current) => ({ ...current, [key]: !current[key] }))
   const toggleIngredient = (key) => setCheckedIngredients((current) => ({ ...current, [key]: !current[key] }))
 
-  async function handleEstimateNutrition() {
+  async function handleEstimateNutrition({ silent = false } = {}) {
     if (!recipe.id || isEstimatingNutrition) return
     setIsEstimatingNutrition(true)
     try {
@@ -118,11 +118,13 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
       if (result) {
         setNutrition(result)
         setSections((prev) => ({ ...prev, nutrition: true }))
-        toast.success('Nutrition generated')
+        if (!silent) toast.success('Nutrition generated')
         onSaved?.()
-      } else {
+      } else if (!silent) {
         toast.error('Could not generate nutrition')
       }
+    } catch {
+      if (!silent) toast.error('Could not generate nutrition')
     } finally {
       setIsEstimatingNutrition(false)
     }
@@ -130,7 +132,7 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
 
   // Auto-estimate nutrition on first load if missing (catalog recipes only)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (!recipe.nutrition && recipe.id) handleEstimateNutrition() }, [])
+  useEffect(() => { if (!recipe.nutrition && recipe.id) handleEstimateNutrition({ silent: true }) }, [])
 
   const tagPills = [
     recipe.tags.cuisine,
@@ -423,7 +425,7 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
               ) : (
                 <button
                   type="button"
-                  onClick={handleEstimateNutrition}
+                  onClick={() => handleEstimateNutrition()}
                   className="mt-3 rounded-full border border-divider bg-surface-card px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-warm-100"
                 >
                   Generate nutrition
