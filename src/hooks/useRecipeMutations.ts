@@ -90,6 +90,22 @@ export async function updateRecipe(recipeId: string, payload: Record<string, unk
   if (error) throw error
 }
 
+export type NutritionInfo = {
+  calories: number
+  protein: string
+  carbs: string
+  fat: string
+  estimated?: boolean
+}
+
+export async function estimateRecipeNutrition(recipeId: string): Promise<NutritionInfo | null> {
+  const { data, error } = await supabase.functions.invoke('estimate-recipe-nutrition', {
+    body: { recipeId },
+  })
+  if (error || !data?.nutrition) return null
+  return data.nutrition as NutritionInfo
+}
+
 export async function updateCategories(recipeId: string, categories: string[]): Promise<void> {
   const { error } = await supabase.from('recipes').update({ category: categories }).eq('id', recipeId)
   if (error) throw error

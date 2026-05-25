@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { normalizeRecipe } from '../lib/recipeSchema'
-import { markCooked, rateRecipe, toggleFavorite } from '../hooks/useRecipeMutations'
+import { estimateRecipeNutrition, markCooked, rateRecipe, toggleFavorite } from '../hooks/useRecipeMutations'
 import { formatIngredientAmount } from '../utils/formatFractions'
 import { CookingMode } from './CookingMode'
 
@@ -92,6 +92,8 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
   const [lastCookedAt, setLastCookedAt] = useState(meal?.last_cooked_at || meal?.cooked_at || meal?.cookedAt || '')
   const [timesCooked, setTimesCooked] = useState(meal?.times_cooked ?? 0)
   const [ratingFocus, setRatingFocus] = useState(false)
+  const [nutrition, setNutrition] = useState(recipe.nutrition ?? null)
+  const [isEstimatingNutrition, setIsEstimatingNutrition] = useState(false)
   const [sections, setSections] = useState({
     ingredients: true,
     instructions: true,
@@ -103,6 +105,24 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
 
   const toggleSection = (key) => setSections((current) => ({ ...current, [key]: !current[key] }))
   const toggleIngredient = (key) => setCheckedIngredients((current) => ({ ...current, [key]: !current[key] }))
+
+  async function handleEstimateNutrition() {
+    if (!recipe.id || isEstimatingNutrition) return
+    setIsEstimatingNutrition(true)
+    try {
+      const result = await estimateRecipeNutrition(recipe.id)
+      if (result) {
+        setNutrition(result)
+        setSections((prev) => ({ ...prev, nutrition: true }))
+      }
+    } finally {
+      setIsEstimatingNutrition(false)
+    }
+  }
+
+  // Auto-estimate nutrition on first load if missing (catalog recipes only)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!recipe.nutrition && recipe.id) handleEstimateNutrition() }, [])
 
   const tagPills = [
     recipe.tags.cuisine,
@@ -322,18 +342,33 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
             </CollapsibleSection>
           ) : null}
 
-          {recipe.nutrition ? (
-            <CollapsibleSection title={`Nutrition${recipe.nutrition.estimated ? ' (estimated)' : ''} (per serving)`} expanded={sections.nutrition} onToggle={() => toggleSection('nutrition')}>
+          {nutrition ? (
+            <CollapsibleSection title={`Nutrition${nutrition.estimated ? ' (estimated)' : ''} (per serving)`} expanded={sections.nutrition} onToggle={() => toggleSection('nutrition')}>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-2xl bg-warm-100 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Calories</div><div className="mt-1 text-lg font-semibold text-text-primary">{recipe.nutrition.calories || '—'}</div></div>
-                <div className="rounded-2xl bg-warm-100 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Protein</div><div className="mt-1 text-lg font-semibold text-text-primary">{recipe.nutrition.protein || '—'}</div></div>
-                <div className="rounded-2xl bg-warm-100 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Carbs</div><div className="mt-1 text-lg font-semibold text-text-primary">{recipe.nutrition.carbs || '—'}</div></div>
-                <div className="rounded-2xl bg-warm-100 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Fat</div><div className="mt-1 text-lg font-semibold text-text-primary">{recipe.nutrition.fat || '—'}</div></div>
+                <div className="rounded-2xl bg-warm-100 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Calories</div><div className="mt-1 text-lg font-semibold text-text-primary">{nutrition.calories || '—'}</div></div>
+                <div className="rounded-2xl bg-warm-100 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Protein</div><div className="mt-1 text-lg font-semibold text-text-primary">{nutrition.protein || '—'}</div></div>
+                <div className="rounded-2xl bg-warm-100 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Carbs</div><div className="mt-1 text-lg font-semibold text-text-primary">{nutrition.carbs || '—'}</div></div>
+                <div className="rounded-2xl bg-warm-100 px-4 py-3"><div className="text-xs uppercase tracking-wide text-text-muted">Fat</div><div className="mt-1 text-lg font-semibold text-text-primary">{nutrition.fat || '—'}</div></div>
               </div>
               <p className="mt-3 text-xs text-text-muted">
-                {recipe.nutrition.estimated ? 'AI-estimated values — actual nutrition may vary.' : 'Approximate values'}
+                {nutrition.estimated ? 'AI-estimated values — actual nutrition may vary.' : 'Approximate values'}
               </p>
             </CollapsibleSection>
+          ) : recipe.id ? (
+            <section className="rounded-[24px] border border-divider bg-surface-card px-5 py-4 shadow-sm">
+              <h3 className="font-display text-xl text-text-primary">Nutrition (per serving)</h3>
+              {isEstimatingNutrition ? (
+                <p className="mt-2 text-sm text-text-muted">Estimating nutrition…</p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleEstimateNutrition}
+                  className="mt-3 rounded-full border border-divider bg-surface-card px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-warm-100"
+                >
+                  Generate nutrition
+                </button>
+              )}
+            </section>
           ) : null}
         </div>
       </div>
