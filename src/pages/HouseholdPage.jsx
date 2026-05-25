@@ -28,8 +28,8 @@ const SEX_OPTIONS = [
   { value: 'other', label: 'Other / prefer not to say' },
 ]
 
-const DIETARY_OPTIONS = ['vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'halal', 'kosher']
-const ALLERGY_OPTIONS = ['peanut', 'tree nut', 'egg', 'dairy', 'soy', 'shellfish', 'sesame']
+const DIETARY_OPTIONS = ['none', 'vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'halal', 'kosher', 'other']
+const ALLERGY_OPTIONS = ['none', 'peanut', 'tree nut', 'egg', 'dairy', 'soy', 'shellfish', 'sesame', 'other']
 
 function getIsMetric() {
   return typeof window !== 'undefined' && localStorage.getItem('allio-unit-preference') === 'metric'
@@ -121,6 +121,29 @@ function ChipGroup({ options, values, onToggle }) {
   )
 }
 
+function SelectWithOther({ label, options, value, otherValue, onChange, onOtherChange, otherPlaceholder }) {
+  const showOther = value === 'other'
+  return (
+    <div>
+      <label className="mb-2 block text-sm font-medium text-text-primary">{label}</label>
+      <select className="input w-full" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((option) => (
+          <option key={option} value={option}>{option === 'none' ? 'None' : option === 'other' ? 'Other' : option}</option>
+        ))}
+      </select>
+      {showOther ? (
+        <input
+          type="text"
+          className="input mt-2 w-full"
+          value={otherValue}
+          onChange={(e) => onOtherChange(e.target.value)}
+          placeholder={otherPlaceholder}
+        />
+      ) : null}
+    </div>
+  )
+}
+
 const NUTRITION_GOAL_OPTIONS = [
   { value: 'lose', label: 'Lose' },
   { value: 'maintain', label: 'Maintain' },
@@ -186,8 +209,10 @@ function SegmentControl({ options, value, onChange, className = '' }) {
 
 
 function normalizeMember(form, fallbackLabel) {
-  const dietary = Array.isArray(form.dietary_restrictions) ? form.dietary_restrictions : []
-  const allergies = Array.isArray(form.allergies) ? form.allergies : []
+  const dietaryRaw = Array.isArray(form.dietary_restrictions) ? form.dietary_restrictions : ['none']
+  const allergiesRaw = Array.isArray(form.allergies) ? form.allergies : ['none']
+  const dietary = dietaryRaw[0] === 'other' ? [String(form.dietary_other || '').trim()].filter(Boolean) : (dietaryRaw[0] === 'none' ? [] : dietaryRaw)
+  const allergies = allergiesRaw[0] === 'other' ? [String(form.allergy_other || '').trim()].filter(Boolean) : (allergiesRaw[0] === 'none' ? [] : allergiesRaw)
   return {
     name: String(form.name || '').trim(),
     label: String(form.name || form.label || fallbackLabel).trim(),
@@ -219,8 +244,10 @@ function EmptyMemberForm() {
     weight_lbs: '',
     activity_level: 'moderate',
     goal: 'maintain',
-    dietary_restrictions: [],
-    allergies: [],
+    dietary_restrictions: ['none'],
+    allergies: ['none'],
+    dietary_other: '',
+    allergy_other: '',
   }
 }
 
@@ -233,10 +260,15 @@ function MemberForm({ title, submitLabel, initialMember, onSubmit, saving }) {
       ...EmptyMemberForm(),
       ...m,
       age: m.date_of_birth ? calculateAgeFromBirthDate(m.date_of_birth) : (m.age ?? ''),
+      date_of_birth: m.date_of_birth || '',
       height_inches: inchesToDisplay(m.height_inches, isMetric),
       height_feet: splitHeight.feet,
       height_only_inches: splitHeight.inches,
       weight_lbs: lbsToDisplay(m.weight_lbs, isMetric),
+      dietary_restrictions: Array.isArray(m.dietary_restrictions) && m.dietary_restrictions.length ? (DIETARY_OPTIONS.includes(m.dietary_restrictions[0]) ? m.dietary_restrictions : ['other']) : ['none'],
+      allergies: Array.isArray(m.allergies) && m.allergies.length ? (ALLERGY_OPTIONS.includes(m.allergies[0]) ? m.allergies : ['other']) : ['none'],
+      dietary_other: Array.isArray(m.dietary_restrictions) && m.dietary_restrictions.length && !DIETARY_OPTIONS.includes(m.dietary_restrictions[0]) ? m.dietary_restrictions[0] : '',
+      allergy_other: Array.isArray(m.allergies) && m.allergies.length && !ALLERGY_OPTIONS.includes(m.allergies[0]) ? m.allergies[0] : '',
     }
   }
 
@@ -245,18 +277,6 @@ function MemberForm({ title, submitLabel, initialMember, onSubmit, saving }) {
   useEffect(() => {
     setForm(memberToDisplay(initialMember))
   }, [initialMember])
-
-  const toggleArrayValue = (field, value) => {
-    setForm((current) => {
-      const existing = current[field] || []
-      return {
-        ...current,
-        [field]: existing.includes(value)
-          ? existing.filter((entry) => entry !== value)
-          : [...existing, value],
-      }
-    })
-  }
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -321,14 +341,26 @@ function MemberForm({ title, submitLabel, initialMember, onSubmit, saving }) {
         </div>
       </div>
 
-      <div className="mt-5">
-        <label className="mb-2 block text-sm font-medium text-text-primary">Dietary restrictions</label>
-        <ChipGroup options={DIETARY_OPTIONS} values={form.dietary_restrictions} onToggle={(value) => toggleArrayValue('dietary_restrictions', value)} />
-      </div>
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <SelectWithOther
+          label="Dietary restrictions"
+          options={DIETARY_OPTIONS}
+          value={form.dietary_restrictions?.[0] || 'none'}
+          otherValue={form.dietary_other || ''}
+          onChange={(value) => setForm((current) => ({ ...current, dietary_restrictions: [value], dietary_other: value === 'other' ? current.dietary_other : '' }))}
+          onOtherChange={(value) => setForm((current) => ({ ...current, dietary_other: value }))}
+          otherPlaceholder="Enter dietary restriction"
+        />
 
-      <div className="mt-5">
-        <label className="mb-2 block text-sm font-medium text-text-primary">Allergies</label>
-        <ChipGroup options={ALLERGY_OPTIONS} values={form.allergies} onToggle={(value) => toggleArrayValue('allergies', value)} />
+        <SelectWithOther
+          label="Allergies"
+          options={ALLERGY_OPTIONS}
+          value={form.allergies?.[0] || 'none'}
+          otherValue={form.allergy_other || ''}
+          onChange={(value) => setForm((current) => ({ ...current, allergies: [value], allergy_other: value === 'other' ? current.allergy_other : '' }))}
+          onOtherChange={(value) => setForm((current) => ({ ...current, allergy_other: value }))}
+          otherPlaceholder="Enter allergy"
+        />
       </div>
 
       <div className="mt-5 flex justify-end">
@@ -356,8 +388,10 @@ function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionPr
       weight_lbs: lbsToDisplay(m.weight_lbs, isMetric),
       activity_level: m.activity_level || 'moderate',
       goal: m.goal || 'maintain',
-      dietary_restrictions: Array.isArray(m.dietary_restrictions) ? m.dietary_restrictions : [],
-      allergies: Array.isArray(m.allergies) ? m.allergies : (Array.isArray(m.food_preferences) ? m.food_preferences : []),
+      dietary_restrictions: Array.isArray(m.dietary_restrictions) && m.dietary_restrictions.length ? (DIETARY_OPTIONS.includes(m.dietary_restrictions[0]) ? m.dietary_restrictions : ['other']) : ['none'],
+      allergies: Array.isArray(m.allergies) && m.allergies.length ? (ALLERGY_OPTIONS.includes(m.allergies[0]) ? m.allergies : ['other']) : ['none'],
+      dietary_other: Array.isArray(m.dietary_restrictions) && m.dietary_restrictions.length && !DIETARY_OPTIONS.includes(m.dietary_restrictions[0]) ? m.dietary_restrictions[0] : '',
+      allergy_other: Array.isArray(m.allergies) && m.allergies.length && !ALLERGY_OPTIONS.includes(m.allergies[0]) ? m.allergies[0] : '',
     }
   }
 
@@ -394,18 +428,6 @@ function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionPr
       nutrition_mode: nutritionProfile?.nutrition_mode || 'auto',
     })
   }, [nutritionProfile, member.goal, isMetric])
-
-  const toggleArrayValue = (field, value) => {
-    setForm((current) => {
-      const existing = current[field] || []
-      return {
-        ...current,
-        [field]: existing.includes(value)
-          ? existing.filter((entry) => entry !== value)
-          : [...existing, value],
-      }
-    })
-  }
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -556,14 +578,26 @@ function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionPr
             </div>
           </div>
 
-          <div className="mt-5">
-            <label className="mb-2 block text-sm font-medium text-text-primary">Dietary restrictions</label>
-            <ChipGroup options={DIETARY_OPTIONS} values={form.dietary_restrictions} onToggle={(value) => toggleArrayValue('dietary_restrictions', value)} />
-          </div>
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <SelectWithOther
+              label="Dietary restrictions"
+              options={DIETARY_OPTIONS}
+              value={form.dietary_restrictions?.[0] || 'none'}
+              otherValue={form.dietary_other || ''}
+              onChange={(value) => setForm((current) => ({ ...current, dietary_restrictions: [value], dietary_other: value === 'other' ? current.dietary_other : '' }))}
+              onOtherChange={(value) => setForm((current) => ({ ...current, dietary_other: value }))}
+              otherPlaceholder="Enter dietary restriction"
+            />
 
-          <div className="mt-5">
-            <label className="mb-2 block text-sm font-medium text-text-primary">Allergies</label>
-            <ChipGroup options={ALLERGY_OPTIONS} values={form.allergies} onToggle={(value) => toggleArrayValue('allergies', value)} />
+            <SelectWithOther
+              label="Allergies"
+              options={ALLERGY_OPTIONS}
+              value={form.allergies?.[0] || 'none'}
+              otherValue={form.allergy_other || ''}
+              onChange={(value) => setForm((current) => ({ ...current, allergies: [value], allergy_other: value === 'other' ? current.allergy_other : '' }))}
+              onOtherChange={(value) => setForm((current) => ({ ...current, allergy_other: value }))}
+              otherPlaceholder="Enter allergy"
+            />
           </div>
 
           {isPrimaryProfileMember ? (

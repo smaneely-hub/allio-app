@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import toast from 'react-hot-toast'
 import { normalizeRecipe } from '../lib/recipeSchema'
-import { estimateRecipeNutrition, markCooked, rateRecipe, toggleFavorite } from '../hooks/useRecipeMutations'
+import { deleteRecipe, estimateRecipeNutrition, markCooked, rateRecipe, toggleFavorite } from '../hooks/useRecipeMutations'
 import { formatIngredientAmount } from '../utils/formatFractions'
 import { CookingMode } from './CookingMode'
+import { ClipRecipeModal } from './ClipRecipeModal'
 
 function HeartIcon({ filled = false }) {
   return (
@@ -88,6 +89,8 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
   }), [meal])
 
   const [cookingMode, setCookingMode] = useState(false)
+  const [editingRecipe, setEditingRecipe] = useState(false)
+  const [deletingRecipe, setDeletingRecipe] = useState(false)
   const [isFavorite, setIsFavorite] = useState(Boolean(meal?.is_favorite ?? meal?.isFavorite))
   const [rating, setRating] = useState(meal?.rating ?? null)
   const [lastCookedAt, setLastCookedAt] = useState(meal?.last_cooked_at || meal?.cooked_at || meal?.cookedAt || '')
@@ -115,6 +118,10 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
       if (result) {
         setNutrition(result)
         setSections((prev) => ({ ...prev, nutrition: true }))
+        toast.success('Nutrition generated')
+        onSaved?.()
+      } else {
+        toast.error('Could not generate nutrition')
       }
     } finally {
       setIsEstimatingNutrition(false)
@@ -150,6 +157,16 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
       </div>
 
       <div className="mx-auto max-w-2xl px-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] pt-5">
+        {editingRecipe ? (
+          <ClipRecipeModal
+            initialRecipe={{ ...meal, ...recipe, nutrition: nutrition || recipe.nutrition }}
+            onClose={() => setEditingRecipe(false)}
+            onSaved={() => {
+              setEditingRecipe(false)
+              onSaved?.()
+            }}
+          />
+        ) : null}
         <header className="rounded-[28px] bg-surface-card px-5 py-5 shadow-lg">
           {recipe.imageUrl ? (
             <div className="mb-4 overflow-hidden rounded-2xl">
@@ -219,7 +236,45 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
             >
               {lastCookedAt ? 'Cooked again' : 'I cooked this'}
             </button>
+            <button
+              type="button"
+              onClick={() => setEditingRecipe(true)}
+              className="rounded-full border border-divider bg-surface-card px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-warm-100"
+            >
+              Edit recipe
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                if (!recipe.id || deletingRecipe) return
+                if (!window.confirm(`Remove "${recipe.title}" from your recipes?`)) return
+                setDeletingRecipe(true)
+                try {
+                  await deleteRecipe(recipe.id)
+                  toast.success('Recipe removed')
+                  onSaved?.()
+                  onClose?.()
+                } catch {
+                  toast.error('Could not remove recipe — try again')
+                } finally {
+                  setDeletingRecipe(false)
+                }
+              }}
+              className="rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100 disabled:opacity-50"
+              disabled={deletingRecipe}
+            >
+              {deletingRecipe ? 'Removing…' : 'Delete recipe'}
+            </button>
           </div>
+
+          {meal?.source_url ? (
+            <div className="mt-4 text-sm text-text-secondary">
+              Source:{' '}
+              <a href={meal.source_url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary-600 underline break-all">
+                {meal.source_domain || meal.source_url}
+              </a>
+            </div>
+          ) : null}
 
           <div className="mt-4">
               <p className="mb-1.5 text-xs font-medium text-text-muted">Your rating</p>
