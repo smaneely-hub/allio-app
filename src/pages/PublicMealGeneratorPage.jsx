@@ -278,7 +278,9 @@ export function PublicMealGeneratorPage() {
                 {mode === 'loading' ? 'Generating ideas…' : 'Generate dinner ideas'}
               </button>
               <p className="text-xs text-text-muted">
-                Preview generations left: {Math.max(0, 6 - dailyAttempts)}
+                {dailyAttempts === 0
+                  ? 'No signup needed — try up to 6 meal ideas free.'
+                  : `${Math.max(0, 6 - dailyAttempts)} free preview${Math.max(0, 6 - dailyAttempts) === 1 ? '' : 's'} remaining.`}
               </p>
             </div>
           </div>
