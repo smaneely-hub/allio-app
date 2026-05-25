@@ -42,6 +42,7 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
   const [error, setError] = useState(null)
   const [form, setForm] = useState(null)
   const [showSavePrompt, setShowSavePrompt] = useState(false)
+  const [isFromImport, setIsFromImport] = useState(false)
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
   const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -102,6 +103,7 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
         steps_text: (r.steps || []).join('\n'),
       })
       setStep('preview')
+      setIsFromImport(true)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -123,6 +125,7 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
       ingredients_text: '',
       steps_text: '',
     })
+    setIsFromImport(false)
     setStep('preview')
   }
 
@@ -241,7 +244,9 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
           />
         ) : null}
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-divider bg-surface px-4 py-3">
-          <h2 className="font-display text-lg text-text-primary">{initialRecipe ? 'Edit Recipe' : 'Add Recipe'}</h2>
+          <h2 className="font-display text-lg text-text-primary">
+            {initialRecipe ? 'Edit Recipe' : isFromImport && step === 'preview' ? 'Review Imported Recipe' : 'Add Recipe'}
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -297,24 +302,42 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
 
           {step === 'preview' && form && !showSavePrompt && (
             <div className="space-y-4">
-              <div className="rounded-xl bg-warm-100 px-3 py-2 text-xs text-text-muted">
-                {form.source_url ? (
-                  <>
-                    Imported from{' '}
-                    <a
-                      href={form.source_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline"
-                    >
-                      {form.source_domain || form.source_url}
-                    </a>
-                    {' '}· Edit any fields before saving.
-                  </>
-                ) : (
-                  <>Edit any fields before saving.</>
-                )}
-              </div>
+              {isFromImport ? (
+                <div className="space-y-3">
+                  {form.image_url && (
+                    <img
+                      src={form.image_url}
+                      alt={form.title}
+                      className="w-full h-44 object-cover rounded-xl"
+                      onError={(e) => { e.currentTarget.style.display = 'none' }}
+                    />
+                  )}
+                  <div className="flex items-start gap-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2.5 text-xs text-green-800">
+                    <span className="mt-0.5 shrink-0">✓</span>
+                    <span>
+                      Recipe imported successfully.
+                      {form.source_url ? (
+                        <>
+                          {' '}Source:{' '}
+                          <a
+                            href={form.source_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline"
+                          >
+                            {form.source_domain || form.source_url}
+                          </a>
+                        </>
+                      ) : null}
+                      {' '}Review and edit the fields below, then save.
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl bg-warm-100 px-3 py-2 text-xs text-text-muted">
+                  Fill in the fields below to add your recipe.
+                </div>
+              )}
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-text-primary">Title</label>
@@ -439,10 +462,10 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
                 {!initialRecipe ? (
                   <button
                     type="button"
-                    onClick={() => { setStep('url'); setError(null) }}
+                    onClick={() => { setStep('url'); setIsFromImport(false); setError(null) }}
                     className="btn-secondary flex-1"
                   >
-                    Back
+                    {isFromImport ? '← Try different URL' : 'Back'}
                   </button>
                 ) : null}
                 <button
@@ -451,7 +474,7 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
                   disabled={loading || !form.title?.trim()}
                   className="btn-primary flex-1"
                 >
-                  {loading ? 'Saving…' : initialRecipe ? 'Save changes' : 'Save Recipe'}
+                  {loading ? 'Saving…' : initialRecipe ? 'Save changes' : isFromImport ? 'Save to Catalog' : 'Save Recipe'}
                 </button>
               </div>
             </div>
