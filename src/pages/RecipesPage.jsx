@@ -34,7 +34,7 @@ export function RecipesPage() {
       ingredient_groups_json, instruction_groups_json, nutrition_json,
       tips_json, substitutions_json, tags_json, tags_v2_json,
       source_note, source_domain, source_url, image_prompt,
-      created_at, updated_at, active, is_favorite, cooked_at, image_url, category
+      created_at, updated_at, active, is_favorite, rating, cooked_at, image_url, category
     `
 
     let { data, error } = await supabase
@@ -68,7 +68,7 @@ export function RecipesPage() {
       return {
         ...row,
         is_favorite: interaction?.is_favorite ?? row.is_favorite ?? false,
-        rating: interaction?.rating ?? null,
+        rating: interaction?.rating ?? row.rating ?? null,
         times_cooked: interaction?.times_cooked ?? 0,
         last_cooked_at: interaction?.last_cooked_at ?? row.cooked_at ?? null,
       }
@@ -96,26 +96,32 @@ export function RecipesPage() {
   const selectedRecipe = useMemo(() => {
     if (!recipeId) return null
     return recipes
-      .map((recipeRow) => normalizeRecipe({
-        ...recipeRow,
-        yield: recipeRow.yield_text,
-        prepTime: recipeRow.prep_time_minutes,
-        cookTime: recipeRow.cook_time_minutes,
-        totalTime: recipeRow.total_time_minutes,
-        image_url: recipeRow.image_url,
-        ingredientGroups: recipeRow.ingredient_groups_json,
-        instructionGroups: recipeRow.instruction_groups_json,
-        ingredients: recipeRow.ingredients_json,
-        instructions: recipeRow.instructions_json,
-        substitutions: recipeRow.substitutions_json,
-        tags: recipeRow.tags_v2_json,
-        sourceNote: recipeRow.source_note,
-        imagePrompt: recipeRow.image_prompt,
-        is_favorite: recipeRow.is_favorite,
-        rating: recipeRow.rating,
-        times_cooked: recipeRow.times_cooked,
-        last_cooked_at: recipeRow.last_cooked_at,
-      }))
+      .map((recipeRow) => {
+        const normalized = normalizeRecipe({
+          ...recipeRow,
+          yield: recipeRow.yield_text,
+          prepTime: recipeRow.prep_time_minutes,
+          cookTime: recipeRow.cook_time_minutes,
+          totalTime: recipeRow.total_time_minutes,
+          image_url: recipeRow.image_url,
+          ingredientGroups: recipeRow.ingredient_groups_json,
+          instructionGroups: recipeRow.instruction_groups_json,
+          ingredients: recipeRow.ingredients_json,
+          instructions: recipeRow.instructions_json,
+          substitutions: recipeRow.substitutions_json,
+          tags: recipeRow.tags_v2_json,
+          sourceNote: recipeRow.source_note,
+          imagePrompt: recipeRow.image_prompt,
+          is_favorite: recipeRow.is_favorite,
+          rating: recipeRow.rating,
+        })
+        // normalizeRecipe drops times_cooked and last_cooked_at — restore them explicitly
+        return {
+          ...normalized,
+          times_cooked: recipeRow.times_cooked ?? 0,
+          last_cooked_at: recipeRow.last_cooked_at ?? null,
+        }
+      })
       .find((recipe) => String(recipe.id) === String(recipeId) || String(recipe.slug) === String(recipeId)) || null
   }, [recipeId, recipes])
 

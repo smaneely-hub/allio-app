@@ -34,6 +34,11 @@ async function getAuthUserId(): Promise<string> {
   return user.id
 }
 
+function isTableMissingError(error: any): boolean {
+  const msg = String(error?.message || '')
+  return msg.includes('recipe_interactions') || error?.code === 'PGRST200' || error?.code === '42P01'
+}
+
 export async function toggleFavorite(recipeId: string, isFavorite: boolean): Promise<void> {
   const userId = await getAuthUserId()
   const { error } = await supabase
@@ -42,7 +47,15 @@ export async function toggleFavorite(recipeId: string, isFavorite: boolean): Pro
       { user_id: userId, recipe_id: recipeId, is_favorite: isFavorite, updated_at: new Date().toISOString() },
       { onConflict: 'user_id,recipe_id' },
     )
-  if (error) throw error
+  if (error) {
+    if (!isTableMissingError(error)) throw error
+    // recipe_interactions not available — fall back to recipes table column
+    const { error: fbError } = await supabase
+      .from('recipes')
+      .update({ is_favorite: isFavorite })
+      .eq('id', recipeId)
+    if (fbError) throw fbError
+  }
 }
 
 export async function rateRecipe(recipeId: string, rating: number): Promise<void> {
@@ -53,7 +66,15 @@ export async function rateRecipe(recipeId: string, rating: number): Promise<void
       { user_id: userId, recipe_id: recipeId, rating, updated_at: new Date().toISOString() },
       { onConflict: 'user_id,recipe_id' },
     )
-  if (error) throw error
+  if (error) {
+    if (!isTableMissingError(error)) throw error
+    // recipe_interactions not available — fall back to recipes table column
+    const { error: fbError } = await supabase
+      .from('recipes')
+      .update({ rating })
+      .eq('id', recipeId)
+    if (fbError) throw fbError
+  }
 }
 
 export async function markCooked(recipeId: string): Promise<void> {

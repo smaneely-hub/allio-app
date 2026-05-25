@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import toast from 'react-hot-toast'
 import { normalizeRecipe } from '../lib/recipeSchema'
 import { estimateRecipeNutrition, markCooked, rateRecipe, toggleFavorite } from '../hooks/useRecipeMutations'
 import { formatIngredientAmount } from '../utils/formatFractions'
@@ -170,6 +171,7 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
                   await toggleFavorite(recipe.id, next)
                 } catch {
                   setIsFavorite(!next)
+                  toast.error('Could not save favorite — try again')
                 }
               }}
               className={`rounded-full border border-divider bg-surface-card p-3 shadow-sm transition ${isFavorite ? 'text-red-400' : 'text-text-muted hover:text-red-400'}`}
@@ -219,8 +221,7 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
             </button>
           </div>
 
-          {(lastCookedAt || ratingFocus) ? (
-            <div className="mt-4">
+          <div className="mt-4">
               <p className="mb-1.5 text-xs font-medium text-text-muted">Your rating</p>
               <div className="flex items-center gap-2">
                 {[1, 2, 3, 4, 5].map((value) => (
@@ -228,8 +229,14 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
                     key={value}
                     type="button"
                     onClick={async () => {
+                      const prev = rating
                       setRating(value)
-                      await rateRecipe(recipe.id, value)
+                      try {
+                        await rateRecipe(recipe.id, value)
+                      } catch {
+                        setRating(prev)
+                        toast.error('Could not save rating — try again')
+                      }
                     }}
                     className="text-amber-500"
                     aria-label={`Rate ${value} stars`}
@@ -240,7 +247,6 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
                 {rating ? <span className="ml-1 text-sm text-text-muted">{rating}/5</span> : null}
               </div>
             </div>
-          ) : null}
 
           {tagPills.length > 0 ? (
             <div className="mt-4 flex flex-wrap gap-2">
