@@ -21,8 +21,13 @@ export async function addMetricLog({ user_id, metric_type, value, recorded_on, n
     recorded_on,
     notes,
     source,
+    updated_at: new Date().toISOString(),
   }
-  const { data, error } = await supabase.from('health_metric_logs').insert(payload).select('*').single()
+  const { data, error } = await supabase
+    .from('health_metric_logs')
+    .upsert(payload, { onConflict: 'user_id,metric_type,recorded_on' })
+    .select('*')
+    .single()
   if (error) throw error
   return data
 }
