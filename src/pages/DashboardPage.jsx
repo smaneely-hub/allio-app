@@ -494,6 +494,7 @@ export function DashboardPage() {
               entries={weightHistory || []}
               targetWeightKg={nutProfile?.target_weight_kg ? Number(nutProfile.target_weight_kg) : null}
               isMetric={false}
+              defaultRangeDays={30}
             />
             {targets ? <MacroBars totals={macroTotals} targets={targets} /> : null}
           </div>

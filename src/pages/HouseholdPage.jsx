@@ -926,7 +926,7 @@ export function HouseholdPage() {
             </div>
 
             <div className="w-full lg:max-w-2xl">
-              <WeightTrendCard entries={weightHistory} targetWeightKg={nutritionProfile?.target_weight_kg} isMetric={isMetric} />
+              <WeightTrendCard entries={weightHistory} targetWeightKg={nutritionProfile?.target_weight_kg} isMetric={isMetric} defaultRangeDays={90} />
             </div>
           </div>
         </section>
