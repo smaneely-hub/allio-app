@@ -338,8 +338,77 @@ function withNormalizedRecipeShape(baseRecipe: any, nextRecipe: any) {
   }
 }
 
+function tryDirectIngredientSwap(recipe: any, feedback: string): { refined: any, changes: string[], matched: boolean } {
+  const feedbackLower = feedback.toLowerCase().trim()
+  const swapMatch = feedbackLower.match(/(?:replace|swap|use|change)\s+(?:the\s+)?(.+?)\s+(?:with|for|instead of)\s+(.+)/i)
+  if (!swapMatch) {
+    return { refined: recipe, changes: [], matched: false }
+  }
+
+  const fromRaw = swapMatch[1]?.trim()
+  const toRaw = swapMatch[2]?.trim()
+  if (!fromRaw || !toRaw) {
+    return { refined: recipe, changes: [], matched: false }
+  }
+
+  const stopWords = /^(the|some|any|my|our)\s+/i
+  const fromNeedle = fromRaw.replace(stopWords, '').trim()
+  const toValue = toRaw.replace(stopWords, '').trim()
+  if (!fromNeedle || !toValue) {
+    return { refined: recipe, changes: [], matched: false }
+  }
+
+  let replacedCount = 0
+  const escapedNeedle = fromNeedle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const ingredientRegex = new RegExp(escapedNeedle, 'ig')
+
+  const nextIngredients = (recipe.ingredients || []).map((ing: any) => {
+    const item = String(ing?.item || ing?.name || ing?.ingredient || '')
+    if (!item || !ingredientRegex.test(item)) {
+      ingredientRegex.lastIndex = 0
+      return ing
+    }
+    ingredientRegex.lastIndex = 0
+    replacedCount += 1
+    return {
+      ...ing,
+      item: item.replace(ingredientRegex, toValue),
+    }
+  })
+
+  if (replacedCount === 0) {
+    return { refined: recipe, changes: [], matched: true }
+  }
+
+  const nextInstructions = (recipe.instructions || []).map((step: string) =>
+    typeof step === 'string' ? step.replace(ingredientRegex, toValue) : step
+  )
+
+  return {
+    refined: withNormalizedRecipeShape(recipe, {
+      ingredients: nextIngredients,
+      instructions: nextInstructions,
+    }),
+    changes: [`replaced: ${fromNeedle} → ${toValue}`],
+    matched: true,
+  }
+}
+
 function applyRefinementRule(recipe: any, feedback: string): { refined: any, changes: string[], fallback: boolean } {
   const feedbackLower = feedback.toLowerCase()
+
+  const directSwap = tryDirectIngredientSwap(recipe, feedback)
+  if (directSwap.changes.length > 0) {
+    console.log('[refine-meal] Applying direct ingredient swap')
+    return {
+      refined: directSwap.refined,
+      changes: directSwap.changes,
+      fallback: false,
+    }
+  }
+  if (directSwap.matched) {
+    return { refined: recipe, changes: [], fallback: true }
+  }
   
   // Try each rule
   for (const [ruleName, rule] of Object.entries(REFINEMENT_RULES)) {
@@ -367,9 +436,9 @@ function applyRefinementRule(recipe: any, feedback: string): { refined: any, cha
 // Use LLM for complex/unsupported feedback
 async function refineWithLLM(recipe: any, feedback: string): Promise<{ refined: any, changes: string[] }> {
   if (!LLM_API_KEY) {
-    return { 
-      refined: recipe, 
-      changes: ['No LLM available for complex refinements'] 
+    return {
+      refined: recipe,
+      changes: [],
     }
   }
   
@@ -430,7 +499,7 @@ Respond with ONLY valid JSON, no other text.`
     }
   } catch (e) {
     console.error('[refine-meal] JSON parse error:', e)
-    return { refined: recipe, changes: ['LLM response parse error'] }
+    return { refined: recipe, changes: [] }
   }
 }
 
