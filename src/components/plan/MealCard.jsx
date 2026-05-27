@@ -189,8 +189,8 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
       <>
         {cookingOverlay}
         <div className="card overflow-hidden">
-          <div className="flex items-center gap-3 p-3">
-            <button type="button" onClick={toggleExpanded} className="group flex flex-1 items-center gap-3 rounded-2xl p-1 text-left transition duration-150 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 p-3">
+            <button type="button" onClick={toggleExpanded} className="group flex min-w-0 items-center gap-3 rounded-2xl p-1 text-left transition duration-150 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2">
               <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-surface-muted text-ink-secondary transition duration-150 group-hover:bg-stone-100 group-hover:scale-[1.02]">
                 <Icon className="h-6 w-6 transition-colors duration-150 group-hover:text-ink-primary" />
               </div>
@@ -211,7 +211,7 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
                 <ChevronDownIcon className={`h-4 w-4 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
               </span>
             </button>
-            <button type="button" onClick={(event) => { event.stopPropagation(); onActionsClick?.(meal) }} className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full p-2 text-ink-tertiary transition-colors duration-150 hover:bg-stone-100 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label="Meal actions">
+            <button type="button" onClick={(event) => { event.stopPropagation(); onActionsClick?.(meal) }} className="relative z-10 flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center self-center rounded-full p-2 text-ink-tertiary transition-colors duration-150 hover:bg-stone-100 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label="Meal actions">
               <MoreVerticalIcon className="h-5 w-5" />
             </button>
           </div>
@@ -226,8 +226,8 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
     <>
       {cookingOverlay}
       <div className="card overflow-hidden">
-        <div className="flex items-center gap-3 p-3">
-          <button type="button" onClick={toggleExpanded} className="group flex flex-1 items-center gap-3 rounded-2xl p-1 text-left transition duration-150 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label={`${expanded ? 'Collapse' : 'Expand'} ${mealTitle}`}>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 p-3">
+          <button type="button" onClick={toggleExpanded} className="group flex min-w-0 items-center gap-3 rounded-2xl p-1 text-left transition duration-150 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label={`${expanded ? 'Collapse' : 'Expand'} ${mealTitle}`}>
             <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface-muted transition duration-150 group-hover:scale-[1.02]">
               {mealImage ? <img src={mealImage} alt={mealTitle} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-surface-muted" />}
             </div>
@@ -248,7 +248,7 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
               <ChevronDownIcon className={`h-4 w-4 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
             </span>
           </button>
-          <button type="button" onClick={(event) => { event.stopPropagation(); onActionsClick?.(meal) }} className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full p-2 text-ink-tertiary transition-colors duration-150 hover:bg-stone-100 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label="Meal actions">
+          <button type="button" onClick={(event) => { event.stopPropagation(); onActionsClick?.(meal) }} className="relative z-10 flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center self-center rounded-full p-2 text-ink-tertiary transition-colors duration-150 hover:bg-stone-100 hover:text-ink-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2" aria-label="Meal actions">
             <MoreVerticalIcon className="h-5 w-5" />
           </button>
         </div>
