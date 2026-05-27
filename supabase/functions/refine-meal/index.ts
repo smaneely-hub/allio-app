@@ -302,6 +302,42 @@ const REFINEMENT_RULES: Record<string, {
 }
 
 // Try to apply rule-based refinement first
+function buildIngredientGroupsFromFlat(ingredients: any[] = []) {
+  return [{
+    label: undefined,
+    ingredients: ingredients.map((ing: any) => ({
+      amount: ing?.quantity != null ? String(ing.quantity) : '',
+      unit: ing?.unit || '',
+      item: ing?.item || ing?.name || ing?.ingredient || '',
+      note: ing?.notes || ing?.note || undefined,
+      optional: Boolean(ing?.optional),
+    })).filter((ing: any) => ing.item)
+  }]
+}
+
+function buildInstructionGroupsFromFlat(instructions: any[] = []) {
+  return [{
+    label: undefined,
+    steps: instructions
+      .map((step: any) => typeof step === 'string' ? { text: step } : { text: step?.text || step?.instruction || step?.step || '' })
+      .filter((step: any) => step.text)
+  }]
+}
+
+function withNormalizedRecipeShape(baseRecipe: any, nextRecipe: any) {
+  const ingredients = Array.isArray(nextRecipe.ingredients) ? nextRecipe.ingredients : (Array.isArray(baseRecipe.ingredients) ? baseRecipe.ingredients : [])
+  const instructions = Array.isArray(nextRecipe.instructions) ? nextRecipe.instructions : (Array.isArray(baseRecipe.instructions) ? baseRecipe.instructions : [])
+
+  return {
+    ...baseRecipe,
+    ...nextRecipe,
+    ingredients,
+    instructions,
+    ingredientGroups: buildIngredientGroupsFromFlat(ingredients),
+    instructionGroups: buildInstructionGroupsFromFlat(instructions),
+  }
+}
+
 function applyRefinementRule(recipe: any, feedback: string): { refined: any, changes: string[], fallback: boolean } {
   const feedbackLower = feedback.toLowerCase()
   
@@ -314,11 +350,10 @@ function applyRefinementRule(recipe: any, feedback: string): { refined: any, cha
       
       if (result.changes.length > 0) {
         return {
-          refined: {
-            ...recipe,
+          refined: withNormalizedRecipeShape(recipe, {
             ingredients: result.ingredients || recipe.ingredients,
             instructions: result.instructions || recipe.instructions,
-          },
+          }),
           changes: result.changes,
           fallback: false
         }
@@ -390,7 +425,7 @@ Respond with ONLY valid JSON, no other text.`
   try {
     const parsed = JSON.parse(content)
     return {
-      refined: parsed.refined_recipe || recipe,
+      refined: withNormalizedRecipeShape(recipe, parsed.refined_recipe || recipe),
       changes: parsed.changes || ['Refined via LLM']
     }
   } catch (e) {
