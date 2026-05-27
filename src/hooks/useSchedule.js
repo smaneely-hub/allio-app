@@ -135,23 +135,38 @@ export function useSchedule() {
           memberIds = (members || []).map(m => m.id)
         }
 
-        const payload = {
+        const basePayload = {
           user_id: user.id,
           household_id: householdId,
           week_start_date: getWeekStartDate(),
           shopping_day: shoppingDay,
-          next_shopping_date: nextShoppingDate || null,
           week_notes: weekNotes || '',
           status: 'draft',
         }
 
+        let payload = {
+          ...basePayload,
+          next_shopping_date: nextShoppingDate || null,
+        }
 
         // Use UPSERT to handle existing schedules
-        const { data: savedSchedule, error: saveError } = await supabase
+        let { data: savedSchedule, error: saveError } = await supabase
           .from('weekly_schedules')
           .upsert(payload, { onConflict: 'user_id,week_start_date' })
           .select()
           .single()
+
+        const missingNextShoppingDate = String(saveError?.message || '').includes('next_shopping_date') || saveError?.code === 'PGRST204'
+        if (missingNextShoppingDate) {
+          payload = basePayload
+          const retry = await supabase
+            .from('weekly_schedules')
+            .upsert(payload, { onConflict: 'user_id,week_start_date' })
+            .select()
+            .single()
+          savedSchedule = retry.data
+          saveError = retry.error
+        }
 
         if (saveError) {
           console.error('[useSchedule] ERROR upserting schedule:', JSON.stringify(saveError))

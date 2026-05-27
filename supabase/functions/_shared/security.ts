@@ -3,6 +3,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 export const ALLOWED_ORIGINS = new Set([
   'https://allio.life',
   'https://www.allio.life',
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
 ])
 
 type HeaderMap = Record<string, string>
