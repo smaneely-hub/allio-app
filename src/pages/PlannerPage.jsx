@@ -477,8 +477,11 @@ export function PlannerPage() {
     if (!data?.refined) throw new Error('No refinement returned')
     const refined = normalizeMealRecord(data.refined)
     const currentMeals = mealPlan?.draft_plan?.meals || []
+    const targetSlotKey = generateFlowTarget ? `${generateFlowTarget.dayKey}-${generateFlowTarget.mealSlot}` : `${meal.day}-${meal.meal}`
     const nextMeals = currentMeals.map((m) =>
-      m.id === meal.id ? { ...refined, id: m.id, day: m.day, meal: m.meal, date: m.date || meal.date } : m
+      `${m.day}-${m.meal}` === targetSlotKey
+        ? normalizeMealRecord({ ...m, ...refined, id: m.id, day: m.day, meal: m.meal, date: m.date || meal.date, recurring: false, locked: m.locked })
+        : m
     )
     const nextPlan = { ...(mealPlan.draft_plan || {}), meals: nextMeals }
     await persistPlan(nextPlan)
@@ -489,7 +492,7 @@ export function PlannerPage() {
       ])
     } catch { /* non-fatal */ }
     toast.success('Meal refined.')
-    return refined
+    return nextMeals.find((m) => `${m.day}-${m.meal}` === targetSlotKey) || refined
   }
 
   const handleFlowAccept = async (meal) => {
@@ -708,8 +711,11 @@ export function PlannerPage() {
 
       const refined = normalizeMealRecord(data.refined)
       const currentMeals = mealPlan?.draft_plan?.meals || []
+      const targetSlotKey = `${refineTarget.day}-${refineTarget.meal}`
       const nextMeals = currentMeals.map((m) =>
-        m.id === refineTarget.id ? { ...refined, id: m.id, day: m.day, meal: m.meal, date: m.date } : m
+        `${m.day}-${m.meal}` === targetSlotKey
+          ? normalizeMealRecord({ ...m, ...refined, id: m.id, day: m.day, meal: m.meal, date: m.date, recurring: false, locked: m.locked })
+          : m
       )
       const nextPlan = { ...(mealPlan.draft_plan || {}), meals: nextMeals }
       await persistPlan(nextPlan)
