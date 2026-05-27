@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { getAdminScaffoldStatus } from '../lib/admin'
+import { loadAdminOverview } from '../lib/adminApi'
 
 function StatCard({ label, value, hint }) {
   return (
@@ -29,6 +31,30 @@ function SectionCard({ title, body, action }) {
 export function AdminPage() {
   const { user } = useAuth()
   const scaffold = getAdminScaffoldStatus()
+  const [overview, setOverview] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    loadAdminOverview()
+      .then((data) => {
+        if (!active) return
+        setOverview(data?.metrics || null)
+        setError('')
+      })
+      .catch((err) => {
+        if (!active) return
+        setError(err?.message || 'Could not load admin overview')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
+  }, [])
+
+  const display = (value) => (loading ? '…' : (value ?? '—'))
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 pb-24 md:px-6">
@@ -38,7 +64,7 @@ export function AdminPage() {
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-text-muted">Admin</div>
           <h1 className="mt-2 font-display text-3xl text-text-primary md:text-4xl">Operations dashboard</h1>
           <p className="mt-3 max-w-3xl text-sm text-text-secondary">
-            This is the admin scaffold. The shell is live, but cross-user metrics and controls should come from server-verified admin endpoints before we rely on them.
+            Secure admin portal, backed by server-side verification and read-only backend endpoints. This is the right first production shape for support and ops.
           </p>
         </div>
         <div className="rounded-2xl border border-divider bg-white px-4 py-3 text-sm text-text-secondary shadow-sm">
@@ -46,44 +72,48 @@ export function AdminPage() {
         </div>
       </div>
 
+      {error ? (
+        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total users" value="--" hint="Wire to admin-overview Edge Function" />
-        <StatCard label="7-day signups" value="--" hint="Source: auth.users" />
-        <StatCard label="7-day active users" value="--" hint="Source: usage_tracking" />
-        <StatCard label="Plan generations" value="--" hint="Source: usage_tracking or meal_plans" />
+        <StatCard label="Total users" value={display(overview?.totalUsers)} hint="All authenticated accounts" />
+        <StatCard label="7-day signups" value={display(overview?.signups7d)} hint="New users this week" />
+        <StatCard label="7-day active users" value={display(overview?.activeUsers7d)} hint="Distinct users with tracked activity" />
+        <StatCard label="Plan generations" value={display(overview?.planGenerations7d)} hint="Tracked plan generations in the last 7 days" />
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
         <SectionCard
           title="User management"
-          body="Search users, inspect household state, and prepare support workflows. The route exists now so we can wire real data next."
+          body="Search users, inspect household state, and support account troubleshooting from a backend-backed explorer."
           action={<Link to="/admin/users" className="btn-primary whitespace-nowrap">Open users</Link>}
         />
         <SectionCard
           title="Security posture"
-          body={`Current scaffold mode: ${scaffold.mode}. Configured admin emails: ${scaffold.configuredAdmins}. This is UI gating only until server-side role checks are added.`}
+          body={`Current client gate mode: ${scaffold.mode}. Configured admin emails: ${scaffold.configuredAdmins}. Backend routes also verify admin access server-side before returning data.`}
           action={<a href="/docs/admin-backend-plan.md" className="btn-secondary whitespace-nowrap">Read plan</a>}
         />
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <div className="rounded-3xl border border-divider bg-surface-card p-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-text-primary">Next backend endpoints</h2>
+          <h2 className="text-lg font-semibold text-text-primary">Portal coverage</h2>
           <ul className="mt-3 space-y-2 text-sm text-text-secondary">
-            <li>• admin-overview, for top-line metrics and health cards</li>
-            <li>• admin-users-list, for searchable support-facing user records</li>
-            <li>• admin-user-detail, for household, preferences, and activity summaries</li>
-            <li>• admin audit logging before any write action goes live</li>
+            <li>• top-line metrics and health cards</li>
+            <li>• searchable user explorer</li>
+            <li>• user account, household, preferences, and recent activity detail</li>
+            <li>• read-only first, audited write actions next</li>
           </ul>
         </div>
 
         <div className="rounded-3xl border border-divider bg-surface-card p-5 shadow-sm">
           <h2 className="text-lg font-semibold text-text-primary">Guardrails</h2>
           <ul className="mt-3 space-y-2 text-sm text-text-secondary">
-            <li>• No service-role secrets in the browser</li>
-            <li>• No broad cross-user anon queries from the client</li>
-            <li>• Read-only first, audited writes later</li>
-            <li>• Support tooling should expose only the minimum PII needed</li>
+            <li>• no service-role secrets in the browser</li>
+            <li>• no direct cross-user browser queries</li>
+            <li>• every admin read passes server verification</li>
+            <li>• future write actions should add audit logs first</li>
           </ul>
         </div>
       </div>
