@@ -324,13 +324,51 @@ function buildInstructionGroupsFromFlat(instructions: any[] = []) {
   }]
 }
 
+function syncRecipeTitle(baseRecipe: any, nextRecipe: any, ingredients: any[]) {
+  const baseTitle = String(baseRecipe?.name || baseRecipe?.title || '').trim()
+  const proposedTitle = String(nextRecipe?.name || nextRecipe?.title || '').trim()
+  const nextIngredientNames = sortedIngredientNames(ingredients)
+
+  if (!baseTitle) return proposedTitle || baseTitle
+  if (!proposedTitle) return baseTitle
+
+  const proteinPairs: Array<[string, string]> = [
+    ['chicken thigh', 'chicken breast'],
+    ['chicken thighs', 'chicken breasts'],
+    ['ground beef', 'ground turkey'],
+    ['beef', 'turkey'],
+    ['pork', 'chicken'],
+    ['lettuce wrap', 'tortilla'],
+    ['lettuce wraps', 'tortillas'],
+    ['bowl', 'taco'],
+    ['bowls', 'tacos'],
+  ]
+
+  let syncedTitle = proposedTitle
+  const lowerTitle = proposedTitle.toLowerCase()
+  for (const [from, to] of proteinPairs) {
+    const hasFromInTitle = lowerTitle.includes(from)
+    const hasToIngredient = nextIngredientNames.some((name) => name.includes(to))
+    const missingFromIngredient = !nextIngredientNames.some((name) => name.includes(from))
+
+    if (hasFromInTitle && hasToIngredient && missingFromIngredient) {
+      syncedTitle = syncedTitle.replace(new RegExp(from, 'ig'), to)
+    }
+  }
+
+  return syncedTitle
+}
+
 function withNormalizedRecipeShape(baseRecipe: any, nextRecipe: any) {
   const ingredients = Array.isArray(nextRecipe.ingredients) ? nextRecipe.ingredients : (Array.isArray(baseRecipe.ingredients) ? baseRecipe.ingredients : [])
   const instructions = Array.isArray(nextRecipe.instructions) ? nextRecipe.instructions : (Array.isArray(baseRecipe.instructions) ? baseRecipe.instructions : [])
+  const syncedTitle = syncRecipeTitle(baseRecipe, nextRecipe, ingredients)
 
   return {
     ...baseRecipe,
     ...nextRecipe,
+    name: syncedTitle || nextRecipe?.name || nextRecipe?.title || baseRecipe?.name || baseRecipe?.title,
+    title: syncedTitle || nextRecipe?.title || nextRecipe?.name || baseRecipe?.title || baseRecipe?.name,
     ingredients,
     instructions,
     ingredientGroups: buildIngredientGroupsFromFlat(ingredients),
