@@ -25,6 +25,7 @@ import { PublicMealGeneratorPage } from './pages/PublicMealGeneratorPage'
 import { PrivacyPage } from './pages/PrivacyPage'
 import { TermsPage } from './pages/TermsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { SharedPage } from './pages/SharedPage'
 import { AdminRoute } from './components/AdminRoute'
 import { AdminPage } from './pages/AdminPage'
 import { AdminUsersPage } from './pages/AdminUsersPage'
@@ -69,6 +70,7 @@ export default function App() {
 function AppShell() {
   const location = useLocation()
   const hideGlobalNav = ['/', '/login', '/try', '/pricing', '/privacy', '/terms'].includes(location.pathname)
+    || location.pathname.startsWith('/share/')
 
   return (
     <>
@@ -219,6 +221,7 @@ function AppShell() {
               </ProtectedRoute>
             }
           />
+          <Route path="/share/:token" element={<SharedPage />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />

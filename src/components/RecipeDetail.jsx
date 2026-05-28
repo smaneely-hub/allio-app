@@ -6,6 +6,7 @@ import { deleteRecipe, estimateRecipeNutrition, markCooked, rateRecipe, toggleFa
 import { formatIngredientAmount } from '../utils/formatFractions'
 import { CookingMode } from './CookingMode'
 import { ClipRecipeModal } from './ClipRecipeModal'
+import { ShareModal } from './ShareModal'
 
 function HeartIcon({ filled = false }) {
   return (
@@ -91,6 +92,7 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
   const [cookingMode, setCookingMode] = useState(false)
   const [editingRecipe, setEditingRecipe] = useState(false)
   const [deletingRecipe, setDeletingRecipe] = useState(false)
+  const [sharingRecipe, setSharingRecipe] = useState(false)
   const [isFavorite, setIsFavorite] = useState(Boolean(meal?.is_favorite ?? meal?.isFavorite))
   const [rating, setRating] = useState(meal?.rating ?? null)
   const [lastCookedAt, setLastCookedAt] = useState(meal?.last_cooked_at || meal?.cooked_at || meal?.cookedAt || '')
@@ -149,6 +151,9 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
           <CookingMode meal={recipe} onExit={() => setCookingMode(false)} />
         </div>,
         document.body,
+      ) : null}
+      {sharingRecipe ? (
+        <ShareModal recipe={meal} onClose={() => setSharingRecipe(false)} />
       ) : null}
       <div className="sticky top-0 z-20 border-b border-divider bg-bg-soft/90 px-4 py-3 backdrop-blur-sm">
         <div className="mx-auto flex max-w-2xl items-center justify-between">
@@ -245,6 +250,15 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
             >
               Edit recipe
             </button>
+            {recipe.id ? (
+              <button
+                type="button"
+                onClick={() => setSharingRecipe(true)}
+                className="rounded-full border border-divider bg-surface-card px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-warm-100"
+              >
+                Share
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={async () => {

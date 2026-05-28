@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import { deleteRecipe, listUserRecipes, toggleFavorite } from '../hooks/useRecipeMutations'
 import { normalizeRecipe } from '../lib/recipeSchema'
 import { ClipRecipeModal } from '../components/ClipRecipeModal'
+import { ShareModal } from '../components/ShareModal'
 import { useAuth } from '../hooks/useAuth'
 
 function SearchIcon(props: any) {
@@ -63,6 +65,8 @@ export function Catalog() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [togglingFavorite, setTogglingFavorite] = useState<string | null>(null)
+  const [sharingFavorites, setSharingFavorites] = useState<any[] | null>(null)
+  const [loadingFavoritesForShare, setLoadingFavoritesForShare] = useState(false)
   const searchRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -168,6 +172,21 @@ export function Catalog() {
     }
   }
 
+  async function handleShareFavorites() {
+    if (loadingFavoritesForShare) return
+    setLoadingFavoritesForShare(true)
+    try {
+      const favorites = await listUserRecipes({ userId: user?.id, favoritesOnly: true })
+      if (favorites.length === 0) {
+        toast('Mark some recipes as favorites first.', { icon: '♡' })
+        return
+      }
+      setSharingFavorites(favorites)
+    } finally {
+      setLoadingFavoritesForShare(false)
+    }
+  }
+
   const hasActiveFilters = cuisine || mealType || minRating || favoritesOnly || sortBy !== 'newest'
 
   return (
@@ -178,9 +197,19 @@ export function Catalog() {
           <h1 className="font-display text-2xl text-text-primary md:text-3xl">Recipes</h1>
           <p className="text-sm text-text-muted">Your imported, cooked, and favorited recipes.</p>
         </div>
-        <button type="button" onClick={() => setShowClipModal(true)} className="btn-primary shrink-0 text-sm">
-          + Add Recipe
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={handleShareFavorites}
+            disabled={loadingFavoritesForShare}
+            className="rounded-full border border-divider bg-surface-card px-3 py-2 text-sm font-medium text-text-secondary transition hover:bg-warm-100 disabled:opacity-50"
+          >
+            {loadingFavoritesForShare ? 'Loading…' : 'Share Favorites'}
+          </button>
+          <button type="button" onClick={() => setShowClipModal(true)} className="btn-primary text-sm">
+            + Add Recipe
+          </button>
+        </div>
       </div>
 
       <div className="mb-4 max-w-md">
@@ -407,6 +436,9 @@ export function Catalog() {
           }}
         />
       )}
+      {sharingFavorites ? (
+        <ShareModal favorites={sharingFavorites} onClose={() => setSharingFavorites(null)} />
+      ) : null}
     </div>
   )
 }
