@@ -16,6 +16,7 @@ function EmptyForm() {
     age: '',
     dietary_restrictions: '',
     food_preferences: '',
+    linked_user_id: '',
   }
 }
 
@@ -41,6 +42,7 @@ function normalizeMemberInput(form, fallbackLabel) {
     restrictions: '',
     preferences: '',
     health_considerations: [],
+    linked_user_id: form.linked_user_id?.trim() || null,
   }
 }
 
@@ -79,6 +81,7 @@ export function HouseholdMembersModal({ open, members = [], saving = false, onCl
       age: member.age ?? '',
       dietary_restrictions: asTextList(member.dietary_restrictions),
       food_preferences: asTextList(member.food_preferences),
+      linked_user_id: member.linked_user_id || '',
     })
   }
 
@@ -145,6 +148,7 @@ export function HouseholdMembersModal({ open, members = [], saving = false, onCl
                       <div className="mt-1 text-sm text-ink-secondary">{member.age != null && member.age !== '' ? `${member.age} years old` : 'Age not provided'}</div>
                       {Array.isArray(member.dietary_restrictions) && member.dietary_restrictions.length > 0 ? <div className="mt-3 text-xs text-ink-secondary">Dietary: {member.dietary_restrictions.join(', ')}</div> : null}
                       {Array.isArray(member.food_preferences) && member.food_preferences.length > 0 ? <div className="mt-1 text-xs text-ink-secondary">Preferences: {member.food_preferences.join(', ')}</div> : null}
+                      {member.linked_user_id ? <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700">Account linked</div> : null}
                     </div>
                     <div className="flex shrink-0 gap-2">
                       <button type="button" onClick={() => startEdit(member)} className="rounded-full border border-surface-muted px-3 py-1.5 text-sm font-medium text-ink-primary transition-colors duration-150 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 cursor-pointer">
@@ -223,6 +227,18 @@ export function HouseholdMembersModal({ open, members = [], saving = false, onCl
                   placeholder="Comma-separated, like loves pasta, prefers mild food"
                   className="input min-h-[88px] w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2"
                 />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-ink-primary">Linked Allio account ID (optional)</label>
+                <input
+                  type="text"
+                  value={form.linked_user_id}
+                  onChange={(event) => setForm((current) => ({ ...current, linked_user_id: event.target.value }))}
+                  placeholder="Their Allio user ID"
+                  className="input w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2"
+                />
+                <div className="mt-1 text-xs text-ink-secondary">If this person has their own Allio account, entering their account ID lets them see your household plan.</div>
               </div>
 
               <div className="flex items-center gap-3 pt-2">

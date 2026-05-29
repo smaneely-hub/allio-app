@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import toast from 'react-hot-toast'
 import { normalizeRecipe } from '../lib/recipeSchema'
@@ -108,11 +108,12 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
     nutrition: false,
   })
   const [checkedIngredients, setCheckedIngredients] = useState({})
+  const autoEstimatedRecipeIds = useRef(new Set())
 
   const toggleSection = (key) => setSections((current) => ({ ...current, [key]: !current[key] }))
   const toggleIngredient = (key) => setCheckedIngredients((current) => ({ ...current, [key]: !current[key] }))
 
-  async function handleEstimateNutrition({ silent = false } = {}) {
+  async function handleEstimateNutrition({ silent = false, skipRefresh = false } = {}) {
     if (!recipe.id || isEstimatingNutrition) return
     setIsEstimatingNutrition(true)
     try {
@@ -121,7 +122,7 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
         setNutrition(result)
         setSections((prev) => ({ ...prev, nutrition: true }))
         if (!silent) toast.success('Nutrition generated')
-        onSaved?.()
+        if (!skipRefresh) onSaved?.()
       } else if (!silent) {
         toast.error('Could not generate nutrition')
       }
@@ -132,9 +133,13 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
     }
   }
 
-  // Auto-estimate nutrition on first load if missing (catalog recipes only)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (!recipe.nutrition && recipe.id) handleEstimateNutrition({ silent: true }) }, [])
+  // Auto-estimate nutrition once per recipe if missing, without forcing a parent reload loop.
+  useEffect(() => {
+    if (recipe.nutrition || nutrition || !recipe.id) return
+    if (autoEstimatedRecipeIds.current.has(recipe.id)) return
+    autoEstimatedRecipeIds.current.add(recipe.id)
+    handleEstimateNutrition({ silent: true, skipRefresh: true })
+  }, [recipe.id, recipe.nutrition, nutrition])
 
   const tagPills = [
     recipe.tags.cuisine,

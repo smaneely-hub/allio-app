@@ -8,6 +8,8 @@ import { useMealPlan } from '../hooks/useMealPlan'
 import { useSubscription } from '../hooks/useSubscription'
 import { useShoppingListPreferences } from '../hooks/useShoppingListPreferences'
 import { useShoppingLists } from '../hooks/useShoppingLists'
+import { useLinkedHousehold } from '../hooks/useLinkedHousehold'
+import { LinkedHouseholdPlan } from '../components/plan/LinkedHouseholdPlan'
 import { ShoppingListPickerModal } from '../components/ShoppingListPickerModal'
 import { ScheduleSkeleton, EmptyState } from '../components/LoadingStates'
 import { MealPlanWorkspace } from '../components/plan/MealPlanWorkspace'
@@ -137,6 +139,7 @@ export function PlannerPage() {
   const { isPremium } = useSubscription()
   const { defaultListId, alwaysAsk } = useShoppingListPreferences(user?.id)
   const { lists, createList } = useShoppingLists(user?.id)
+  const { linkedHousehold, linkedPlan } = useLinkedHousehold()
   const {
     mealPlan,
     generating,
@@ -814,6 +817,14 @@ export function PlannerPage() {
         {members.length === 0 ? <MemberEmptyState onOpen={() => setShowMembersModal(true)} /> : <MemberSummary members={members} onOpen={() => setShowMembersModal(true)} />}
 
         {members.length === 0 ? <div className="mt-3 text-sm text-ink-secondary">Meal generation stays disabled until you add at least one household member.</div> : <div className="mt-3 text-sm text-ink-secondary">Generate meals one slot at a time from each day card, or add meals manually.</div>}
+
+        {linkedHousehold && linkedPlan && (
+          <>
+            <div className="mt-4 text-xs font-semibold uppercase tracking-[0.12em] text-ink-tertiary">Linked household (read-only)</div>
+            <LinkedHouseholdPlan household={linkedHousehold} plan={linkedPlan} />
+            <div className="mt-5 text-xs font-semibold uppercase tracking-[0.12em] text-ink-tertiary">Your plan</div>
+          </>
+        )}
 
         {loading ? <ScheduleSkeleton /> : (
           <MealPlanWorkspace

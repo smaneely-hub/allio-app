@@ -227,6 +227,7 @@ export function useHousehold() {
           allergies: member.allergies || [],
           health_considerations: member.health_considerations || [],
           date_of_birth: member.date_of_birth || null,
+          linked_user_id: member.linked_user_id || null,
         }))
 
         // Non-destructive save: delete only members removed from the list,
@@ -257,13 +258,14 @@ export function useHousehold() {
             .update(payload)
             .eq('id', id)
           if (updateError) {
-            // date_of_birth column may not exist in prod yet; retry without it
-            const isDobMissing = String(updateError.message || '').includes('date_of_birth')
-            if (isDobMissing) {
-              const { date_of_birth: _dob, ...payloadWithoutDob } = payload
+            // Some columns (date_of_birth, linked_user_id) may not exist in prod yet; retry without them
+            const msg = String(updateError.message || '')
+            const isColumnMissing = msg.includes('date_of_birth') || msg.includes('linked_user_id')
+            if (isColumnMissing) {
+              const { date_of_birth: _dob, linked_user_id: _lid, ...payloadStripped } = payload
               const { error: retryError } = await supabase
                 .from('household_members')
-                .update(payloadWithoutDob)
+                .update(payloadStripped)
                 .eq('id', id)
               updateError = retryError
             }
@@ -280,13 +282,14 @@ export function useHousehold() {
             .from('household_members')
             .insert(newMembers)
           if (insertError) {
-            // date_of_birth column may not exist in prod yet; retry without it
-            const isDobMissing = String(insertError.message || '').includes('date_of_birth')
-            if (isDobMissing) {
-              const membersWithoutDob = newMembers.map(({ date_of_birth: _dob, ...m }) => m)
+            // Some columns (date_of_birth, linked_user_id) may not exist in prod yet; retry without them
+            const msg = String(insertError.message || '')
+            const isColumnMissing = msg.includes('date_of_birth') || msg.includes('linked_user_id')
+            if (isColumnMissing) {
+              const membersStripped = newMembers.map(({ date_of_birth: _dob, linked_user_id: _lid, ...m }) => m)
               const { error: retryError } = await supabase
                 .from('household_members')
-                .insert(membersWithoutDob)
+                .insert(membersStripped)
               insertError = retryError
             }
           }
