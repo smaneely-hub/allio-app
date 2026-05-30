@@ -45,8 +45,9 @@ export function RecipesPage() {
       .order('title', { ascending: true })
 
     if (error) {
-      const isRelationMissing = String(error.message || '').includes('recipe_interactions') || error.code === 'PGRST200'
-      if (!isRelationMissing) {
+      const message = String(error.message || '').toLowerCase()
+      const isRecipeInteractionsQueryError = message.includes('recipe_interactions') || message.includes('could not find a relationship') || message.includes('more than one relationship was found') || message.includes('foreign key') || error.code === 'PGRST200' || error.code === 'PGRST201'
+      if (!isRecipeInteractionsQueryError) {
         setLoading(false)
         return
       }

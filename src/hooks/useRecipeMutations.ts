@@ -34,9 +34,17 @@ async function getAuthUserId(): Promise<string> {
   return user.id
 }
 
-function isTableMissingError(error: any): boolean {
-  const msg = String(error?.message || '')
-  return msg.includes('recipe_interactions') || error?.code === 'PGRST200' || error?.code === '42P01'
+function isRecipeInteractionsQueryError(error: any): boolean {
+  const msg = String(error?.message || '').toLowerCase()
+  return (
+    msg.includes('recipe_interactions') ||
+    msg.includes('could not find a relationship') ||
+    msg.includes('more than one relationship was found') ||
+    msg.includes('foreign key') ||
+    error?.code === 'PGRST200' ||
+    error?.code === 'PGRST201' ||
+    error?.code === '42P01'
+  )
 }
 
 export async function toggleFavorite(recipeId: string, isFavorite: boolean): Promise<void> {
@@ -48,7 +56,7 @@ export async function toggleFavorite(recipeId: string, isFavorite: boolean): Pro
       { onConflict: 'user_id,recipe_id' },
     )
   if (error) {
-    if (!isTableMissingError(error)) throw error
+    if (!isRecipeInteractionsQueryError(error)) throw error
     // recipe_interactions not available — fall back to recipes table column
     const { error: fbError } = await supabase
       .from('recipes')
@@ -67,7 +75,7 @@ export async function rateRecipe(recipeId: string, rating: number): Promise<void
       { onConflict: 'user_id,recipe_id' },
     )
   if (error) {
-    if (!isTableMissingError(error)) throw error
+    if (!isRecipeInteractionsQueryError(error)) throw error
     // recipe_interactions not available — fall back to recipes table column
     const { error: fbError } = await supabase
       .from('recipes')
@@ -164,9 +172,8 @@ export async function listUserRecipes(opts: {
   let { data, error } = await query
 
   if (error) {
-    // recipe_interactions relation may not exist in prod yet — fall back to plain query
-    const isRelationMissing = String(error.message || '').includes('recipe_interactions') || (error as any).code === 'PGRST200'
-    if (!isRelationMissing) throw error
+    // recipe_interactions join can fail when the relation is missing, ambiguous, or malformed in prod.
+    if (!isRecipeInteractionsQueryError(error)) throw error
     const fallback = await applyRecipeFilters(
       supabase.from('recipes').select('*').eq('active', true),
       opts,
