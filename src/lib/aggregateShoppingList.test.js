@@ -111,3 +111,14 @@ test('shopping events determine shopping window before weekly fallback', () => {
   })
   assert.deepEqual(filtered.map((meal) => meal.name), ['Keep Me', 'Keep Me Too'])
 })
+
+test('aggregate shopping list removes planned items after the meal date passes', () => {
+  const items = aggregateShoppingList({
+    meals: [
+      { name: 'Expired Meal', date: '2026-05-15', ingredients: [{ item: 'Milk', quantity: 1, unit: 'carton' }] },
+      { name: 'Upcoming Meal', date: '2026-05-17', ingredients: [{ item: 'Bread', quantity: 1, unit: 'loaf' }] },
+    ],
+  }, '', { referenceDate: new Date('2026-05-16T12:00:00Z') })
+  assert.equal(items.length, 1)
+  assert.equal(items[0].name, 'bread')
+})

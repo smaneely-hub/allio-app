@@ -69,20 +69,31 @@ export function filterMealsForShoppingWindow(meals = [], { shoppingDay = 'Sunday
 export function aggregateShoppingList(mealPlan, staplesOnHand = '', options = {}) {
   const meals = mealPlan?.meals || mealPlan || []
   const shoppingEvents = meals.filter((meal) => meal?.event_type === SHOPPING_EVENT_TYPE)
+  const referenceDate = options.referenceDate || new Date()
+  const startOfReferenceDay = new Date(referenceDate)
+  startOfReferenceDay.setHours(0, 0, 0, 0)
+
   const datedMeals = meals
     .map((meal) => parseIsoLocalDate(meal?.date))
     .filter(Boolean)
     .sort((a, b) => a.getTime() - b.getTime())
-  const windowAnchor = datedMeals[0] || new Date()
+  const windowAnchor = datedMeals[0] || referenceDate
   const expandedMeals = expandRecurringMeals(meals, getStartOfWeek(windowAnchor), 7)
+  const activeMeals = expandedMeals.filter((meal) => {
+    if (meal?.event_type === SHOPPING_EVENT_TYPE) return true
+    const mealDate = parseIsoLocalDate(meal?.date)
+    if (!mealDate) return true
+    mealDate.setHours(0, 0, 0, 0)
+    return mealDate >= startOfReferenceDay
+  })
   const windowedMeals = (options?.shoppingDay || options?.nextShoppingDate || shoppingEvents.length)
-    ? filterMealsForShoppingWindow(expandedMeals, {
+    ? filterMealsForShoppingWindow(activeMeals, {
         shoppingDay: options.shoppingDay,
         nextShoppingDate: options.nextShoppingDate,
         shoppingEvents,
-        referenceDate: options.referenceDate || new Date(),
+        referenceDate,
       })
-    : expandedMeals
+    : activeMeals
   // Non-cooking meals don't contribute ingredients to the grocery list.
   const cookingMeals = windowedMeals.filter((meal) => !['eat_out', 'takeout', 'delivery'].includes(meal?.meal_source || 'generated'))
   return buildGroupedShoppingItems(cookingMeals, staplesOnHand)
