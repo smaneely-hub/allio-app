@@ -90,18 +90,29 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Could not extract a recipe from this URL')
       const r = data.recipe || {}
+      const importedIngredients = Array.isArray(r.ingredients)
+        ? r.ingredients
+        : Array.isArray(r.ingredient_groups_json)
+          ? r.ingredient_groups_json.flatMap((group) => (group?.ingredients || []).map((ingredient) => [ingredient.amount, ingredient.unit, ingredient.item || ingredient.name].filter(Boolean).join(' ').trim()))
+          : []
+      const importedSteps = Array.isArray(r.steps)
+        ? r.steps
+        : Array.isArray(r.instruction_groups_json)
+          ? r.instruction_groups_json.flatMap((group) => (group?.steps || []).map((step) => step?.text).filter(Boolean))
+          : []
+
       setForm({
         title: r.title || '',
         description: r.description || '',
-        meal_type: 'dinner',
+        meal_type: r.meal_type || r.tags?.mealType || 'dinner',
         prep_time_minutes: r.prep_time_minutes ?? '',
         cook_time_minutes: r.cook_time_minutes ?? '',
         servings: r.servings ?? '',
         image_url: r.image_url || '',
         source_url: r.source_url || trimmed,
         source_domain: r.source_domain || '',
-        ingredients_text: (r.ingredients || []).join('\n'),
-        steps_text: (r.steps || []).join('\n'),
+        ingredients_text: importedIngredients.join('\n'),
+        steps_text: importedSteps.join('\n'),
         nutrition: r.nutrition || null,
       })
       setStep('preview')
@@ -220,6 +231,13 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
       await saveRecipe(form)
       toast.success(form.id ? 'Recipe updated!' : 'Recipe saved to your catalog!')
       setShowSavePrompt(false)
+      setError(null)
+      if (!form.id) {
+        setStep('url')
+        setUrl('')
+        setForm(null)
+        setIsFromImport(false)
+      }
       onSaved?.()
       onClose()
     } catch (e) {
@@ -492,7 +510,7 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
                   disabled={loading || !form.title?.trim()}
                   className="btn-primary flex-1"
                 >
-                  {loading ? 'Saving…' : initialRecipe ? 'Save changes' : isFromImport ? 'Save to Catalog' : 'Save Recipe'}
+                  {loading ? 'Saving…' : initialRecipe ? 'Save changes' : isFromImport ? 'Save & Close' : 'Save Recipe'}
                 </button>
               </div>
             </div>

@@ -10,6 +10,7 @@ import { formatShoppingListEmail } from '../lib/formatShoppingListEmail'
 import { EmptyState } from '../components/LoadingStates'
 import { UpgradePrompt } from '../components/UpgradePrompt'
 import { AdSlot } from '../components/AdSlot'
+import { canNativeShare, copyToClipboard, nativeShare } from '../lib/sharing'
 import { useShoppingList } from '../hooks/useShoppingList'
 import { useShoppingLists } from '../hooks/useShoppingLists'
 import { CATEGORY_LABELS, CATEGORY_ORDER, categorizeIngredient } from '../lib/shoppingListUtils'
@@ -57,6 +58,7 @@ export function ShopPage() {
   const [emailing, setEmailing] = useState(false)
   const [upgradeFeature, setUpgradeFeature] = useState(null)
   const [deletingList, setDeletingList] = useState(false)
+  const [showShareSheet, setShowShareSheet] = useState(false)
 
   const displayGroups = useMemo(() => {
     return CATEGORY_ORDER.reduce((acc, category) => {
@@ -215,15 +217,33 @@ export function ShopPage() {
     toast.success(`${item.name} removed`)
   }
 
+  const shareText = useMemo(() => shareListAsText(items || [], listLabel), [items, listLabel])
+
   const handleShare = async () => {
     if (!isPremium) {
       setUpgradeFeature('shopping_share')
       return
     }
 
-    const text = shareListAsText(items || [], listLabel)
-    await navigator.clipboard.writeText(text)
-    toast.success('Shopping list copied!')
+    setShowShareSheet(true)
+  }
+
+  const handleCopyShare = async () => {
+    try {
+      await copyToClipboard(shareText)
+      toast.success('Shopping list copied!')
+      setShowShareSheet(false)
+    } catch {
+      toast.error('Could not copy shopping list')
+    }
+  }
+
+  const handleNativeShare = async () => {
+    try {
+      await nativeShare(shareText, listLabel)
+    } catch (err) {
+      if (err?.name !== 'AbortError') toast.error('Could not open share sheet')
+    }
   }
 
   const handleEmailShop = async () => {
@@ -298,15 +318,14 @@ export function ShopPage() {
           <div>
             <div className="h-1 w-12 rounded-full bg-gradient-to-r from-primary-400 via-teal-400 to-purple-400 mb-2"></div>
             <h1 className="font-display text-2xl md:text-3xl text-text-primary">{listLabel}</h1>
-            <p className="text-sm text-text-muted">Planner items and manual items merge in the same list. Sharing is still copy or email for now.</p>
+            <p className="text-sm text-text-muted">Planner items and manual items merge in the same list. Share by copy, native share, or email.</p>
           </div>
           <button
             type="button"
-            onClick={handleEmailShop}
-            disabled={emailing}
+            onClick={handleShare}
             className="text-sm text-primary-500 hover:bg-primary-50 rounded-lg px-3 py-1.5 transition-all duration-150 active:scale-[0.97]"
           >
-            {emailing ? 'Sending...' : 'Share'}
+            Share
           </button>
         </div>
 
@@ -392,6 +411,32 @@ export function ShopPage() {
       {!isPremium && (
         <div className="mb-3">
           <AdSlot size="banner" position="shop_middle" />
+        </div>
+      )}
+
+      {showShareSheet && (
+        <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/40 p-4 sm:items-center" onClick={() => setShowShareSheet(false)}>
+          <div className="w-full max-w-md rounded-[28px] bg-surface-card p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-text-muted">Share Shopping List</div>
+            <div className="text-xl font-display text-text-primary">{listLabel}</div>
+            <p className="mt-2 text-sm text-text-secondary">Choose how you want to share this list.</p>
+            <div className="mt-4 space-y-2">
+              <button type="button" onClick={handleCopyShare} className="w-full rounded-2xl border border-divider bg-white px-4 py-3 text-left text-sm font-medium text-text-primary transition hover:bg-warm-50">
+                Copy list text
+              </button>
+              {canNativeShare() ? (
+                <button type="button" onClick={handleNativeShare} className="w-full rounded-2xl border border-divider bg-white px-4 py-3 text-left text-sm font-medium text-text-primary transition hover:bg-warm-50">
+                  Share via device
+                </button>
+              ) : null}
+              <button type="button" onClick={handleEmailShop} disabled={emailing} className="w-full rounded-2xl border border-divider bg-white px-4 py-3 text-left text-sm font-medium text-text-primary transition hover:bg-warm-50 disabled:opacity-50">
+                {emailing ? 'Sending email…' : 'Email to myself'}
+              </button>
+            </div>
+            <button type="button" onClick={() => setShowShareSheet(false)} className="mt-4 w-full rounded-full bg-primary-500 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-primary-600">
+              Done
+            </button>
+          </div>
         </div>
       )}
 
