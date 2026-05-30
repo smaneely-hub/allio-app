@@ -1,4 +1,4 @@
-import { normalizeRecipe } from './recipeSchema'
+import { normalizeRecipe } from './recipeSchema.js'
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const DAY_SHORT = {

@@ -1,4 +1,4 @@
-import { mergeIngredients, normalizeUnit } from '../utils/unitConversion'
+import { mergeIngredients, normalizeUnit } from '../utils/unitConversion.js'
 
 const UNIT_WORDS = new Set([
   'lb', 'lbs', 'pound', 'pounds', 'oz', 'ounce', 'ounces', 'g', 'kg', 'mg',

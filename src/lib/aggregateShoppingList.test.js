@@ -61,7 +61,7 @@ test('normalize ingredient removes adjectives and applies synonyms', () => {
   assert.equal(normalizeIngredientName('Fresh chicken breast'), 'chicken breasts')
 })
 
-test('shopping window excludes meals after next shopping day', () => {
+test('shopping window includes meals through the next scheduled shopping day', () => {
   const meals = [
     { name: 'Near Meal', date: '2026-05-16', ingredients: [{ item: 'Milk', quantity: 1, unit: 'carton' }] },
     { name: 'Far Meal', date: '2026-05-20', ingredients: [{ item: 'Bread', quantity: 1, unit: 'loaf' }] },
@@ -70,8 +70,8 @@ test('shopping window excludes meals after next shopping day', () => {
     shoppingDay: 'Friday',
     referenceDate: new Date('2026-05-16T12:00:00Z'),
   })
-  assert.equal(filtered.length, 1)
-  assert.equal(filtered[0].name, 'Near Meal')
+  assert.equal(filtered.length, 2)
+  assert.deepEqual(filtered.map((meal) => meal.name), ['Near Meal', 'Far Meal'])
 })
 
 test('aggregate shopping list respects shopping window option', () => {
@@ -81,8 +81,8 @@ test('aggregate shopping list respects shopping window option', () => {
       { name: 'Meal B', date: '2026-05-19', ingredients: [{ item: 'Pasta', quantity: 1, unit: 'box' }] },
     ],
   }, '', { shoppingDay: 'Friday', referenceDate: new Date('2026-05-16T12:00:00Z') })
-  assert.equal(items.length, 1)
-  assert.equal(items[0].name, 'eggs')
+  assert.equal(items.length, 2)
+  assert.deepEqual(items.map((item) => item.normalizedName), ['eggs', 'pasta'])
 })
 
 test('explicit next shopping date overrides weekly shopping day window', () => {
@@ -120,5 +120,5 @@ test('aggregate shopping list removes planned items after the meal date passes',
     ],
   }, '', { referenceDate: new Date('2026-05-16T12:00:00Z') })
   assert.equal(items.length, 1)
-  assert.equal(items[0].name, 'bread')
+  assert.equal(items[0].normalizedName, 'bread')
 })

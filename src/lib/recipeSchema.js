@@ -1,5 +1,5 @@
-import { formatIngredientAmount } from '../utils/formatFractions'
-import { decodeHtmlEntities as dec } from '../utils/decodeHtml'
+import { formatIngredientAmount } from '../utils/formatFractions.js'
+import { decodeHtmlEntities as dec } from '../utils/decodeHtml.js'
 
 function asArray(value) {
   return Array.isArray(value) ? value : []

@@ -1,5 +1,5 @@
-import { expandRecurringMeals, getNextShoppingOccurrence, getStartOfWeek, parseIsoLocalDate, SHOPPING_EVENT_TYPE } from './planner'
-import { buildGroupedShoppingItems, CATEGORY_LABELS, CATEGORY_ORDER, groupItemsByCategory } from './shoppingListUtils'
+import { expandRecurringMeals, getNextShoppingOccurrence, getStartOfWeek, parseIsoLocalDate, SHOPPING_EVENT_TYPE } from './planner.js'
+import { buildGroupedShoppingItems, CATEGORY_LABELS, CATEGORY_ORDER, groupItemsByCategory } from './shoppingListUtils.js'
 
 const DAY_TO_INDEX = {
   monday: 0,
@@ -46,12 +46,11 @@ function getShoppingWindow({ referenceDate = new Date(), shoppingDay = 'Sunday',
   const dayKey = normalizeShoppingDay(shoppingDay)
   const shoppingIndex = DAY_TO_INDEX[dayKey]
   const jsDay = (base.getDay() + 6) % 7
-  const diffToLastShoppingDay = (jsDay - shoppingIndex + 7) % 7
+  const diffToNextShoppingDay = (shoppingIndex - jsDay + 7) % 7
   const windowStart = new Date(base)
-  windowStart.setDate(base.getDate() - diffToLastShoppingDay)
   windowStart.setHours(0, 0, 0, 0)
-  const windowEnd = new Date(windowStart)
-  windowEnd.setDate(windowStart.getDate() + 7)
+  const windowEnd = new Date(base)
+  windowEnd.setDate(base.getDate() + diffToNextShoppingDay + 1)
   windowEnd.setHours(0, 0, 0, 0)
   return { windowStart, windowEnd }
 }
