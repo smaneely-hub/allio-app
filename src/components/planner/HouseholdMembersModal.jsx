@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useAuth } from '../../hooks/useAuth'
 
 function CloseIcon(props) {
   return (
@@ -47,17 +48,10 @@ function normalizeMemberInput(form, fallbackLabel) {
 }
 
 export function HouseholdMembersModal({ open, members = [], saving = false, onClose, onSave }) {
+  const { user } = useAuth()
   const [form, setForm] = useState(EmptyForm)
   const [editingId, setEditingId] = useState(null)
   const [confirmRemoveId, setConfirmRemoveId] = useState(null)
-
-  useEffect(() => {
-    if (!open) {
-      setForm(EmptyForm())
-      setEditingId(null)
-      setConfirmRemoveId(null)
-    }
-  }, [open])
 
   const sortedMembers = useMemo(() => members.map((member, index) => ({
     ...member,
@@ -235,10 +229,18 @@ export function HouseholdMembersModal({ open, members = [], saving = false, onCl
                   type="text"
                   value={form.linked_user_id}
                   onChange={(event) => setForm((current) => ({ ...current, linked_user_id: event.target.value }))}
-                  placeholder="Their Allio user ID"
+                  placeholder="Their Allio account ID"
                   className="input w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2"
                 />
-                <div className="mt-1 text-xs text-ink-secondary">If this person has their own Allio account, entering their account ID lets them see your household plan.</div>
+                <div className="mt-1 text-xs text-ink-secondary">If this person has their own Allio account, paste their account ID here so they can see your household plan.</div>
+                {user?.id ? (
+                  <div className="mt-3 rounded-2xl border border-surface-muted bg-stone-50 px-3 py-3 text-xs text-ink-secondary">
+                    <div className="font-medium text-ink-primary">Need an account ID?</div>
+                    <div className="mt-1">On the other person&apos;s device, copy this from their logged-in Allio account context:</div>
+                    <div className="mt-2 break-all rounded-xl bg-white px-2.5 py-2 font-mono text-[11px] text-ink-primary">{user.id}</div>
+                    <div className="mt-2">That value is the format you should paste into this field for a linked household member.</div>
+                  </div>
+                ) : null}
               </div>
 
               <div className="flex items-center gap-3 pt-2">

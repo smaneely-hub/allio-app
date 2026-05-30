@@ -25,8 +25,17 @@ export function useLinkedHousehold() {
   const [linkedPlan, setLinkedPlan] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  const resetState = useCallback(() => {
+    setLinkedHousehold(null)
+    setLinkedMembers([])
+    setLinkedSchedule(null)
+    setLinkedSlots([])
+    setLinkedPlan(null)
+  }, [])
+
   const load = useCallback(async () => {
     if (!user) {
+      resetState()
       setLoading(false)
       return
     }
@@ -44,13 +53,17 @@ export function useLinkedHousehold() {
         .maybeSingle()
 
       if (memberError) {
+        resetState()
         // Column not yet available in this environment — fail silently.
         const isColumnMissing = String(memberError.message || '').includes('linked_user_id')
         if (!isColumnMissing) console.warn('[useLinkedHousehold]', memberError)
         return
       }
 
-      if (!memberRow?.household_id) return
+      if (!memberRow?.household_id) {
+        resetState()
+        return
+      }
 
       const householdId = memberRow.household_id
 
@@ -62,7 +75,12 @@ export function useLinkedHousehold() {
       setLinkedHousehold(householdResult.data || null)
       setLinkedMembers(membersResult.data || [])
 
-      if (!householdResult.data) return
+      if (!householdResult.data) {
+        setLinkedSchedule(null)
+        setLinkedSlots([])
+        setLinkedPlan(null)
+        return
+      }
 
       const weekStartDate = getWeekStartDate()
       const { data: schedule } = await supabase
@@ -75,7 +93,11 @@ export function useLinkedHousehold() {
 
       setLinkedSchedule(schedule || null)
 
-      if (!schedule?.id) return
+      if (!schedule?.id) {
+        setLinkedSlots([])
+        setLinkedPlan(null)
+        return
+      }
 
       const [slotsResult, planResult] = await Promise.all([
         supabase.from('schedule_slots').select('*').eq('schedule_id', schedule.id).order('sort_order', { ascending: true }),
@@ -85,11 +107,12 @@ export function useLinkedHousehold() {
       setLinkedSlots(slotsResult.data || [])
       setLinkedPlan(planResult.data || null)
     } catch (err) {
+      resetState()
       console.warn('[useLinkedHousehold] load failed:', err)
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }, [resetState, user])
 
   useEffect(() => {
     load()
