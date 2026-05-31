@@ -26,6 +26,8 @@ import { PrivacyPage } from './pages/PrivacyPage'
 import { TermsPage } from './pages/TermsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { SharedPage } from './pages/SharedPage'
+import { FeedPage } from './pages/FeedPage'
+import { SharedPostPage } from './pages/SharedPostPage'
 import { AdminRoute } from './components/AdminRoute'
 import { AdminPage } from './pages/AdminPage'
 import { AdminUsersPage } from './pages/AdminUsersPage'
@@ -222,6 +224,8 @@ function AppShell() {
             }
           />
           <Route path="/share/:token" element={<SharedPage />} />
+          <Route path="/feed" element={<FeedPage />} />
+          <Route path="/shared-post/:postId" element={<SharedPostPage />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/terms" element={<TermsPage />} />

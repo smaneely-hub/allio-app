@@ -51,6 +51,8 @@ export function ShareModal({ recipe, favorites, onClose }) {
   const [status, setStatus] = useState('creating') // creating | ready | error
   const [shareUrl, setShareUrl] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [publishPublicly, setPublishPublicly] = useState(false)
+  const [caption, setCaption] = useState('')
 
   const isRecipe = Boolean(recipe)
   const title = isRecipe
@@ -62,8 +64,8 @@ export function ShareModal({ recipe, favorites, onClose }) {
     async function create() {
       try {
         const token = isRecipe
-          ? await createRecipeShare(recipe)
-          : await createFavoritesShare(favorites)
+          ? await createRecipeShare(recipe, { publish: publishPublicly, caption })
+          : await createFavoritesShare(favorites, { publish: publishPublicly, caption })
         if (!cancelled) {
           setShareUrl(getShareUrl(token))
           setStatus('ready')
@@ -156,6 +158,21 @@ export function ShareModal({ recipe, favorites, onClose }) {
               <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-text-secondary">
                 {shareUrl}
               </span>
+            </div>
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 text-sm text-text-secondary">
+                <input type="checkbox" checked={publishPublicly} onChange={(e) => setPublishPublicly(e.target.checked)} />
+                Also publish to public feed
+              </label>
+              {publishPublicly ? (
+                <textarea
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  placeholder="Add a short caption"
+                  className="w-full rounded-2xl border border-divider bg-bg-soft px-4 py-3 text-sm text-text-primary"
+                  rows={3}
+                />
+              ) : null}
             </div>
             <div className="flex gap-2">
               <button

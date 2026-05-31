@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { createPublicPost } from './publicSharing'
 
 function generateToken() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -39,8 +40,22 @@ export function getShareUrl(token) {
   return `${window.location.origin}/share/${token}`
 }
 
-export async function createRecipeShare(recipe) {
+export async function createRecipeShare(recipe, { publish = false, caption = '' } = {}) {
   const userId = await getAuthUserId()
+  const snapshot = {
+    version: 1,
+    share_type: 'recipe',
+    recipes: [buildRecipePayload(recipe)],
+  }
+  if (publish) {
+    await createPublicPost({
+      postType: 'recipe',
+      title: recipe.title,
+      caption,
+      snapshot,
+      visibility: 'public',
+    })
+  }
   const token = generateToken()
   const { data, error } = await supabase
     .from('recipe_shares')
@@ -49,11 +64,7 @@ export async function createRecipeShare(recipe) {
       share_type: 'recipe',
       created_by: userId,
       label: recipe.title,
-      snapshot_json: {
-        version: 1,
-        share_type: 'recipe',
-        recipes: [buildRecipePayload(recipe)],
-      },
+      snapshot_json: snapshot,
     })
     .select('token')
     .single()
@@ -61,8 +72,22 @@ export async function createRecipeShare(recipe) {
   return data.token
 }
 
-export async function createFavoritesShare(recipes) {
+export async function createFavoritesShare(recipes, { publish = false, caption = '' } = {}) {
   const userId = await getAuthUserId()
+  const snapshot = {
+    version: 1,
+    share_type: 'favorites',
+    recipes: recipes.map(buildRecipePayload),
+  }
+  if (publish) {
+    await createPublicPost({
+      postType: 'favorites',
+      title: 'My Favorites',
+      caption,
+      snapshot,
+      visibility: 'public',
+    })
+  }
   const token = generateToken()
   const { data, error } = await supabase
     .from('recipe_shares')
@@ -71,11 +96,7 @@ export async function createFavoritesShare(recipes) {
       share_type: 'favorites',
       created_by: userId,
       label: 'My Favorites',
-      snapshot_json: {
-        version: 1,
-        share_type: 'favorites',
-        recipes: recipes.map(buildRecipePayload),
-      },
+      snapshot_json: snapshot,
     })
     .select('token')
     .single()
