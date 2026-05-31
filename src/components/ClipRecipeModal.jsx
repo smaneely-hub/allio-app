@@ -195,14 +195,14 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
       cook_time_minutes: cookMin,
       total_time_minutes: prepMin && cookMin ? prepMin + cookMin : cookMin || null,
       servings,
-      ingredients_json: JSON.stringify(ingredients),
-      instructions_json: JSON.stringify(steps),
-      ingredient_groups_json: JSON.stringify([
+      ingredients_json: ingredients,
+      instructions_json: steps,
+      ingredient_groups_json: [
         { label: null, ingredients: ingredients.map((i) => ({ item: i })) },
-      ]),
-      instruction_groups_json: JSON.stringify([
+      ],
+      instruction_groups_json: [
         { label: null, steps: steps.map((s) => ({ text: s })) },
-      ]),
+      ],
       source_type: 'clipped',
       source_name: formState.source_domain || null,
       source_url: formState.source_url || null,
