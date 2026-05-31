@@ -288,11 +288,11 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
             </button>
           </div>
 
-          {meal?.source_url ? (
+          {recipe.sourceUrl ? (
             <div className="mt-4 text-sm text-text-secondary">
               Source:{' '}
-              <a href={meal.source_url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary-600 underline break-all">
-                {meal.source_domain || meal.source_url}
+              <a href={recipe.sourceUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-primary-600 underline break-all">
+                {recipe.sourceDomain || recipe.sourceUrl}
               </a>
             </div>
           ) : null}

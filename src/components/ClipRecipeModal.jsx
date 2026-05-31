@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { updateRecipe } from '../hooks/useRecipeMutations'
+import { normalizeRecipe } from '../lib/recipeSchema'
 
 function SaveToCatalogPrompt({ recipe, onSave, onEditFirst, loading }) {
   return (
@@ -84,6 +85,30 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
   const [form, setForm] = useState(null)
   const [showSavePrompt, setShowSavePrompt] = useState(false)
   const [isFromImport, setIsFromImport] = useState(false)
+
+  const previewRecipe = useMemo(() => {
+    if (!form) return null
+    return normalizeRecipe({
+      title: form.title,
+      description: form.description,
+      meal_type: form.meal_type,
+      prep_time_minutes: form.prep_time_minutes,
+      cook_time_minutes: form.cook_time_minutes,
+      servings: form.servings,
+      image_url: form.image_url,
+      source_url: form.source_url,
+      source_domain: form.source_domain,
+      ingredients_json: form.ingredients_text
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean),
+      instructions_json: form.steps_text
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean),
+      nutrition_json: form.nutrition || null,
+    })
+  }, [form])
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
   const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -263,19 +288,28 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
     setError(null)
     try {
       const savedRecipe = await saveRecipe(form)
+      let nutritionWarning = null
       if (!form.id && !form.nutrition && savedRecipe?.id) {
         try {
           const estimated = await supabase.functions.invoke('estimate-recipe-nutrition', {
             body: { recipeId: savedRecipe.id },
           })
+          if (estimated?.error) {
+            throw estimated.error
+          }
           if (estimated?.data?.nutrition) {
             form.nutrition = estimated.data.nutrition
+          } else {
+            nutritionWarning = 'Recipe saved, but nutrition could not be generated yet.'
           }
-        } catch {
-          // Non-fatal: recipe is still saved, user can generate later.
+        } catch (nutritionError) {
+          nutritionWarning = nutritionError?.message || 'Recipe saved, but nutrition could not be generated yet.'
         }
       }
       toast.success(form.id ? 'Recipe updated!' : 'Recipe saved to your catalog!')
+      if (nutritionWarning) {
+        toast.error(nutritionWarning)
+      }
       setShowSavePrompt(false)
       setError(null)
       if (!form.id) {
@@ -372,10 +406,10 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
             <div className="space-y-4">
               {isFromImport ? (
                 <div className="space-y-3">
-                  {form.image_url && (
+                  {previewRecipe?.imageUrl && (
                     <img
-                      src={form.image_url}
-                      alt={form.title}
+                      src={previewRecipe.imageUrl}
+                      alt={previewRecipe.title}
                       className="w-full h-44 object-cover rounded-xl"
                       onError={(e) => { e.currentTarget.style.display = 'none' }}
                     />
@@ -384,16 +418,16 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
                     <span className="mt-0.5 shrink-0">✓</span>
                     <span>
                       Recipe imported successfully.
-                      {form.source_url ? (
+                      {previewRecipe?.sourceUrl ? (
                         <>
                           {' '}Source:{' '}
                           <a
-                            href={form.source_url}
+                            href={previewRecipe.sourceUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="underline"
                           >
-                            {form.source_domain || form.source_url}
+                            {previewRecipe.sourceDomain || previewRecipe.sourceUrl}
                           </a>
                         </>
                       ) : null}
@@ -483,6 +517,30 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
                   />
                 </div>
               </div>
+
+              {isFromImport && previewRecipe ? (
+                <div className="rounded-xl border border-divider bg-surface-card px-3 py-3 text-sm text-text-secondary">
+                  <div className="font-medium text-text-primary">Import preview</div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <div className="text-xs uppercase tracking-wide text-text-muted">Ingredients</div>
+                      <div className="mt-1 line-clamp-6 whitespace-pre-line">{form.ingredients_text || 'None found'}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs uppercase tracking-wide text-text-muted">Steps</div>
+                      <div className="mt-1 line-clamp-6 whitespace-pre-line">{form.steps_text || 'None found'}</div>
+                    </div>
+                  </div>
+                  {previewRecipe.nutrition ? (
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                      <span className="rounded-full bg-warm-100 px-2.5 py-1">{previewRecipe.nutrition.calories} cal</span>
+                      <span className="rounded-full bg-warm-100 px-2.5 py-1">P {previewRecipe.nutrition.protein || '—'}</span>
+                      <span className="rounded-full bg-warm-100 px-2.5 py-1">C {previewRecipe.nutrition.carbs || '—'}</span>
+                      <span className="rounded-full bg-warm-100 px-2.5 py-1">F {previewRecipe.nutrition.fat || '—'}</span>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-text-primary">

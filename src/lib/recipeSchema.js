@@ -238,6 +238,8 @@ export function normalizeRecipe(recipe = {}) {
         }
       : undefined,
     sourceNote: typeof recipe.sourceNote === 'string' ? recipe.sourceNote : undefined,
+    sourceUrl: asString(recipe.sourceUrl ?? recipe.source_url, ''),
+    sourceDomain: asString(recipe.sourceDomain ?? recipe.source_domain, ''),
     imagePrompt: typeof recipe.imagePrompt === 'string' ? recipe.imagePrompt : undefined,
     createdAt: asString(recipe.createdAt ?? recipe.created_at, ''),
     updatedAt: asString(recipe.updatedAt ?? recipe.updated_at, ''),
