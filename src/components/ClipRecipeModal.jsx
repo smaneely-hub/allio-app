@@ -247,8 +247,9 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
       return
     }
 
-    const { error } = await supabase.from('recipes').insert(row)
+    const { data, error } = await supabase.from('recipes').insert(row).select('id').single()
     if (error) throw new Error(error.message)
+    return data
   }
 
   async function handleSave() {
@@ -261,7 +262,19 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
     setLoading(true)
     setError(null)
     try {
-      await saveRecipe(form)
+      const savedRecipe = await saveRecipe(form)
+      if (!form.id && !form.nutrition && savedRecipe?.id) {
+        try {
+          const estimated = await supabase.functions.invoke('estimate-recipe-nutrition', {
+            body: { recipeId: savedRecipe.id },
+          })
+          if (estimated?.data?.nutrition) {
+            form.nutrition = estimated.data.nutrition
+          }
+        } catch {
+          // Non-fatal: recipe is still saved, user can generate later.
+        }
+      }
       toast.success(form.id ? 'Recipe updated!' : 'Recipe saved to your catalog!')
       setShowSavePrompt(false)
       setError(null)
