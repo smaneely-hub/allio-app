@@ -155,6 +155,7 @@ export function normalizeRecipe(recipe = {}) {
     recipe.instruction_groups,
     nestedRecipe?.instruction_groups,
   )
+  const rawNutrition = recipe?.nutrition_json ?? recipe?.nutrition ?? nestedRecipe?.nutrition_json ?? nestedRecipe?.nutrition
   const normalizedLegacyInstructionSteps = legacyInstructionSteps.length
     ? legacyInstructionSteps
     : splitInstructionString(instructionString)
@@ -225,15 +226,15 @@ export function normalizeRecipe(recipe = {}) {
       season: typeof tags?.season === 'string' ? tags.season : undefined,
       cookingMethod: asArray(tags.cookingMethod).filter((value) => typeof value === 'string'),
     },
-    nutrition: recipe?.nutrition && typeof recipe.nutrition === 'object'
+    nutrition: rawNutrition && typeof rawNutrition === 'object'
       ? {
-          calories: asNumber(recipe.nutrition.calories, 0),
-          protein: asString(recipe.nutrition.protein, ''),
-          carbs: asString(recipe.nutrition.carbs, ''),
-          fat: asString(recipe.nutrition.fat, ''),
-          fiber: typeof recipe.nutrition.fiber === 'string' ? recipe.nutrition.fiber : undefined,
-          sodium: typeof recipe.nutrition.sodium === 'string' ? recipe.nutrition.sodium : undefined,
-          estimated: Boolean(recipe.nutrition.estimated),
+          calories: asNumber(rawNutrition.calories, 0),
+          protein: asString(rawNutrition.protein, ''),
+          carbs: asString(rawNutrition.carbs, ''),
+          fat: asString(rawNutrition.fat, ''),
+          fiber: typeof rawNutrition.fiber === 'string' ? rawNutrition.fiber : undefined,
+          sodium: typeof rawNutrition.sodium === 'string' ? rawNutrition.sodium : undefined,
+          estimated: Boolean(rawNutrition.estimated),
         }
       : undefined,
     sourceNote: typeof recipe.sourceNote === 'string' ? recipe.sourceNote : undefined,
