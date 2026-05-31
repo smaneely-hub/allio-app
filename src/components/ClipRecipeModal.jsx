@@ -27,6 +27,47 @@ function SaveToCatalogPrompt({ recipe, onSave, onEditFirst, loading }) {
 
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack']
 
+function flattenImportedIngredients(value) {
+  if (!value) return []
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => {
+      if (!entry) return []
+      if (typeof entry === 'string') return entry.trim() ? [entry.trim()] : []
+      if (typeof entry === 'object') {
+        if (Array.isArray(entry.ingredients)) return flattenImportedIngredients(entry.ingredients)
+        const line = [entry.amount, entry.unit, entry.item || entry.name || entry.text]
+          .filter(Boolean)
+          .map((part) => String(part).trim())
+          .join(' ')
+          .trim()
+        return line ? [line] : []
+      }
+      return []
+    })
+  }
+  return []
+}
+
+function flattenImportedSteps(value) {
+  if (!value) return []
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => {
+      if (!entry) return []
+      if (typeof entry === 'string') return entry.trim() ? [entry.trim()] : []
+      if (typeof entry === 'object') {
+        if (Array.isArray(entry.steps)) return flattenImportedSteps(entry.steps)
+        const text = entry.text || entry.name
+        return typeof text === 'string' && text.trim() ? [text.trim()] : []
+      }
+      return []
+    })
+  }
+  if (typeof value === 'string') {
+    return value.split('\n').map((line) => line.trim()).filter(Boolean)
+  }
+  return []
+}
+
 function slugify(text) {
   return text
     .toLowerCase()
@@ -90,25 +131,17 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Could not extract a recipe from this URL')
       const r = data.recipe || {}
-      const importedIngredients = Array.isArray(r.ingredients)
-        ? r.ingredients
-        : Array.isArray(r.ingredient_groups_json)
-          ? r.ingredient_groups_json.flatMap((group) => (group?.ingredients || []).map((ingredient) => [ingredient.amount, ingredient.unit, ingredient.item || ingredient.name].filter(Boolean).join(' ').trim()))
-          : []
-      const importedSteps = Array.isArray(r.steps)
-        ? r.steps
-        : Array.isArray(r.instruction_groups_json)
-          ? r.instruction_groups_json.flatMap((group) => (group?.steps || []).map((step) => step?.text).filter(Boolean))
-          : []
+      const importedIngredients = flattenImportedIngredients(r.ingredients || r.ingredient_groups_json)
+      const importedSteps = flattenImportedSteps(r.steps || r.instructions || r.instruction_groups_json)
 
       setForm({
-        title: r.title || '',
-        description: r.description || '',
+        title: typeof r.title === 'string' ? r.title : '',
+        description: typeof r.description === 'string' ? r.description : '',
         meal_type: r.meal_type || r.tags?.mealType || 'dinner',
-        prep_time_minutes: r.prep_time_minutes ?? '',
-        cook_time_minutes: r.cook_time_minutes ?? '',
-        servings: r.servings ?? '',
-        image_url: r.image_url || '',
+        prep_time_minutes: r.prep_time_minutes ?? r.prepTime ?? '',
+        cook_time_minutes: r.cook_time_minutes ?? r.cookTime ?? '',
+        servings: r.servings ?? r.yield ?? '',
+        image_url: r.image_url || r.imageUrl || '',
         source_url: r.source_url || trimmed,
         source_domain: r.source_domain || '',
         ingredients_text: importedIngredients.join('\n'),
