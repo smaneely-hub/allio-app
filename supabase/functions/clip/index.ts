@@ -372,7 +372,7 @@ async function fetchDirectHtml(url: string): Promise<string | null> {
 }
 
 async function fetchJina(url: string, asHtml: boolean): Promise<string | null> {
-  const endpoint = `https://r.jina.ai/http://${url}`
+  const endpoint = `https://r.jina.ai/${url}`
   const headers: Record<string, string> = {
     'Accept': asHtml ? 'text/html' : 'text/plain',
   }
