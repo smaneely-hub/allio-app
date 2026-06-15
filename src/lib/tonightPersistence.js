@@ -15,13 +15,14 @@ export async function upsertShoppingListForDate({ userId, householdId, weekOf, i
   const plannerKeepers = (existingItems || []).filter((item) => !PLANNER_SOURCES.has(String(item.source || '').trim().toLowerCase()))
   const nextPlannerItems = (items || []).map((item) => ({
     name: item.name,
-    quantity: [item.quantity, item.unit].filter(Boolean).join(' ').trim() || null,
+    quantity: item.quantity != null ? String(item.quantity).trim() || null : null,
+    unit: item.unit != null ? String(item.unit).trim() : '',
     category: item.category,
     checked: Boolean(item.checked),
     source: item.source || 'planner',
   }))
 
-  const { supabase } = await import('./supabase')
+  const { supabase } = await import('./supabase.js')
   const existingPlannerIds = (existingItems || [])
     .filter((item) => PLANNER_SOURCES.has(String(item.source || '').trim().toLowerCase()))
     .map((item) => item.id)

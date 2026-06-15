@@ -122,3 +122,26 @@ test('aggregate shopping list removes planned items after the meal date passes',
   assert.equal(items.length, 1)
   assert.equal(items[0].normalizedName, 'bread')
 })
+
+test('buildGroupedShoppingItems prefers structured ingredientGroups over degraded ingredient strings', () => {
+  const rows = aggregateShoppingList({
+    meals: [{
+      name: 'Sheet-Pan Lemon-Herb Chicken Thighs With Broccoli',
+      ingredients: ['size florets', 'lemons, 1 thinly sliced and 1 cut into wedges'],
+      ingredientGroups: [
+        {
+          ingredients: [
+            { amount: '1', unit: 'large', item: 'head broccoli, cut into bite-size florets' },
+            { amount: '2', unit: 'medium', item: 'lemons, 1 thinly sliced and 1 cut into wedges' },
+            { amount: '1/4', unit: 'tsp', item: 'red pepper flakes', optional: true },
+          ],
+        },
+      ],
+    }],
+  }, '')
+
+  assert.equal(rows.some((item) => item.normalizedName === 'size florets'), false)
+  assert.equal(rows.some((item) => item.normalizedName.includes('head broccoli')), true)
+  assert.equal(rows.some((item) => item.normalizedName === 'lemons, 1 thinly sliced and 1 cut into wedges'), true)
+  assert.equal(rows.some((item) => item.normalizedName === 'red pepper flakes'), true)
+})

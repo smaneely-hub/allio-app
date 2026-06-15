@@ -1,5 +1,5 @@
-import { supabase } from './supabase'
-import { normalizeIngredientName, parseIngredient } from './shoppingListUtils'
+import { supabase } from './supabase.js'
+import { normalizeIngredientName, parseIngredient } from './shoppingListUtils.js'
 
 const MIXED_SOURCE = 'mixed'
 
@@ -253,10 +253,10 @@ export function buildShoppingItemRows(meal, staplesOnHand = '', source = 'tonigh
     .map((value) => value.trim())
     .filter(Boolean)
 
-  const ingredients = Array.isArray(meal?.ingredients)
-    ? meal.ingredients
-    : Array.isArray(meal?.ingredientGroups)
-      ? meal.ingredientGroups.flatMap((group) => Array.isArray(group?.ingredients) ? group.ingredients : [])
+  const ingredients = Array.isArray(meal?.ingredientGroups)
+    ? meal.ingredientGroups.flatMap((group) => Array.isArray(group?.ingredients) ? group.ingredients : [])
+    : Array.isArray(meal?.ingredients)
+      ? meal.ingredients
       : []
 
   return ingredients
@@ -265,7 +265,8 @@ export function buildShoppingItemRows(meal, staplesOnHand = '', source = 'tonigh
     .filter((parsed) => !staples.some((staple) => parsed.normalizedName.includes(staple)))
     .map((parsed) => ({
       name: parsed.name,
-      quantity: [parsed.quantityText, parsed.unit].filter(Boolean).join(' ').trim(),
+      quantity: parsed.quantityText,
+      unit: parsed.unit,
       category: parsed.category,
       checked: false,
       source,
