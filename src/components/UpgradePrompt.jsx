@@ -1,7 +1,4 @@
-import { useState } from 'react'
-import toast from 'react-hot-toast'
-import { useAuth } from '../hooks/useAuth'
-import { upgradeToPremium } from '../lib/usageTracking'
+import { Link } from 'react-router-dom'
 
 const featureDescriptions = {
   email_delivery: {
@@ -45,29 +42,9 @@ const premiumBenefits = [
 ]
 
 export function UpgradePrompt({ feature, onClose, isOpen }) {
-  // Don't render if not open or no feature specified
-  if (!isOpen || !feature) return null
-  
-  const { user } = useAuth()
-  const [loading, setLoading] = useState(false)
-  
   const featureInfo = featureDescriptions[feature] || { title: 'Go Premium', description: 'Unlock all features with Allio Premium.' }
-  
-  const handleUpgrade = async () => {
-    setLoading(true)
-    try {
-      // Beta: temporarily upgrade to premium
-      if (user) {
-        await upgradeToPremium(user.id)
-      }
-      toast.success('Payment coming soon! Enjoy premium features for free during our beta.')
-      onClose?.()
-    } catch (err) {
-      toast.error('Something went wrong. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
+
+  if (!isOpen || !feature) return null
   
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -119,16 +96,16 @@ export function UpgradePrompt({ feature, onClose, isOpen }) {
         </div>
         
         {/* CTA Button */}
-        <button
-          onClick={handleUpgrade}
-          disabled={loading}
-          className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 active:scale-[0.97] disabled:opacity-50"
+        <Link
+          to="/pricing"
+          onClick={onClose}
+          className="block w-full text-center bg-gradient-to-r from-green-500 to-teal-500 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 active:scale-[0.97]"
         >
-          {loading ? 'Processing...' : 'Start free trial'}
-        </button>
-        
+          See pricing — coming soon
+        </Link>
+
         <p className="text-xs text-text-muted text-center mt-3">
-          Cancel anytime. 7-day free trial.
+          Premium plans launching soon. Sign up free to be notified.
         </p>
       </div>
     </div>

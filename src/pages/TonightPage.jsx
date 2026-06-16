@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { SwipeDeck } from '../components/SwipeDeck'
 import toast from 'react-hot-toast'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
@@ -10,8 +10,8 @@ import { normalizeMealRecord } from '../lib/mealSchema'
 import { getLocalDateString } from '../lib/date'
 import { autoLogCookedMealNutrition, isNutritionLoggingUnavailable } from '../lib/nutritionLogging'
 import { invokePlannerFunction, refineMeal } from '../lib/plannerFunction'
-import { upsertShoppingListForDate, buildShoppingItemsFromMeal } from '../lib/tonightPersistence'
-import { addItemsToShoppingList } from '../lib/shoppingLists'
+import { buildShoppingItemsFromMeal } from '../lib/tonightPersistence'
+import { addItemsToShoppingList, ensureDefaultShoppingList } from '../lib/shoppingLists'
 import { useShoppingListPreferences } from '../hooks/useShoppingListPreferences'
 import { useShoppingLists } from '../hooks/useShoppingLists'
 import { ShoppingListPickerModal } from '../components/ShoppingListPickerModal'
@@ -248,7 +248,7 @@ const MEMBER_FEEDBACK_OPTIONS = [
   { value: 'did_not_eat', label: "Didn't eat it" },
 ]
 
-async function persistTonightMealState({ userId, householdId, meal, staplesOnHand = '' }) {
+async function persistTonightMealState({ userId, householdId, meal }) {
   const today = getLocalDateString()
   const planPayload = {
     meals: [{ ...meal, id: `${meal.day}-${meal.meal}` }],
@@ -392,7 +392,6 @@ async function loadTonightPreferenceSignals(userId) {
 export function TonightPage() {
   useDocumentTitle("Tonight's Meal | Allio")
   const { user } = useAuth()
-  const navigate = useNavigate()
   const initialDataLoadedRef = useRef(false)
   const savedMealsLoadedRef = useRef(false)
   const { members } = useHouseholdMembers(user?.id)

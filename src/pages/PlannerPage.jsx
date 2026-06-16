@@ -5,7 +5,6 @@ import { useAuth } from '../hooks/useAuth'
 import { useHousehold } from '../hooks/useHousehold'
 import { useSchedule } from '../hooks/useSchedule'
 import { useMealPlan } from '../hooks/useMealPlan'
-import { useSubscription } from '../hooks/useSubscription'
 import { useShoppingListPreferences } from '../hooks/useShoppingListPreferences'
 import { useShoppingLists } from '../hooks/useShoppingLists'
 import { useLinkedHousehold } from '../hooks/useLinkedHousehold'
@@ -136,7 +135,6 @@ export function PlannerPage() {
   const { user } = useAuth()
   const { household, members, loading: householdLoading, saveMembers, reloadHousehold } = useHousehold()
   const { schedule, slots, loading: scheduleLoading, saveSchedule, loadSchedule } = useSchedule()
-  const { isPremium } = useSubscription()
   const { defaultListId, alwaysAsk } = useShoppingListPreferences(user?.id)
   const { lists, createList } = useShoppingLists(user?.id)
   const { linkedHousehold, linkedPlan } = useLinkedHousehold()
@@ -388,10 +386,19 @@ export function PlannerPage() {
     const slotKey = `${dayKey}-${mealType}`
     const existingSlot = slotState[slotKey]
     const fallbackAttendees = memberOptions.slice(0, 1).map((m) => m.id)
-    // Use explicitly provided targetDate; otherwise resolve the visible day's actual date.
+    // Use explicitly provided targetDate; otherwise resolve the day's date within the visible week.
     const targetDate = overrides.targetDate || (() => {
-      const matchingDay = plannerDays.find((day) => day.key === dayKey)
-      return matchingDay?.date ? toIsoLocalDate(matchingDay.date) : toIsoLocalDate(new Date(selectedDate))
+      const DOW = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 }
+      const base = new Date(selectedDate)
+      base.setHours(0, 0, 0, 0)
+      const targetDow = DOW[dayKey]
+      if (targetDow !== undefined) {
+        const offset = (targetDow - base.getDay() + 7) % 7
+        const d = new Date(base)
+        d.setDate(base.getDate() + offset)
+        return toIsoLocalDate(d)
+      }
+      return toIsoLocalDate(base)
     })()
 
     const slot = {

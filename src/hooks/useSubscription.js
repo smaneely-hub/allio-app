@@ -13,17 +13,38 @@ const FEATURES = {
 }
 
 export function useSubscription() {
-  const [tier, setTier] = useState('premium')
+  const [tier, setTier] = useState('free')
   const [subscription, setSubscription] = useState(null)
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
 
   useEffect(() => {
     async function initSubscription() {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-      setTier('premium')
-      setSubscription({ tier: 'premium', testingOverride: true })
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      setUser(authUser)
+
+      if (!authUser) {
+        setTier('free')
+        setSubscription(null)
+        setLoading(false)
+        return
+      }
+
+      try {
+        const { data: household } = await supabase
+          .from('households')
+          .select('subscription_tier')
+          .eq('user_id', authUser.id)
+          .maybeSingle()
+
+        const resolvedTier = household?.subscription_tier === 'premium' ? 'premium' : 'free'
+        setTier(resolvedTier)
+        setSubscription(household ? { tier: resolvedTier } : null)
+      } catch {
+        setTier('free')
+        setSubscription(null)
+      }
+
       setLoading(false)
     }
 
@@ -121,18 +142,10 @@ export function useSubscription() {
     }
   }, [isPremium, getUsageCount])
 
-  // Upgrade to premium (beta temporary)
-  const upgradeToPremium = useCallback(async () => {
-    if (!user) return false
-
-    await supabase
-      .from('households')
-      .update({ subscription_tier: 'premium' })
-      .eq('user_id', user.id)
-
-    setTier('premium')
-    return true
-  }, [user])
+  const upgradeToPremium = useCallback(() => {
+    // Paid subscriptions are not yet available. Redirect to pricing info.
+    return Promise.resolve(false)
+  }, [])
 
   return {
     tier,

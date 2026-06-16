@@ -26,16 +26,16 @@ const premiumFeatures = [
 
 const faqs = [
   {
-    question: 'Can I cancel anytime?',
-    answer: 'Yes. Cancel from your profile page. You keep premium until the end of your billing period.'
+    question: 'When will Premium be available?',
+    answer: 'We\'re working on it. Sign up for free now — you\'ll be notified when paid plans launch.'
   },
   {
-    question: 'What happens to my data if I downgrade?',
-    answer: 'All your meal plans and shopping lists are saved. You just can\'t generate new plans beyond the free limit.'
+    question: 'What happens to my data?',
+    answer: 'All your meal plans and shopping lists are always saved. You can delete your account and data at any time from Settings → Account.'
   },
   {
     question: 'Is there a family plan?',
-    answer: 'Coming soon! Right now premium covers your entire household.'
+    answer: 'Coming soon! Right now the app covers your entire household under one account.'
   }
 ]
 
@@ -100,15 +100,15 @@ export function PricingPage() {
           {/* Premium Plan */}
           <div className="bg-white rounded-2xl p-8 shadow-lg border-2 border-primary-200 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-primary-400 to-teal-400 text-white text-center py-1 text-xs font-semibold">
-              MOST POPULAR
+              COMING SOON
             </div>
-            
+
             <h2 className="font-display text-2xl text-text-primary mb-2 mt-2">Premium</h2>
             <div className="mb-6">
               <span className="font-display text-4xl text-text-primary">$6.99</span>
               <span className="text-text-muted">/month</span>
             </div>
-            
+
             <ul className="space-y-3 mb-8">
               {premiumFeatures.map((feature, i) => (
                 <li key={i} className="flex items-center gap-2 text-sm text-text-primary">
@@ -117,16 +117,16 @@ export function PricingPage() {
                 </li>
               ))}
             </ul>
-            
-            <Link 
-              to="/login" 
+
+            <Link
+              to="/login"
               className="block w-full py-3 px-6 text-center bg-gradient-to-r from-green-500 to-teal-500 text-white font-bold rounded-full shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all"
             >
-              Start 7-day free trial
+              Sign up — be first to know
             </Link>
-            
+
             <p className="text-xs text-text-muted text-center mt-3">
-              Cancel anytime
+              Paid plans launching soon
             </p>
           </div>
         </div>

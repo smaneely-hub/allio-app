@@ -51,6 +51,9 @@ export function SettingsPage() {
   const { lists: shoppingLists } = useShoppingLists(user?.id)
   const [saving, setSaving] = useState(false)
   const [savingMembers, setSavingMembers] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deletingAccount, setDeletingAccount] = useState(false)
   const { theme, setTheme } = useTheme()
 
   useEffect(() => {
@@ -162,6 +165,23 @@ export function SettingsPage() {
       toast.error(error?.message || 'Could not restore family members')
     } finally {
       setSavingMembers(false)
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') return
+    setDeletingAccount(true)
+    try {
+      const { error } = await supabase.functions.invoke('delete-account', {})
+      if (error) {
+        toast.error(error.message || 'Could not delete account. Please contact support.')
+        setDeletingAccount(false)
+        return
+      }
+      await signOut()
+    } catch (err) {
+      toast.error(err?.message || 'Could not delete account. Please contact support.')
+      setDeletingAccount(false)
     }
   }
 
@@ -337,6 +357,46 @@ export function SettingsPage() {
           <div className="space-y-3">
             <Link to="/household" className="block text-sm font-medium text-text-primary underline underline-offset-2">Household</Link>
             <button type="button" onClick={signOut} className="text-sm font-medium text-red-500">Sign out</button>
+            <div className="border-t border-divider pt-3">
+              {!showDeleteConfirm ? (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="text-sm font-medium text-red-500 hover:text-red-700"
+                >
+                  Delete account…
+                </button>
+              ) : (
+                <div className="space-y-3 rounded-2xl border border-red-200 bg-red-50 p-4">
+                  <p className="text-sm font-semibold text-red-700">Delete your account permanently?</p>
+                  <p className="text-xs text-red-600">This will delete all your data — meal plans, shopping lists, household — and cannot be undone. Type <strong>DELETE</strong> to confirm.</p>
+                  <input
+                    className="input w-full text-sm"
+                    placeholder="Type DELETE to confirm"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    autoComplete="off"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleDeleteAccount}
+                      disabled={deleteConfirmText !== 'DELETE' || deletingAccount}
+                      className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40 hover:bg-red-700 transition-colors"
+                    >
+                      {deletingAccount ? 'Deleting…' : 'Delete my account'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText('') }}
+                      className="rounded-full border border-divider px-4 py-2 text-sm font-medium text-text-secondary hover:bg-surface transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </section>
 
