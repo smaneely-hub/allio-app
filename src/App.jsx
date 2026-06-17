@@ -32,6 +32,7 @@ import { AdminRoute } from './components/AdminRoute'
 import { AdminPage } from './pages/AdminPage'
 import { AdminUsersPage } from './pages/AdminUsersPage'
 import { AdminUserDetailPage } from './pages/AdminUserDetailPage'
+import { AuthCallbackPage } from './pages/AuthCallbackPage'
 
 function ConnectionCheck({ children }) {
   return children
@@ -71,7 +72,7 @@ export default function App() {
 
 function AppShell() {
   const location = useLocation()
-  const hideGlobalNav = ['/', '/login', '/try', '/pricing', '/privacy', '/terms'].includes(location.pathname)
+  const hideGlobalNav = ['/', '/login', '/try', '/pricing', '/privacy', '/terms', '/auth/callback'].includes(location.pathname)
     || location.pathname.startsWith('/share/')
 
   return (
@@ -82,6 +83,7 @@ function AppShell() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/try" element={<PublicMealGeneratorPage />} />
           <Route
             path="/onboarding"
