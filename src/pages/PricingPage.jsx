@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { PREMIUM_PRICE_MONTHLY } from '../lib/billing'
 
 const freeFeatures = [
   { name: '1 meal plan per week', included: true },
@@ -105,7 +106,7 @@ export function PricingPage() {
 
             <h2 className="font-display text-2xl text-text-primary mb-2 mt-2">Premium</h2>
             <div className="mb-6">
-              <span className="font-display text-4xl text-text-primary">$6.99</span>
+              <span className="font-display text-4xl text-text-primary">${PREMIUM_PRICE_MONTHLY}</span>
               <span className="text-text-muted">/month</span>
             </div>
 

@@ -228,6 +228,7 @@ export function useHousehold() {
           health_considerations: member.health_considerations || [],
           date_of_birth: member.date_of_birth || null,
           linked_user_id: member.linked_user_id || null,
+          avatar_url: member.avatar_url || null,
         }))
 
         // Non-destructive save: delete only members removed from the list,
@@ -258,11 +259,11 @@ export function useHousehold() {
             .update(payload)
             .eq('id', id)
           if (updateError) {
-            // Some columns (date_of_birth, linked_user_id) may not exist in prod yet; retry without them
+            // Some columns may not exist in prod yet; retry without them
             const msg = String(updateError.message || '')
-            const isColumnMissing = msg.includes('date_of_birth') || msg.includes('linked_user_id')
+            const isColumnMissing = msg.includes('date_of_birth') || msg.includes('linked_user_id') || msg.includes('avatar_url')
             if (isColumnMissing) {
-              const { date_of_birth: _dob, linked_user_id: _lid, ...payloadStripped } = payload
+              const { date_of_birth: _dob, linked_user_id: _lid, avatar_url: _av, ...payloadStripped } = payload
               const { error: retryError } = await supabase
                 .from('household_members')
                 .update(payloadStripped)
@@ -282,11 +283,12 @@ export function useHousehold() {
             .from('household_members')
             .insert(newMembers)
           if (insertError) {
-            // Some columns (date_of_birth, linked_user_id) may not exist in prod yet; retry without them
+            // Some columns may not exist in prod yet; retry without them
             const msg = String(insertError.message || '')
-            const isColumnMissing = msg.includes('date_of_birth') || msg.includes('linked_user_id')
+            const isColumnMissing = msg.includes('date_of_birth') || msg.includes('linked_user_id') || msg.includes('avatar_url')
             if (isColumnMissing) {
-              const membersStripped = newMembers.map(({ date_of_birth: _dob, linked_user_id: _lid, ...m }) => m)
+              // eslint-disable-next-line no-unused-vars
+              const membersStripped = newMembers.map(({ date_of_birth: _dob, linked_user_id: _lid, avatar_url: _av, ...m }) => m)
               const { error: retryError } = await supabase
                 .from('household_members')
                 .insert(membersStripped)

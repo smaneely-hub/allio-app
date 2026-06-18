@@ -1,6 +1,7 @@
 // Subscription and feature access hook
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { resolveEntitlement, SUBSCRIPTION_TIERS } from '../lib/billing'
 
 const FEATURES = {
   meal_plan_generate: { free: 1, premium: Infinity, period: 7 }, // 1 per week for free
@@ -13,7 +14,8 @@ const FEATURES = {
 }
 
 export function useSubscription() {
-  const [tier, setTier] = useState('free')
+  const [tier, setTier] = useState(SUBSCRIPTION_TIERS.FREE)
+  const [subscriptionSource, setSubscriptionSource] = useState(null)
   const [subscription, setSubscription] = useState(null)
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
@@ -24,7 +26,8 @@ export function useSubscription() {
       setUser(authUser)
 
       if (!authUser) {
-        setTier('free')
+        setTier(SUBSCRIPTION_TIERS.FREE)
+        setSubscriptionSource(null)
         setSubscription(null)
         setLoading(false)
         return
@@ -33,15 +36,17 @@ export function useSubscription() {
       try {
         const { data: household } = await supabase
           .from('households')
-          .select('subscription_tier')
+          .select('subscription_tier, subscription_source, subscription_id')
           .eq('user_id', authUser.id)
           .maybeSingle()
 
-        const resolvedTier = household?.subscription_tier === 'premium' ? 'premium' : 'free'
-        setTier(resolvedTier)
-        setSubscription(household ? { tier: resolvedTier } : null)
+        const entitlement = resolveEntitlement(household)
+        setTier(entitlement.tier)
+        setSubscriptionSource(entitlement.source)
+        setSubscription(household ? entitlement : null)
       } catch {
-        setTier('free')
+        setTier(SUBSCRIPTION_TIERS.FREE)
+        setSubscriptionSource(null)
         setSubscription(null)
       }
 
@@ -143,14 +148,16 @@ export function useSubscription() {
   }, [isPremium, getUsageCount])
 
   const upgradeToPremium = useCallback(() => {
-    // Paid subscriptions are not yet available. Redirect to pricing info.
-    return Promise.resolve(false)
+    // No billing provider is integrated yet.
+    // See src/lib/billing.js for the integration path and stubs.
+    return Promise.resolve({ supported: false })
   }, [])
 
   return {
     tier,
     isPremium,
     isFreeTier,
+    subscriptionSource,
     loading,
     subscription,
     checkFeatureAccess,

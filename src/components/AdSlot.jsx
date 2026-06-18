@@ -22,12 +22,12 @@ export function AdSlot({ size = 'banner', position = 'default' }) {
       
       const { data: household } = await supabase
         .from('households')
-        .select('tier')
+        .select('subscription_tier')
         .eq('user_id', user.id)
         .limit(1)
         .single()
-      
-      setIsPremium(household?.tier === 'premium')
+
+      setIsPremium(household?.subscription_tier === 'premium')
       setLoading(false)
     }
     

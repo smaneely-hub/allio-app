@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
+import { MemberAvatar } from '../household/MemberAvatar'
 
 function CloseIcon(props) {
   return (
@@ -137,12 +138,15 @@ export function HouseholdMembersModal({ open, members = [], saving = false, onCl
               sortedMembers.map((member, index) => (
                 <div key={member.id || `${member.displayName}-${index}`} className="rounded-3xl border border-surface-muted bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <MemberAvatar name={member.displayName} avatarUrl={member.avatar_url} size="sm" className="mt-0.5 shrink-0" />
+                      <div className="min-w-0 flex-1">
                       <div className="text-base font-semibold text-ink-primary">{member.displayName}</div>
                       <div className="mt-1 text-sm text-ink-secondary">{member.age != null && member.age !== '' ? `${member.age} years old` : 'Age not provided'}</div>
                       {Array.isArray(member.dietary_restrictions) && member.dietary_restrictions.length > 0 ? <div className="mt-3 text-xs text-ink-secondary">Dietary: {member.dietary_restrictions.join(', ')}</div> : null}
                       {Array.isArray(member.food_preferences) && member.food_preferences.length > 0 ? <div className="mt-1 text-xs text-ink-secondary">Preferences: {member.food_preferences.join(', ')}</div> : null}
                       {member.linked_user_id ? <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700">Account linked</div> : null}
+                      </div>
                     </div>
                     <div className="flex shrink-0 gap-2">
                       <button type="button" onClick={() => startEdit(member)} className="rounded-full border border-surface-muted px-3 py-1.5 text-sm font-medium text-ink-primary transition-colors duration-150 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 cursor-pointer">

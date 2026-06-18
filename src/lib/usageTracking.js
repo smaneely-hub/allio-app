@@ -1,18 +1,19 @@
-// Usage tracking functions
+// Usage tracking functions — metering and rate-limiting only.
+// Entitlement decisions (isPremium, tier) belong in useSubscription / billing.js,
+// not here. Do NOT call supabase to set subscription_tier from client code.
 import { supabase } from './supabase'
 
 // Track an action (plan generation, email sent, etc.)
 export async function trackUsage(userId, action) {
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from('usage_tracking')
     .insert({ user_id: userId, action })
-    .select()
-  
+
   if (error) {
     console.error('[trackUsage] Error:', error)
     return null
   }
-  return data
+  return true
 }
 
 // Get count of usage for an action within a time window
@@ -20,7 +21,7 @@ export async function getUsageCount(userId, action, sinceDaysAgo = 7) {
   const sinceDate = new Date()
   sinceDate.setDate(sinceDate.getDate() - sinceDaysAgo)
   
-  const { data, error, count } = await supabase
+  const { error, count } = await supabase
     .from('usage_tracking')
     .select('*', { count: 'exact' })
     .eq('user_id', userId)
@@ -103,42 +104,24 @@ export async function isFeatureEnabled(userId, featureName) {
   return isPremium ? feature.premium : feature.free
 }
 
-// Upgrade user to premium (beta temporary)
-export async function upgradeToPremium(userId) {
-  const { data, error } = await supabase
-    .from('households')
-    .update({ 
-      tier: 'premium',
-      premium_since: new Date().toISOString()
-    })
-    .eq('user_id', userId)
-    .select()
-    .single()
-  
-  if (error) {
-    console.error('[upgradeToPremium] Error:', error)
-    return null
-  }
-  
-  return data
-}
-
-// Get user's current tier info
+// Get user's current tier info.
+// Prefer useSubscription for reactive UI — this is for one-off server-side checks.
 export async function getUserTier(userId) {
   const { data, error } = await supabase
     .from('households')
-    .select('tier, premium_since')
+    .select('subscription_tier, subscription_source, premium_since')
     .eq('user_id', userId)
     .limit(1)
     .single()
-  
+
   if (error) {
     return { tier: 'free', isPremium: false }
   }
-  
+
   return {
-    tier: data?.tier || 'free',
-    isPremium: data?.tier === 'premium',
+    tier: data?.subscription_tier || 'free',
+    isPremium: data?.subscription_tier === 'premium',
+    source: data?.subscription_source ?? null,
     premiumSince: data?.premium_since
   }
 }

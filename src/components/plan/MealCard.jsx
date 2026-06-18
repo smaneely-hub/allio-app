@@ -82,12 +82,12 @@ const nonCookingMeta = {
 
 
 export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsClick }) {
-  const { isPremium } = useSubscription()
+  const { isPremium, upgradeToPremium } = useSubscription()
   const [cookingMode, setCookingMode] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [swapping, setSwapping] = useState(false)
   const [showSwapModal, setShowSwapModal] = useState(false)
-  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
+  const [upgradeFeature, setUpgradeFeature] = useState(null)
   const mealSource = meal?.meal_source || 'generated'
 
   const recipe = useMemo(() => normalizeRecipe({
@@ -107,7 +107,7 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
 
   const startCooking = () => {
     if (!isPremium) {
-      setShowUpgradePrompt(true)
+      setUpgradeFeature('cooking_mode')
       return
     }
     setCookingMode(true)
@@ -217,7 +217,7 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
           </div>
           {inlineDetail}
         </div>
-        <UpgradePrompt feature="cooking_mode" isOpen={showUpgradePrompt} onClose={() => setShowUpgradePrompt(false)} />
+        <UpgradePrompt feature={upgradeFeature} onClose={() => setUpgradeFeature(null)} onUpgrade={upgradeToPremium} />
       </>
     )
   }
@@ -255,7 +255,7 @@ export function MealCard({ meal, onSwap = async () => {}, onOpenMeal, onActionsC
         {inlineDetail}
       </div>
       <SwapModal isOpen={showSwapModal} onClose={() => !swapping && setShowSwapModal(false)} onSwap={async (suggestion) => { try { setSwapping(true); await onSwap(meal, suggestion || ''); setShowSwapModal(false) } finally { setSwapping(false) } }} mealName={meal.name} loading={swapping} />
-      <UpgradePrompt feature="cooking_mode" isOpen={showUpgradePrompt} onClose={() => setShowUpgradePrompt(false)} />
+      <UpgradePrompt feature={upgradeFeature} onClose={() => setUpgradeFeature(null)} onUpgrade={upgradeToPremium} />
     </>
   )
 }

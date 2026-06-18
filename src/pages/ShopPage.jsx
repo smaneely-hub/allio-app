@@ -41,7 +41,7 @@ function SourceBadge({ source }) {
 export function ShopPage() {
   useDocumentTitle('Shopping List | Allio')
   const { user } = useAuth()
-  const { isPremium, trackUsage } = useSubscription()
+  const { isPremium, trackUsage, upgradeToPremium } = useSubscription()
   const [searchParams, setSearchParams] = useSearchParams()
   const selectedListId = searchParams.get('list') || null
   const { createList, makeDefault, deleteList } = useShoppingLists(user?.id)
@@ -582,9 +582,8 @@ export function ShopPage() {
 
       <UpgradePrompt
         feature={upgradeFeature}
-        onClose={() => {
-          setUpgradeFeature(null)
-        }}
+        onClose={() => setUpgradeFeature(null)}
+        onUpgrade={upgradeToPremium}
       />
     </div>
   )

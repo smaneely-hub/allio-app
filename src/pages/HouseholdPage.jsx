@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
+import { useAuth } from '../hooks/useAuth'
 import { useHousehold } from '../hooks/useHousehold'
 import { useNutritionProfile } from '../hooks/useNutritionProfile'
 import { WeightTrendCard } from '../components/health/WeightTrendCard'
+import { MemberAvatar } from '../components/household/MemberAvatar'
+import { supabase } from '../lib/supabase'
 import {
   ACTIVITY_LABELS,
   calculateTDEE,
@@ -43,10 +46,7 @@ function displayToKg(val, isMetric) {
   if (val === '' || val == null) return ''
   return isMetric ? Number(val) : +(Number(val) / 2.20462).toFixed(2)
 }
-function cmToDisplay(cm, isMetric) {
-  if (cm == null || cm === '') return ''
-  return isMetric ? cm : +(Number(cm) / 2.54).toFixed(1)
-}
+
 function displayToCm(val, isMetric) {
   if (val === '' || val == null) return ''
   return isMetric ? Number(val) : +(Number(val) * 2.54).toFixed(1)
@@ -275,6 +275,7 @@ function MemberForm({ title, submitLabel, initialMember, onSubmit, saving }) {
   const [form, setForm] = useState(() => memberToDisplay(initialMember))
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setForm(memberToDisplay(initialMember))
   }, [initialMember])
 
@@ -372,7 +373,60 @@ function MemberForm({ title, submitLabel, initialMember, onSubmit, saving }) {
   )
 }
 
-function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionProfile, nutritionTargets, saveNutritionProfile, isPrimaryProfileMember }) {
+async function uploadMemberAvatar(userId, memberId, file) {
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+  const path = `${userId}/${memberId}.${ext}`
+  const { error: uploadError } = await supabase.storage
+    .from('member-avatars')
+    .upload(path, file, { upsert: true, contentType: file.type })
+  if (uploadError) throw uploadError
+  const { data } = supabase.storage.from('member-avatars').getPublicUrl(path)
+  return data.publicUrl
+}
+
+function AvatarUpload({ memberId, userId, currentUrl, name, onUploaded }) {
+  const inputRef = useRef(null)
+  const [uploading, setUploading] = useState(false)
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) { toast.error('Please choose an image file'); return }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5 MB'); return }
+    setUploading(true)
+    try {
+      const url = await uploadMemberAvatar(userId, memberId, file)
+      onUploaded(url)
+      toast.success('Photo updated')
+    } catch (err) {
+      console.error('[AvatarUpload]', err)
+      toast.error('Could not upload photo — check storage bucket is set up')
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-3">
+      <MemberAvatar name={name} avatarUrl={currentUrl} size="lg" />
+      <div>
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading || !memberId}
+          className="rounded-full border border-divider bg-white px-3 py-1.5 text-xs font-medium text-text-primary transition hover:bg-surface-muted disabled:opacity-50"
+        >
+          {uploading ? 'Uploading…' : currentUrl ? 'Change photo' : 'Add photo'}
+        </button>
+        {!memberId ? <p className="mt-1 text-xs text-text-muted">Save member first to enable photo upload</p> : null}
+        <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+      </div>
+    </div>
+  )
+}
+
+function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionProfile, nutritionTargets, saveNutritionProfile, isPrimaryProfileMember, userId }) {
   const isMetric = getIsMetric()
 
   const memberToDisplay = (m) => {
@@ -392,6 +446,7 @@ function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionPr
       allergies: Array.isArray(m.allergies) && m.allergies.length ? (ALLERGY_OPTIONS.includes(m.allergies[0]) ? m.allergies : ['other']) : ['none'],
       dietary_other: Array.isArray(m.dietary_restrictions) && m.dietary_restrictions.length && !DIETARY_OPTIONS.includes(m.dietary_restrictions[0]) ? m.dietary_restrictions[0] : '',
       allergy_other: Array.isArray(m.allergies) && m.allergies.length && !ALLERGY_OPTIONS.includes(m.allergies[0]) ? m.allergies[0] : '',
+      avatar_url: m.avatar_url || '',
     }
   }
 
@@ -411,10 +466,12 @@ function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionPr
   }))
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setForm(memberToDisplay(member))
   }, [member])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNutritionForm({
       goal_type: nutritionProfile?.goal_type || member.goal || 'maintain',
       target_weight_kg: kgToDisplay(nutritionProfile?.target_weight_kg, isMetric),
@@ -437,7 +494,7 @@ function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionPr
       height_inches: isMetric ? displayToInches(form.height_inches, isMetric) : feetInchesToInches(form.height_feet, form.height_only_inches),
       weight_lbs: displayToLbs(form.weight_lbs, isMetric),
     }
-    await onSave(member.id, normalizeMember(imperial, `Member ${index + 1}`))
+    await onSave(member.id, { ...normalizeMember(imperial, `Member ${index + 1}`), avatar_url: form.avatar_url || null })
   }
 
   const nutritionField = (name) => ({
@@ -479,6 +536,7 @@ function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionPr
 
   const [foodsInput, setFoodsInput] = useState('')
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFoodsInput((nutritionForm.foods_to_avoid || []).join(', '))
   }, [nutritionForm.foods_to_avoid])
 
@@ -509,7 +567,7 @@ function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionPr
     (member.date_of_birth || (member.age != null && member.age !== '')) ? `Age ${member.date_of_birth ? calculateAgeFromBirthDate(member.date_of_birth) : member.age}` : null,
     member.sex ? member.sex : null,
     member.height_inches
-      ? (isMetric ? `${+(member.height_inches * 2.54).toFixed(0)} cm` : `${Math.floor(member.height_inches / 12)}'${Math.round(member.height_inches % 12)}\"`)
+      ? (isMetric ? `${+(member.height_inches * 2.54).toFixed(0)} cm` : `${Math.floor(member.height_inches / 12)}'${Math.round(member.height_inches % 12)}"`)
       : null,
     member.weight_lbs
       ? (isMetric ? `${+(member.weight_lbs / 2.20462).toFixed(1)} kg` : `${member.weight_lbs} lb`)
@@ -519,11 +577,14 @@ function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionPr
   return (
     <div className="overflow-hidden rounded-2xl border border-divider bg-white">
       <button type="button" onClick={onToggle} className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left">
-        <div className="min-w-0 flex-1">
-          <div className="text-base font-medium text-text-primary">{member.name || member.label || `Member ${index + 1}`}</div>
-          <div className="mt-1 text-sm text-text-secondary">{intakeSummary || 'Demographic details not provided yet'}</div>
-          <div className="mt-1 text-sm text-text-muted">
-            {[member.activity_level, member.goal, ...(member.dietary_restrictions || [])].filter(Boolean).slice(0, 3).join(' • ') || 'No planning modifiers yet'}
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <MemberAvatar name={member.name || member.label} avatarUrl={member.avatar_url} size="md" />
+          <div className="min-w-0">
+            <div className="text-base font-medium text-text-primary">{member.name || member.label || `Member ${index + 1}`}</div>
+            <div className="mt-0.5 text-sm text-text-secondary">{intakeSummary || 'Demographic details not provided yet'}</div>
+            <div className="mt-0.5 text-xs text-text-muted">
+              {[member.activity_level, member.goal, ...(member.dietary_restrictions || [])].filter(Boolean).slice(0, 3).join(' • ') || 'No planning modifiers yet'}
+            </div>
           </div>
         </div>
         <div className="shrink-0 text-text-muted">
@@ -533,6 +594,16 @@ function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionPr
 
       {open ? (
         <form onSubmit={handleSubmit} className="border-t border-divider px-5 py-5">
+          <div className="mb-5">
+            <label className="mb-1.5 block text-sm font-medium text-text-primary">Profile photo</label>
+            <AvatarUpload
+              memberId={member.id}
+              userId={userId}
+              currentUrl={form.avatar_url}
+              name={form.name || member.name}
+              onUploaded={(url) => setForm((f) => ({ ...f, avatar_url: url }))}
+            />
+          </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="xl:col-span-2">
               <label className="mb-1 block text-sm font-medium text-text-primary">Name</label>
@@ -702,6 +773,7 @@ function MemberCard({ member, index, open, onToggle, onSave, saving, nutritionPr
 export function HouseholdPage() {
   useDocumentTitle('Family Demographics | Allio')
 
+  const { user } = useAuth()
   const { household, members, loading, saveMembers, repairMembers } = useHousehold()
   const {
     profile: nutritionProfile,
@@ -795,7 +867,6 @@ export function HouseholdPage() {
     return members.find((member) => member.id && member.id === nutritionProfile.profile_member_id) || members[0]
   }, [members, nutritionProfile.profile_member_id])
 
-  const primaryMemberName = primaryMember?.name || primaryMember?.label || 'you'
   const primaryProfileMemberId = primaryMember?.id || null
   const isMetric = household?.unit_system === 'metric'
 
@@ -879,6 +950,7 @@ export function HouseholdPage() {
                       nutritionTargets={nutritionTargets}
                       saveNutritionProfile={saveNutritionProfile}
                       isPrimaryProfileMember={member.id === primaryProfileMemberId}
+                      userId={user?.id}
                     />
                   )
                 })}
