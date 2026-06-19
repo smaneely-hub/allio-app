@@ -30,3 +30,4 @@ dist-ssr
 .supabase_token
 credentials.1md
 CREDENTIALS.md
+android/keystore.properties
