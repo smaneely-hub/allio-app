@@ -43,7 +43,9 @@ export function handleCorsPreflight(req: Request, extraHeaders: HeaderMap = {}):
 
 export function rejectDisallowedOrigin(req: Request): Response | null {
   const origin = req.headers.get('origin')
-  if (origin && !ALLOWED_ORIGINS.has(origin)) {
+  const authorization = req.headers.get('authorization') || req.headers.get('Authorization')
+
+  if (origin && !ALLOWED_ORIGINS.has(origin) && !authorization) {
     return new Response(JSON.stringify({ error: 'Origin not allowed' }), {
       status: 403,
       headers: {
