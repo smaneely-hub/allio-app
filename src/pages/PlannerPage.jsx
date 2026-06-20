@@ -23,6 +23,7 @@ import { normalizeMealRecord } from '../lib/mealSchema'
 import { normalizeRecipe } from '../lib/recipeSchema'
 import { upsertShoppingListForDate } from '../lib/tonightPersistence'
 import { refineMeal } from '../lib/plannerFunction'
+import { fetchRecipeImageData } from '../lib/edgeFunctions'
 import { supabase } from '../lib/supabase'
 
 function toIsoLocalDate(date) {
@@ -32,21 +33,8 @@ function toIsoLocalDate(date) {
 
 async function fetchPlannerMealImage(mealName) {
   try {
-    const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-recipe-image`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({ query: mealName || 'food' }),
-      }
-    )
-    const data = await res.json()
-    return typeof data?.imageUrl === 'string' && data.imageUrl.trim() ? data.imageUrl.trim() : null
+    const data = await fetchRecipeImageData(mealName)
+    return data.url || null
   } catch {
     return null
   }

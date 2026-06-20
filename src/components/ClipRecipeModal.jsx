@@ -110,9 +110,6 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
     })
   }, [form])
 
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-
   useEffect(() => {
     if (!initialRecipe) return
     setForm({
@@ -142,20 +139,13 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
     setError(null)
     setLoading(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token || supabaseAnonKey
-      const res = await fetch(`${supabaseUrl}/functions/v1/clip`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-          apikey: supabaseAnonKey,
-        },
-        body: JSON.stringify({ url: trimmed }),
+      const { data, error } = await supabase.functions.invoke('clip', {
+        body: { url: trimmed },
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Could not extract a recipe from this URL')
-      const r = data.recipe || {}
+      if (error) {
+        throw error
+      }
+      const r = data?.recipe || {}
       const importedIngredients = flattenImportedIngredients(r.ingredients || r.ingredient_groups_json)
       const importedSteps = flattenImportedSteps(r.steps || r.instructions || r.instruction_groups_json)
 

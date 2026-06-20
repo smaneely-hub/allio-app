@@ -10,6 +10,7 @@ import { normalizeMealRecord } from '../lib/mealSchema'
 import { getLocalDateString } from '../lib/date'
 import { autoLogCookedMealNutrition, isNutritionLoggingUnavailable } from '../lib/nutritionLogging'
 import { invokePlannerFunction, refineMeal } from '../lib/plannerFunction'
+import { fetchRecipeImageData } from '../lib/edgeFunctions'
 import { buildShoppingItemsFromMeal } from '../lib/tonightPersistence'
 import { addItemsToShoppingList, ensureDefaultShoppingList } from '../lib/shoppingLists'
 import { useShoppingListPreferences } from '../hooks/useShoppingListPreferences'
@@ -40,25 +41,7 @@ const DEFAULT_IMAGE = { url: null, photographer: null, photographerUrl: null }
 async function fetchRecipeImage(dishName) {
   const query = dishName || 'food'
   try {
-    const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-recipe-image`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({ query }),
-      }
-    )
-    const data = await res.json()
-    return {
-      url: typeof data?.imageUrl === 'string' && data.imageUrl.trim() ? data.imageUrl.trim() : null,
-      photographer: typeof data?.photographer === 'string' && data.photographer.trim() ? data.photographer.trim() : null,
-      photographerUrl: typeof data?.pexelsLink === 'string' && data.pexelsLink.trim() ? data.pexelsLink.trim() : null,
-    }
+    return await fetchRecipeImageData(query)
   } catch {
     return DEFAULT_IMAGE
   }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { normalizeMealRecord } from '../lib/mealSchema'
+import { fetchRecipeImageData } from '../lib/edgeFunctions'
 import { recordTryFeedback } from '../lib/publicTryFeedback'
 import { SwipeDeck } from '../components/SwipeDeck'
 import { CookingMode } from '../components/CookingMode'
@@ -21,25 +22,7 @@ function getTrySessionId() {
 async function fetchRecipeImage(dishName) {
   const query = dishName || 'food'
   try {
-    const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-recipe-image`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({ query }),
-      }
-    )
-    const data = await res.json()
-    return {
-      url: typeof data?.imageUrl === 'string' && data.imageUrl.trim() ? data.imageUrl.trim() : null,
-      photographer: typeof data?.photographer === 'string' && data.photographer.trim() ? data.photographer.trim() : null,
-      photographerUrl: typeof data?.pexelsLink === 'string' && data.pexelsLink.trim() ? data.pexelsLink.trim() : null,
-    }
+    return await fetchRecipeImageData(query)
   } catch {
     return DEFAULT_IMAGE
   }
