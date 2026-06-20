@@ -1,4 +1,5 @@
 import { addItemsToShoppingList, buildShoppingItemRows, ensureDefaultShoppingList, getShoppingListItems } from './shoppingLists'
+import { aggregateShoppingList } from './aggregateShoppingList'
 
 const PLANNER_SOURCES = new Set(['planner'])
 
@@ -41,5 +42,41 @@ export async function upsertShoppingListForDate({ userId, householdId, weekOf, i
     listId: targetListId,
     items: nextPlannerItems,
     source: 'planner',
+  })
+}
+
+export async function syncPlannerShoppingList({ userId, listId = null }) {
+  if (!userId) return []
+
+  const { supabase } = await import('./supabase.js')
+  const [{ data: mealPlan, error: mealPlanError }, { data: household, error: householdError }] = await Promise.all([
+    supabase
+      .from('meal_plans')
+      .select('draft_plan, plan')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('households')
+      .select('id, staples_on_hand')
+      .eq('user_id', userId)
+      .limit(1)
+      .maybeSingle(),
+  ])
+
+  if (mealPlanError) throw mealPlanError
+  if (householdError) throw householdError
+  if (!household?.id) return []
+
+  const meals = mealPlan?.draft_plan?.meals || mealPlan?.plan?.meals || []
+  const items = aggregateShoppingList({ meals }, household.staples_on_hand || '', {})
+
+  return upsertShoppingListForDate({
+    userId,
+    householdId: household.id,
+    weekOf: new Date().toISOString().split('T')[0],
+    items,
+    listId,
   })
 }

@@ -6,10 +6,8 @@ import { useHousehold } from '../hooks/useHousehold'
 import { useSchedule } from '../hooks/useSchedule'
 import { useMealPlan } from '../hooks/useMealPlan'
 import { useShoppingListPreferences } from '../hooks/useShoppingListPreferences'
-import { useShoppingLists } from '../hooks/useShoppingLists'
 import { useLinkedHousehold } from '../hooks/useLinkedHousehold'
 import { LinkedHouseholdPlan } from '../components/plan/LinkedHouseholdPlan'
-import { ShoppingListPickerModal } from '../components/ShoppingListPickerModal'
 import { ScheduleSkeleton, EmptyState } from '../components/LoadingStates'
 import { MealPlanWorkspace } from '../components/plan/MealPlanWorkspace'
 import { PlannerActionSheet } from '../components/plan/PlannerActionSheet'
@@ -25,7 +23,6 @@ import { normalizeMealRecord } from '../lib/mealSchema'
 import { normalizeRecipe } from '../lib/recipeSchema'
 import { upsertShoppingListForDate } from '../lib/tonightPersistence'
 import { refineMeal } from '../lib/plannerFunction'
-import { groupByCategory } from '../utils/groceryCategories'
 import { supabase } from '../lib/supabase'
 
 function toIsoLocalDate(date) {
@@ -54,18 +51,6 @@ async function fetchPlannerMealImage(mealName) {
     return null
   }
 }
-const CATEGORY_EMOJI = {
-  Produce: '🥬',
-  'Meat & Seafood': '🥩',
-  'Dairy & Eggs': '🥚',
-  Bakery: '🍞',
-  Pantry: '🫙',
-  Frozen: '🧊',
-  Beverages: '🥤',
-  Other: '📦',
-}
-
-
 const PLANNER_VIEW_MODE_KEY = 'planner.viewMode'
 
 function buildShoppingEvent(date, recurrence = null, existing = {}) {
@@ -135,8 +120,7 @@ export function PlannerPage() {
   const { user } = useAuth()
   const { household, members, loading: householdLoading, saveMembers, reloadHousehold } = useHousehold()
   const { schedule, slots, loading: scheduleLoading, saveSchedule, loadSchedule } = useSchedule()
-  const { defaultListId, alwaysAsk } = useShoppingListPreferences(user?.id)
-  const { lists, createList } = useShoppingLists(user?.id)
+  const { defaultListId } = useShoppingListPreferences(user?.id)
   const { linkedHousehold, linkedPlan } = useLinkedHousehold()
   const {
     mealPlan,
@@ -170,7 +154,7 @@ export function PlannerPage() {
   const [reviewLoading, setReviewLoading] = useState(false)
   const [generatingSlotKey, setGeneratingSlotKey] = useState(null)
   const [recurrenceTarget, setRecurrenceTarget] = useState(null)
-  const [plannerPickerOpen, setPlannerPickerOpen] = useState(false)
+  const [networkProbeRunning, setNetworkProbeRunning] = useState(false)
 
   useEffect(() => {
     localStorage.setItem(PLANNER_VIEW_MODE_KEY, viewMode)
@@ -214,7 +198,20 @@ export function PlannerPage() {
   const planMeals = useMemo(() => rawPlanMeals.filter((meal) => meal?.event_type !== SHOPPING_EVENT_TYPE).map((meal) => normalizeMealRecord(meal)), [rawPlanMeals])
   const activeSlots = Object.values(slotState).filter((slot) => slot.active && slot.attendees?.length > 0)
   const loading = householdLoading || scheduleLoading || (schedule && slots.length > 0 && Object.keys(slotState).length === 0)
-  const groupedShopping = useMemo(() => groupByCategory(shoppingItems), [shoppingItems])
+
+  const runNetworkProbe = async () => {
+    setNetworkProbeRunning(true)
+    try {
+      const response = await fetch('https://www.google.com', { method: 'GET' })
+      alert(`NETWORK PROBE\nurl: https://www.google.com\nstatus: ${response.status}\nok: ${response.ok}`)
+      console.log('network probe success', { status: response.status, ok: response.ok })
+    } catch (err) {
+      alert(`NETWORK PROBE ERROR\nurl: https://www.google.com\nname: ${err?.name || 'n/a'}\nmessage: ${err?.message || 'n/a'}\ncause: ${JSON.stringify(err?.cause ?? null)}`)
+      console.error('network probe error', err)
+    } finally {
+      setNetworkProbeRunning(false)
+    }
+  }
 
   const persistMealsAndShopping = async (nextMeals) => {
     const nextPlan = { ...(mealPlan?.draft_plan || { meals: [] }), meals: nextMeals }
@@ -817,6 +814,7 @@ export function PlannerPage() {
         <div className="flex items-center justify-between pt-4">
           <h1 className="font-display text-xl text-ink-primary">Planner</h1>
           <div className="flex gap-2">
+            <button type="button" onClick={runNetworkProbe} disabled={networkProbeRunning} className="rounded-full border border-surface-muted bg-surface-card px-4 py-2 text-sm text-ink-secondary transition-colors duration-150 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer">{networkProbeRunning ? 'Testing network…' : 'Test network'}</button>
             <button type="button" onClick={handleClearPlan} disabled={saving || generating || (!mealPlan && activeSlots.length === 0)} className="rounded-full border border-surface-muted bg-surface-card px-4 py-2 text-sm text-ink-secondary transition-colors duration-150 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer">Start Fresh</button>
           </div>
         </div>
@@ -1107,44 +1105,6 @@ export function PlannerPage() {
           onSelect={handleSetShoppingRecurrence}
         />
 
-        {plannerPickerOpen && lists.length > 0 && (
-          <ShoppingListPickerModal
-            lists={lists}
-            onSelect={async (id) => {
-              setPlannerPickerOpen(false)
-              try {
-                await upsertShoppingListForDate({
-                  userId: household.user_id,
-                  householdId: household.id,
-                  weekOf: new Date().toISOString().split('T')[0],
-                  items: shoppingItems,
-                  listId: id,
-                })
-                const list = lists.find((l) => l.id === id)
-                toast.success(list ? `Groceries sent to "${list.name}"` : 'Groceries synced')
-              } catch {
-                toast.error('Could not sync groceries.')
-              }
-            }}
-            onCreateAndSelect={async (name) => {
-              try {
-                const created = await createList(name)
-                setPlannerPickerOpen(false)
-                await upsertShoppingListForDate({
-                  userId: household.user_id,
-                  householdId: household.id,
-                  weekOf: new Date().toISOString().split('T')[0],
-                  items: shoppingItems,
-                  listId: created.id,
-                })
-                toast.success(`Groceries sent to "${created.name}"`)
-              } catch {
-                toast.error('Could not create list or sync groceries.')
-              }
-            }}
-            onClose={() => setPlannerPickerOpen(false)}
-          />
-        )}
 
         <PlannerGenerationFlow
           open={Boolean(generateFlowTarget)}
@@ -1170,47 +1130,6 @@ export function PlannerPage() {
           />
         )}
 
-        <div className="card mt-4">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="font-display text-xl text-text-primary">Shopping List</div>
-            {shoppingItems.length > 0 && !generating && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (alwaysAsk && lists.length > 0) {
-                    setPlannerPickerOpen(true)
-                  } else {
-                    upsertShoppingListForDate({
-                      userId: household.user_id,
-                      householdId: household.id,
-                      weekOf: new Date().toISOString().split('T')[0],
-                      items: shoppingItems,
-                      listId: defaultListId || null,
-                    })
-                      .then(() => {
-                        const list = lists.find((l) => l.id === defaultListId) || null
-                        toast.success(list ? `Groceries sent to "${list.name}"` : 'Groceries synced')
-                      })
-                      .catch(() => toast.error('Could not sync groceries.'))
-                  }
-                }}
-                className="text-sm text-primary-600 hover:underline"
-              >
-                Send to list →
-              </button>
-            )}
-          </div>
-          {generating ? <div className="rounded-2xl border border-surface-muted bg-white px-4 py-6 text-sm text-ink-secondary">Updating your shopping list…</div> : shoppingItems.length === 0 ? <EmptyState emoji="🛒" headline="Shopping list will appear automatically" body="Add or generate meals and we'll build the list automatically." ctaLabel={null} /> : (
-            <div className="rounded-xl border border-divider bg-white p-4">
-              {groupedShopping.map(({ category, items }, groupIndex) => (
-                <div key={category} className={groupIndex > 0 ? 'mt-4' : ''}>
-                  <div className="mb-2 border-b border-gray-100 pb-1 text-sm font-semibold text-gray-500">{`${CATEGORY_EMOJI[category] || '📦'} ${category}`}</div>
-                  <ul className="space-y-1 text-sm text-text-secondary">{items.map((item, itemIdx) => <li key={`${category}-${itemIdx}`}>{item.quantity} {item.unit} {item.name}</li>)}</ul>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   )

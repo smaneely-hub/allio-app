@@ -3,6 +3,7 @@ import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
 import { groupItemsByCategory } from '../lib/shoppingListUtils'
 import { addItemsToShoppingList, ensureDefaultShoppingList, getShoppingListItems, listShoppingLists } from '../lib/shoppingLists'
+import { syncPlannerShoppingList } from '../lib/tonightPersistence'
 
 export function useShoppingList(userId, listId = null) {
   const [shoppingList, setShoppingList] = useState(null)
@@ -48,6 +49,7 @@ export function useShoppingList(userId, listId = null) {
         return null
       }
 
+      await syncPlannerShoppingList({ userId, listId: targetList.id })
       const nextItems = await getShoppingListItems(targetList.id)
       setShoppingList(targetList)
       setItems(nextItems)

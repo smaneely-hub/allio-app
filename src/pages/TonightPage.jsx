@@ -822,7 +822,6 @@ export function TonightPage() {
       normalized = presentation.meal
       setMeal(normalized)
       setMealQueue([{ meal: normalized, image: presentation.image }])
-      await addMealToShoppingList(normalized, defaultListId, 'Shopping list updated ✓')
       setFeedback('')
       setRefinementChanges([])  // Clear refinement state on new generation
       setMealInstanceId(null)   // Clear old instance ID for new meal
@@ -997,7 +996,6 @@ export function TonightPage() {
       normalized = presentation.meal
       setMeal(normalized)
       setMealQueue([{ meal: normalized, image: presentation.image }])
-      await addMealToShoppingList(normalized, defaultListId, 'Shopping list updated ✓')
       setFeedback('')
       setCooked(false)
       setRefinementChanges([])  // Clear refinement state on swap
