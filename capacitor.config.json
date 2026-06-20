@@ -1,5 +1,10 @@
 {
   "appId": "allio.life",
   "appName": "Allio",
-  "webDir": "dist"
+  "webDir": "dist",
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": false
+    }
+  }
 }
