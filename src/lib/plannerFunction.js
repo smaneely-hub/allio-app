@@ -14,7 +14,26 @@ async function invokeWithTimeout(name, payload, options = {}) {
   const timeoutMs = options.timeoutMs || DEFAULT_FUNCTION_TIMEOUT_MS
 
   return Promise.race([
-    supabase.functions.invoke(name, { body: payload, ...options }),
+    (async () => {
+      try {
+        // TEMP DIAGNOSTIC — remove after debugging native edge function failure.
+        const { data, error } = await supabase.functions.invoke(name, { body: payload, ...options })
+        if (error) {
+          alert(
+            `EDGE FN ERROR\nname: ${error?.name || 'n/a'}\nmessage: ${error?.message || 'n/a'}\nstatus: ${error?.context?.status ?? 'n/a'}`
+          )
+          console.error(`${name} error`, error)
+        }
+        return { data, error }
+      } catch (err) {
+        // TEMP DIAGNOSTIC — remove after debugging native edge function failure.
+        alert(
+          `THROWN ERROR\nname: ${err?.name || 'n/a'}\nmessage: ${err?.message || 'n/a'}`
+        )
+        console.error(`${name} threw`, err)
+        return { data: null, error: err }
+      }
+    })(),
     new Promise((resolve) => {
       setTimeout(() => resolve({ data: null, error: createFunctionTimeoutError(timeoutMs) }), timeoutMs)
     }),
@@ -89,13 +108,17 @@ export async function refineMeal(recipe, feedback) {
   
   try {
     console.log('[plannerFunction] Calling refine-meal edge function...')
+    // TEMP DIAGNOSTIC — remove after debugging native edge function failure.
     const { data, error } = await supabase.functions.invoke('refine-meal', {
       body: { recipe, feedback }
     })
     console.log('[plannerFunction] refine-meal response:', { data, error })
     
     if (error) {
-      console.error('[plannerFunction] refine-meal returned error:', error)
+      alert(
+        `EDGE FN ERROR\nname: ${error?.name || 'n/a'}\nmessage: ${error?.message || 'n/a'}\nstatus: ${error?.context?.status ?? 'n/a'}`
+      )
+      console.error('refine-meal error', error)
       // Check if it's a function not found error
       if (error.message?.includes('not found') || error.message?.includes('404') || error.status === 404) {
         return { 
@@ -110,7 +133,10 @@ export async function refineMeal(recipe, feedback) {
     
     return { data, error }
   } catch (err) {
-    console.error('[plannerFunction] refine-meal exception:', err)
+    alert(
+      `THROWN ERROR\nname: ${err?.name || 'n/a'}\nmessage: ${err?.message || 'n/a'}`
+    )
+    console.error('refine-meal threw', err)
     // Provide a clearer message for connection/service issues
     if (err.message?.includes('Failed to fetch') || err.message?.includes('network')) {
       return { data: null, error: { message: 'Cannot connect to service. Please check your internet connection.' } }
