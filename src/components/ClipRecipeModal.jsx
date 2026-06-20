@@ -166,7 +166,21 @@ export function ClipRecipeModal({ onClose, onSaved, initialRecipe = null }) {
       setStep('preview')
       setIsFromImport(true)
     } catch (e) {
-      setError(e.message)
+      const message = e?.message || 'Recipe import failed'
+      const details = {
+        message,
+        name: e?.name || null,
+        status: e?.status || null,
+        context: e?.context || null,
+        stack: typeof e?.stack === 'string' ? e.stack.split('\n').slice(0, 6).join('\n') : null,
+        url: trimmed,
+      }
+      try {
+        if (typeof window !== 'undefined' && /Android/i.test(navigator.userAgent || '')) {
+          alert(`Recipe import failed\n\n${JSON.stringify(details, null, 2)}`)
+        }
+      } catch {}
+      setError(message)
     } finally {
       setLoading(false)
     }
