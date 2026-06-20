@@ -262,8 +262,6 @@ export function useMealPlan(scheduleId) {
 
       let { data: generated, error: functionError } = await invokeGeneratePlan(payload, { timeoutMs: 45000 })
       if (functionError) {
-        // TEMP DIAGNOSTIC — remove after debugging native edge function failure.
-        alert(`EDGE FN ERROR\nname: ${functionError?.name || 'n/a'}\nmessage: ${functionError?.message || 'n/a'}\nstatus: ${functionError?.context?.status ?? functionError?.status ?? 'n/a'}`)
         console.error('generate-plan error (generatePlan)', functionError)
         if (String(functionError.message || '').includes('non-2xx') || String(functionError.context || '').includes('401') || functionError.status === 401) {
           toast.error('Your session expired. Please log in again.')
@@ -300,8 +298,6 @@ export function useMealPlan(scheduleId) {
       setMealPlan({ ...savedPlan, draft_plan: withMealDefaults(savedPlan.draft_plan || savedPlan.plan || {}), plan: withMealDefaults(savedPlan.plan || savedPlan.draft_plan || {}) })
       return savedPlan
     } catch (err) {
-      // TEMP DIAGNOSTIC — remove after debugging native edge function failure.
-      alert(`THROWN ERROR\nname: ${err?.name || 'n/a'}\nmessage: ${err?.message || 'n/a'}`)
       console.error('generatePlan threw', err)
       setError(err)
       toast.error("Something went wrong building your plan. Want to try again?")
@@ -372,8 +368,6 @@ export function useMealPlan(scheduleId) {
 
       let { data: generated, error: functionError } = await invokeGeneratePlan(payload)
       if (functionError) {
-        // TEMP DIAGNOSTIC — remove after debugging native edge function failure.
-        alert(`EDGE FN ERROR\nname: ${functionError?.name || 'n/a'}\nmessage: ${functionError?.message || 'n/a'}\nstatus: ${functionError?.context?.status ?? functionError?.status ?? 'n/a'}`)
         console.error('generate-plan error (swapMeal)', functionError)
         if (String(functionError.message || '').includes('non-2xx') || String(functionError.context || '').includes('401')) {
           toast.error('Your session expired. Please log in again.')
@@ -406,8 +400,6 @@ export function useMealPlan(scheduleId) {
       }
       return persisted
     } catch (err) {
-      // TEMP DIAGNOSTIC — remove after debugging native edge function failure.
-      alert(`THROWN ERROR\nname: ${err?.name || 'n/a'}\nmessage: ${err?.message || 'n/a'}`)
       console.error('swapMeal threw', err)
       if (optimisticPlan) {
         setMealPlan((current) => current ? { ...current, draft_plan: { ...mealPlan.draft_plan, meals: mealPlan.draft_plan.meals.map((meal) => ({ ...meal, swap_pending: false })) }, plan: { ...mealPlan.draft_plan, meals: mealPlan.draft_plan.meals.map((meal) => ({ ...meal, swap_pending: false })) } } : current)
@@ -497,8 +489,6 @@ export function useMealPlan(scheduleId) {
 
       let { data: generated, error: functionError } = await invokeGeneratePlan(payload, { timeoutMs: 45000 })
       if (functionError) {
-        // TEMP DIAGNOSTIC — remove after debugging native edge function failure.
-        alert(`EDGE FN ERROR\nname: ${functionError?.name || 'n/a'}\nmessage: ${functionError?.message || 'n/a'}\nstatus: ${functionError?.context?.status ?? functionError?.status ?? 'n/a'}`)
         console.error('generate-plan error (generateSlot)', functionError)
         if (String(functionError.message || '').includes('non-2xx') || String(functionError.context || '').includes('401') || functionError.status === 401) {
           toast.error('Your session expired. Please log in again.')
@@ -565,8 +555,6 @@ export function useMealPlan(scheduleId) {
       setMealPlan(normalizedSaved)
       return normalizedSaved
     } catch (err) {
-      // TEMP DIAGNOSTIC — remove after debugging native edge function failure.
-      alert(`THROWN ERROR\nname: ${err?.name || 'n/a'}\nmessage: ${err?.message || 'n/a'}`)
       console.error('generateSlot threw', err)
       setError(err)
       toast.error('Could not generate meal for this slot.')
