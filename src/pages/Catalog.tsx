@@ -45,6 +45,8 @@ const CORE_MEAL_TYPE_CHIPS = [
   { value: 'dinner', label: 'Dinner' },
 ]
 
+const RECIPE_FILTERS_STORAGE_KEY = 'recipes.filters.v1'
+
 type SortOption = 'newest' | 'rating' | 'favorites' | 'most_cooked' | 'az'
 
 export function Catalog() {
@@ -52,21 +54,31 @@ export function Catalog() {
   const { user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const initialQuery = searchParams.get('q') || ''
+  const storedFilters = (() => {
+    if (typeof window === 'undefined') return null
+    try {
+      const raw = window.localStorage.getItem(RECIPE_FILTERS_STORAGE_KEY)
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
+  })()
   const [recipes, setRecipes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchInput, setSearchInput] = useState(initialQuery)
-  const [search, setSearch] = useState(initialQuery)
-  const [cuisine, setCuisine] = useState('')
-  const [mealType, setMealType] = useState('')
-  const [minRating, setMinRating] = useState('')
-  const [favoritesOnly, setFavoritesOnly] = useState(false)
-  const [sortBy, setSortBy] = useState<SortOption>('newest')
+  const [searchInput, setSearchInput] = useState(initialQuery || storedFilters?.search || '')
+  const [search, setSearch] = useState(initialQuery || storedFilters?.search || '')
+  const [cuisine, setCuisine] = useState(storedFilters?.cuisine || '')
+  const [mealType, setMealType] = useState(storedFilters?.mealType || '')
+  const [minRating, setMinRating] = useState(storedFilters?.minRating || '')
+  const [favoritesOnly, setFavoritesOnly] = useState(Boolean(storedFilters?.favoritesOnly))
+  const [sortBy, setSortBy] = useState<SortOption>(storedFilters?.sortBy || 'newest')
   const [showClipModal, setShowClipModal] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [togglingFavorite, setTogglingFavorite] = useState<string | null>(null)
   const [sharingFavorites, setSharingFavorites] = useState<any[] | null>(null)
   const [loadingFavoritesForShare, setLoadingFavoritesForShare] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(() => Boolean(storedFilters?.filtersOpen))
   const searchRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -80,6 +92,19 @@ export function Catalog() {
     else next.delete('q')
     setSearchParams(next, { replace: true })
   }, [search, searchParams, setSearchParams])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(RECIPE_FILTERS_STORAGE_KEY, JSON.stringify({
+      search,
+      cuisine,
+      mealType,
+      minRating,
+      favoritesOnly,
+      sortBy,
+      filtersOpen,
+    }))
+  }, [search, cuisine, mealType, minRating, favoritesOnly, sortBy, filtersOpen])
 
   useEffect(() => {
     let cancelled = false
@@ -245,51 +270,62 @@ export function Catalog() {
       ) : null}
 
       <div className="mb-4 rounded-2xl border border-divider bg-surface-card p-3 shadow-sm">
-        <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
-          <select className="input w-full" value={cuisine} onChange={(e) => setCuisine(e.target.value)}>
-            <option value="">All cuisines</option>
-            {cuisines.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
-          </select>
-          <select className="input w-full" value={mealType} onChange={(e) => setMealType(e.target.value)}>
-            <option value="">All meal types</option>
-            {mealTypes.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
-          </select>
-          <select className="input w-full" value={minRating} onChange={(e) => setMinRating(e.target.value)}>
-            <option value="">Any rating</option>
-            <option value="3">3+ stars</option>
-            <option value="4">4+ stars</option>
-            <option value="5">5 stars only</option>
-          </select>
-          <select
-            className="input w-full"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortOption)}
-          >
-            <option value="newest">Newest first</option>
-            <option value="az">A – Z</option>
-            <option value="rating">Highest rated</option>
-            <option value="most_cooked">Most cooked</option>
-            <option value="favorites">Favorites first</option>
-          </select>
-          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-divider bg-surface-card px-3 py-2 text-sm text-text-primary sm:col-span-2 md:col-span-1">
-            Favorites only
-            <input
-              type="checkbox"
-              checked={favoritesOnly}
-              onChange={(e) => setFavoritesOnly(e.target.checked)}
-              className="h-4 w-4 accent-primary-500"
-            />
-          </label>
-        </div>
-        {hasActiveFilters && (
+        <div className="flex items-center justify-between gap-3">
           <button
             type="button"
-            onClick={() => { setCuisine(''); setMealType(''); setMinRating(''); setFavoritesOnly(false); setSortBy('newest') }}
-            className="mt-2 text-xs font-medium text-primary-500 hover:underline"
+            onClick={() => setFiltersOpen((current) => !current)}
+            className="text-sm font-medium text-text-primary"
           >
-            Clear filters
+            Filters {filtersOpen ? '▲' : '▼'}
           </button>
-        )}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={() => { setCuisine(''); setMealType(''); setMinRating(''); setFavoritesOnly(false); setSortBy('newest') }}
+              className="text-xs font-medium text-primary-500 hover:underline"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+        {filtersOpen ? (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+            <select className="input w-full" value={cuisine} onChange={(e) => setCuisine(e.target.value)}>
+              <option value="">All cuisines</option>
+              {cuisines.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
+            </select>
+            <select className="input w-full" value={mealType} onChange={(e) => setMealType(e.target.value)}>
+              <option value="">All meal types</option>
+              {mealTypes.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
+            </select>
+            <select className="input w-full" value={minRating} onChange={(e) => setMinRating(e.target.value)}>
+              <option value="">Any rating</option>
+              <option value="3">3+ stars</option>
+              <option value="4">4+ stars</option>
+              <option value="5">5 stars only</option>
+            </select>
+            <select
+              className="input w-full"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+            >
+              <option value="newest">Newest first</option>
+              <option value="az">A – Z</option>
+              <option value="rating">Highest rated</option>
+              <option value="most_cooked">Most cooked</option>
+              <option value="favorites">Favorites first</option>
+            </select>
+            <label className="flex cursor-pointer items-center justify-between rounded-xl border border-divider bg-surface-card px-3 py-2 text-sm text-text-primary sm:col-span-2 md:col-span-1">
+              Favorites only
+              <input
+                type="checkbox"
+                checked={favoritesOnly}
+                onChange={(e) => setFavoritesOnly(e.target.checked)}
+                className="h-4 w-4 accent-primary-500"
+              />
+            </label>
+          </div>
+        ) : null}
       </div>
 
       {loading ? (

@@ -40,6 +40,7 @@ async function fetchPlannerMealImage(mealName) {
   }
 }
 const PLANNER_VIEW_MODE_KEY = 'planner.viewMode'
+const PLANNER_OPTIONS_OPEN_KEY = 'planner.optionsOpen'
 
 function buildShoppingEvent(date, recurrence = null, existing = {}) {
   return {
@@ -125,6 +126,7 @@ export function PlannerPage() {
   const [shoppingRecurrenceTarget, setShoppingRecurrenceTarget] = useState(null)
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [viewMode, setViewMode] = useState(() => localStorage.getItem(PLANNER_VIEW_MODE_KEY) || 'day')
+  const [optionsOpen, setOptionsOpen] = useState(() => localStorage.getItem(PLANNER_OPTIONS_OPEN_KEY) === 'true')
   const [slotState, setSlotState] = useState({})
   const [saving, setSaving] = useState(false)
   const [shoppingItems, setShoppingItems] = useState([])
@@ -142,11 +144,14 @@ export function PlannerPage() {
   const [reviewLoading, setReviewLoading] = useState(false)
   const [generatingSlotKey, setGeneratingSlotKey] = useState(null)
   const [recurrenceTarget, setRecurrenceTarget] = useState(null)
-  const [networkProbeRunning, setNetworkProbeRunning] = useState(false)
 
   useEffect(() => {
     localStorage.setItem(PLANNER_VIEW_MODE_KEY, viewMode)
   }, [viewMode])
+
+  useEffect(() => {
+    localStorage.setItem(PLANNER_OPTIONS_OPEN_KEY, String(optionsOpen))
+  }, [optionsOpen])
 
   useEffect(() => {
     if (!schedule) return
@@ -186,20 +191,6 @@ export function PlannerPage() {
   const planMeals = useMemo(() => rawPlanMeals.filter((meal) => meal?.event_type !== SHOPPING_EVENT_TYPE).map((meal) => normalizeMealRecord(meal)), [rawPlanMeals])
   const activeSlots = Object.values(slotState).filter((slot) => slot.active && slot.attendees?.length > 0)
   const loading = householdLoading || scheduleLoading || (schedule && slots.length > 0 && Object.keys(slotState).length === 0)
-
-  const runNetworkProbe = async () => {
-    setNetworkProbeRunning(true)
-    try {
-      const response = await fetch('https://www.google.com', { method: 'GET' })
-      alert(`NETWORK PROBE\nurl: https://www.google.com\nstatus: ${response.status}\nok: ${response.ok}`)
-      console.log('network probe success', { status: response.status, ok: response.ok })
-    } catch (err) {
-      alert(`NETWORK PROBE ERROR\nurl: https://www.google.com\nname: ${err?.name || 'n/a'}\nmessage: ${err?.message || 'n/a'}\ncause: ${JSON.stringify(err?.cause ?? null)}`)
-      console.error('network probe error', err)
-    } finally {
-      setNetworkProbeRunning(false)
-    }
-  }
 
   const persistMealsAndShopping = async (nextMeals) => {
     const nextPlan = { ...(mealPlan?.draft_plan || { meals: [] }), meals: nextMeals }
@@ -338,30 +329,6 @@ export function PlannerPage() {
       key.startsWith(`${dayKey}-`) ? [key, { ...value, active: false, attendees: [] }] : [key, value]
     ))))
     toast.success('Day cleared.')
-  }
-
-  const handleClearPlan = async () => {
-    if (!window.confirm("Clear your current plan and start fresh? This cannot be undone.")) return
-    setSaving(true)
-    try {
-      await clearPlan()
-      if (household?.id) {
-        await upsertShoppingListForDate({
-          userId: household.user_id,
-          householdId: household.id,
-          weekOf: new Date().toISOString().split('T')[0],
-          items: [],
-          listId: defaultListId || null,
-        })
-      }
-      setSlotState({})
-      setShoppingItems([])
-      toast.success("Plan cleared. Start fresh whenever you're ready.")
-    } catch (err) {
-      toast.error(err?.message || "Unable to clear plan.")
-    } finally {
-      setSaving(false)
-    }
   }
 
   const handleGenerateSlot = async (dayKey, mealType, overrides = {}) => {
@@ -801,15 +768,7 @@ export function PlannerPage() {
       <div className="mx-auto max-w-xl px-4 pb-24">
         <div className="flex items-center justify-between pt-4">
           <h1 className="font-display text-xl text-ink-primary">Planner</h1>
-          <div className="flex gap-2">
-            <button type="button" onClick={runNetworkProbe} disabled={networkProbeRunning} className="rounded-full border border-surface-muted bg-surface-card px-4 py-2 text-sm text-ink-secondary transition-colors duration-150 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer">{networkProbeRunning ? 'Testing network…' : 'Test network'}</button>
-            <button type="button" onClick={handleClearPlan} disabled={saving || generating || (!mealPlan && activeSlots.length === 0)} className="rounded-full border border-surface-muted bg-surface-card px-4 py-2 text-sm text-ink-secondary transition-colors duration-150 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer">Start Fresh</button>
-          </div>
         </div>
-
-        {members.length === 0 ? <MemberEmptyState onOpen={() => setShowMembersModal(true)} /> : <MemberSummary members={members} onOpen={() => setShowMembersModal(true)} />}
-
-        {members.length === 0 ? <div className="mt-3 text-sm text-ink-secondary">Meal generation stays disabled until you add at least one household member.</div> : <div className="mt-3 text-sm text-ink-secondary">Generate meals one slot at a time from each day card, or add meals manually.</div>}
 
         {linkedHousehold && linkedPlan && (
           <>
@@ -840,6 +799,36 @@ export function PlannerPage() {
             onSelectMonthDay={handleSelectMonthDay}
             generatingSlotKey={generatingSlotKey}
           />
+        )}
+
+        <div className="mt-4 rounded-2xl border border-divider bg-surface-card p-3 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setOptionsOpen((current) => !current)}
+              className="text-sm font-medium text-text-primary"
+            >
+              Plan options {optionsOpen ? '▲' : '▼'}
+            </button>
+          </div>
+
+          {optionsOpen ? (
+            <>
+              <div className="mt-3">
+                {members.length === 0 ? <MemberEmptyState onOpen={() => setShowMembersModal(true)} /> : <MemberSummary members={members} onOpen={() => setShowMembersModal(true)} />}
+              </div>
+
+              {members.length === 0 ? <div className="mt-3 text-sm text-ink-secondary">Meal generation stays disabled until you add at least one household member.</div> : <div className="mt-3 text-sm text-ink-secondary">Generate meals one slot at a time from each day card, or add meals manually.</div>}
+            </>
+          ) : null}
+        </div>
+
+        {false && linkedHousehold && linkedPlan && (
+          <>
+            <div className="mt-4 text-xs font-semibold uppercase tracking-[0.12em] text-ink-tertiary">Linked household (read-only)</div>
+            <LinkedHouseholdPlan household={linkedHousehold} plan={linkedPlan} />
+            <div className="mt-5 text-xs font-semibold uppercase tracking-[0.12em] text-ink-tertiary">Your plan</div>
+          </>
         )}
 
         <DayActionsMenu

@@ -17,3 +17,7 @@ export async function loadAdminUsers(query = '') {
 export async function loadAdminUserDetail(userId) {
   return invoke('admin-user-detail', { userId })
 }
+
+export async function deleteAdminUser(userId) {
+  return invoke('admin-user-delete', { userId })
+}

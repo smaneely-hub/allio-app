@@ -93,8 +93,11 @@ export function aggregateShoppingList(mealPlan, staplesOnHand = '', options = {}
         referenceDate,
       })
     : activeMeals
-  // Non-cooking meals don't contribute ingredients to the grocery list.
-  const cookingMeals = windowedMeals.filter((meal) => !['eat_out', 'takeout', 'delivery'].includes(meal?.meal_source || 'generated'))
+  // Non-cooking meals and Tonight-only meals don't contribute to the planner grocery list.
+  const cookingMeals = windowedMeals.filter((meal) => {
+    if (meal?.source === 'tonight' || meal?.source_type === 'tonight') return false
+    return !['eat_out', 'takeout', 'delivery'].includes(meal?.meal_source || 'generated')
+  })
   return buildGroupedShoppingItems(cookingMeals, staplesOnHand)
 }
 

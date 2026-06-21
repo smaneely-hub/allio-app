@@ -1,6 +1,7 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { loadAdminUserDetail } from '../lib/adminApi'
+import toast from 'react-hot-toast'
+import { deleteAdminUser, loadAdminUserDetail } from '../lib/adminApi'
 
 function DetailCard({ title, children }) {
   return (
@@ -13,9 +14,11 @@ function DetailCard({ title, children }) {
 
 export function AdminUserDetailPage() {
   const { userId } = useParams()
+  const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -44,6 +47,23 @@ export function AdminUserDetailPage() {
   const recentPlans = data?.recentPlans || []
   const recentRecipes = data?.recentRecipes || []
 
+  const handleDeleteUser = async () => {
+    if (!userId || deleting) return
+    const label = user?.email || userId
+    if (!window.confirm(`Delete ${label}? This permanently removes the auth user and their app data.`)) return
+
+    setDeleting(true)
+    try {
+      await deleteAdminUser(userId)
+      toast.success('User deleted')
+      navigate('/admin/users', { replace: true })
+    } catch (err) {
+      toast.error(err?.message || 'Could not delete user')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 pb-24 md:px-6">
       <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -54,7 +74,17 @@ export function AdminUserDetailPage() {
             Backend-backed support view for <span className="font-medium text-text-primary">{userId}</span>.
           </p>
         </div>
-        <Link to="/admin/users" className="btn-secondary whitespace-nowrap">Back to users</Link>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleDeleteUser}
+            disabled={loading || deleting}
+            className="rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 disabled:opacity-50"
+          >
+            {deleting ? 'Deleting…' : 'Delete user'}
+          </button>
+          <Link to="/admin/users" className="btn-secondary whitespace-nowrap">Back to users</Link>
+        </div>
       </div>
 
       {error ? <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}

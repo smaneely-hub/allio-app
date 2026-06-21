@@ -64,7 +64,7 @@ export function NutritionPage() {
   }
 
   const ensurePlannedMealsLogged = async (existingEntries = []) => {
-    if (!user?.id) return
+    if (!user?.id) return false
 
     const { data: mealPlan } = await supabase
       .from('meal_plans')
@@ -75,9 +75,23 @@ export function NutritionPage() {
       .maybeSingle()
 
     const plannedMeals = getTodayPlannedMeals(mealPlan)
-    if (!plannedMeals.length) return
+    const plannerKeys = new Set(
+      plannedMeals.map((meal) => `${meal.recipe_id || ''}::${meal.name || meal.title || ''}::${meal.meal || meal.slot || 'dinner'}`)
+    )
 
-    const existingKeys = new Set(existingEntries.filter((entry) => entry.notes === 'Auto-added from meal plan').map((entry) => `${entry.recipe_id || ''}::${entry.entry_name}::${entry.meal_slot}`))
+    const autoAddedEntries = existingEntries.filter((entry) => entry.notes === 'Auto-added from meal plan')
+    const staleEntries = autoAddedEntries.filter((entry) => !plannerKeys.has(`${entry.recipe_id || ''}::${entry.entry_name}::${entry.meal_slot}`))
+
+    if (staleEntries.length) {
+      const { error } = await supabase.from('meal_nutrition_logs').delete().in('id', staleEntries.map((entry) => entry.id))
+      if (error) throw error
+    }
+
+    if (!plannedMeals.length) {
+      return staleEntries.length > 0
+    }
+
+    const existingKeys = new Set(autoAddedEntries.map((entry) => `${entry.recipe_id || ''}::${entry.entry_name}::${entry.meal_slot}`))
 
     const missingMeals = plannedMeals.filter((meal) => {
       const key = `${meal.recipe_id || ''}::${meal.name || meal.title || ''}::${meal.meal || meal.slot || 'dinner'}`
@@ -87,6 +101,8 @@ export function NutritionPage() {
     for (const meal of missingMeals) {
       await addPlannedMealLog({ user_id: user.id, log_date: today, meal })
     }
+
+    return staleEntries.length > 0 || missingMeals.length > 0
   }
 
   const load = async () => {
@@ -101,7 +117,13 @@ export function NutritionPage() {
 
       if (!hydratingPlan) {
         setHydratingPlan(true)
-        await ensurePlannedMealsLogged(entriesResult.data || [])
+        const changed = await ensurePlannedMealsLogged(entriesResult.data || [])
+        if (changed) {
+          await supabase.rpc('recompute_daily_nutrition_log', {
+            p_user_id: user.id,
+            p_log_date: today,
+          })
+        }
         const [refreshedDaily, refreshedEntries] = await Promise.all([
           supabase.from('daily_nutrition_logs').select('*').eq('user_id', user.id).eq('log_date', today).maybeSingle(),
           supabase.from('meal_nutrition_logs').select('*').eq('user_id', user.id).eq('log_date', today).order('logged_at', { ascending: true }),

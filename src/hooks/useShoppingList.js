@@ -203,6 +203,26 @@ export function useShoppingList(userId, listId = null) {
     return nextItems
   }, [items])
 
+  const deleteItems = useCallback(async (itemIds = []) => {
+    const ids = Array.from(new Set((itemIds || []).filter(Boolean)))
+    if (!ids.length) return items
+
+    const { error: deleteError } = await supabase
+      .from('shopping_list_items')
+      .delete()
+      .in('id', ids)
+
+    if (deleteError) {
+      toast.error(deleteError.message)
+      throw deleteError
+    }
+
+    const idSet = new Set(ids)
+    const nextItems = items.filter((item) => !idSet.has(item.id))
+    setItems(nextItems)
+    return nextItems
+  }, [items])
+
   const groupedItems = useMemo(() => groupItemsByCategory(items || []), [items])
 
   return {
@@ -218,5 +238,6 @@ export function useShoppingList(userId, listId = null) {
     addItem,
     updateItem,
     deleteItem,
+    deleteItems,
   }
 }

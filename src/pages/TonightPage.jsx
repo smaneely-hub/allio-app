@@ -19,6 +19,7 @@ import { ShoppingListPickerModal } from '../components/ShoppingListPickerModal'
 import { calculateServings, logServingsCalculation, getDemographicBucket } from '../hooks/useServings'
 import { CookingMode } from '../components/CookingMode'
 import { MealDetailBody } from '../components/MealDetailBody'
+import { addDays, formatIsoLocalDate, getStartOfWeek, MEAL_SLOTS } from '../lib/planner'
 
 const FALLBACK_TIME_LIMITS = {
   low: 30,
@@ -293,6 +294,140 @@ async function persistTonightMealForUser({ userId, meal, staplesOnHand = '' }) {
   return household
 }
 
+async function addTonightMealToPlanner({ userId, targetMeal, targetDate, mealSlot }) {
+  const household = await getHousehold(userId)
+  if (!household?.id) throw new Error('Household not found')
+
+  const targetIso = formatIsoLocalDate(targetDate)
+  const weekOf = formatIsoLocalDate(getStartOfWeek(targetDate))
+  const dayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+  const dayKey = dayKeys[targetDate.getDay()] || 'mon'
+
+  const { data: existingPlan, error: planLoadError } = await supabase
+    .from('meal_plans')
+    .select('id, plan, draft_plan')
+    .eq('user_id', userId)
+    .eq('week_of', weekOf)
+    .eq('status', 'active')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (planLoadError) throw planLoadError
+
+  const currentMeals = existingPlan?.draft_plan?.meals || existingPlan?.plan?.meals || []
+  const nextMeal = {
+    ...targetMeal,
+    id: crypto.randomUUID(),
+    day: dayKey,
+    meal: mealSlot,
+    date: targetIso,
+    recurring: false,
+    source: targetMeal?.source || 'tonight',
+    source_type: targetMeal?.source_type || 'tonight',
+  }
+
+  const withoutSameSlot = currentMeals.filter((meal) => !(meal?.date === targetIso && meal?.meal === mealSlot))
+  const nextPlan = {
+    ...(existingPlan?.draft_plan || existingPlan?.plan || {}),
+    meals: [...withoutSameSlot, nextMeal],
+  }
+
+  if (existingPlan?.id) {
+    const { error } = await supabase
+      .from('meal_plans')
+      .update({
+        household_id: household.id,
+        plan: nextPlan,
+        draft_plan: nextPlan,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existingPlan.id)
+
+    if (error) throw error
+  } else {
+    const { error } = await supabase
+      .from('meal_plans')
+      .insert({
+        user_id: userId,
+        household_id: household.id,
+        week_of: weekOf,
+        status: 'active',
+        plan: nextPlan,
+        draft_plan: nextPlan,
+        updated_at: new Date().toISOString(),
+      })
+
+    if (error) throw error
+  }
+}
+
+function AddToPlannerModal({ open, onClose, onSubmit }) {
+  const [targetDate, setTargetDate] = useState(() => formatIsoLocalDate(new Date()))
+  const [mealSlot, setMealSlot] = useState('dinner')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    setTargetDate(formatIsoLocalDate(new Date()))
+    setMealSlot('dinner')
+    setSaving(false)
+  }, [open])
+
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-end justify-center bg-black/40 p-4 sm:items-center" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-[28px] bg-surface-card p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="text-lg font-semibold text-text-primary">Add to planner</div>
+        <p className="mt-1 text-sm text-text-secondary">Choose where this quick meal should go.</p>
+
+        <div className="mt-4 space-y-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">Day</label>
+            <input
+              type="date"
+              value={targetDate}
+              onChange={(e) => setTargetDate(e.target.value)}
+              className="input w-full"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-text-primary">Meal slot</label>
+            <select className="input w-full" value={mealSlot} onChange={(e) => setMealSlot(e.target.value)}>
+              {MEAL_SLOTS.map((slot) => (
+                <option key={slot} value={slot}>{slot.charAt(0).toUpperCase() + slot.slice(1)}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-5 flex gap-2">
+          <button type="button" onClick={onClose} className="flex-1 rounded-full border border-divider px-4 py-2 text-sm font-medium text-text-secondary">
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={saving || !targetDate}
+            onClick={async () => {
+              setSaving(true)
+              try {
+                await onSubmit({ targetDate, mealSlot })
+                onClose()
+              } finally {
+                setSaving(false)
+              }
+            }}
+            className="flex-1 rounded-full bg-primary-500 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {saving ? 'Adding…' : 'Add'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 async function loadTonightPreferenceSignals(userId) {
   if (!userId) {
     return {
@@ -413,6 +548,7 @@ export function TonightPage() {
   const [cookingMode, setCookingMode] = useState(false)
   const [listPickerOpen, setListPickerOpen] = useState(false)
   const [pendingMealForList, setPendingMealForList] = useState(null)
+  const [plannerPickerOpen, setPlannerPickerOpen] = useState(false)
 
   const activeMeal = mealQueue[0] || meal
 
@@ -1595,6 +1731,13 @@ export function TonightPage() {
             >
               View shopping list
             </Link>
+            <button
+              type="button"
+              onClick={() => setPlannerPickerOpen(true)}
+              className="rounded-full border border-divider bg-white px-4 py-2 text-sm font-semibold text-text-primary transition hover:bg-warm-50"
+            >
+              Add to planner
+            </button>
           </div>
 
           {cookingMode ? createPortal(
@@ -1825,6 +1968,22 @@ export function TonightPage() {
           </div>
         </div>
       )}
+
+      <AddToPlannerModal
+        open={plannerPickerOpen}
+        onClose={() => setPlannerPickerOpen(false)}
+        onSubmit={async ({ targetDate, mealSlot }) => {
+          if (!user?.id || !activeMeal) return
+          const parsedDate = new Date(`${targetDate}T12:00:00`)
+          await addTonightMealToPlanner({
+            userId: user.id,
+            targetMeal: activeMeal,
+            targetDate: parsedDate,
+            mealSlot,
+          })
+          toast.success(`Added to planner for ${targetDate}`)
+        }}
+      />
     </div>
   )
 }

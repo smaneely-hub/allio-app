@@ -16,6 +16,11 @@ import { useShoppingLists } from '../hooks/useShoppingLists'
 import { CATEGORY_LABELS, CATEGORY_ORDER, categorizeIngredient } from '../lib/shoppingListUtils'
 import { getSourceBadgeLabel } from '../lib/shoppingLists'
 
+const SHOP_OPTIONS_OPEN_KEY = 'shopping.optionsOpen'
+const SHOP_FILTERS_OPEN_KEY = 'shopping.filtersOpen'
+const SHOP_GROUP_BY_KEY = 'shopping.groupBy'
+const SHOP_SOURCE_FILTER_KEY = 'shopping.sourceFilter'
+
 const categoryColors = {
   produce: { border: '#22C55E', bg: 'bg-green-50' },
   dairy: { border: '#3B82F6', bg: 'bg-blue-50' },
@@ -45,7 +50,7 @@ export function ShopPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const selectedListId = searchParams.get('list') || null
   const { createList, makeDefault, deleteList } = useShoppingLists(user?.id)
-  const { shoppingList, items, availableLists, loading, toggleItem, clearChecked, addItem, updateItem, deleteItem } = useShoppingList(user?.id, selectedListId)
+  const { shoppingList, items, availableLists, loading, toggleItem, clearChecked, addItem, updateItem, deleteItem, deleteItems } = useShoppingList(user?.id, selectedListId)
   const listLabel = shoppingList?.name || 'Shopping List'
   const [newItemName, setNewItemName] = useState('')
   const [newItemQuantity, setNewItemQuantity] = useState('')
@@ -59,16 +64,31 @@ export function ShopPage() {
   const [upgradeFeature, setUpgradeFeature] = useState(null)
   const [deletingList, setDeletingList] = useState(false)
   const [showShareSheet, setShowShareSheet] = useState(false)
+  const [optionsOpen, setOptionsOpen] = useState(() => localStorage.getItem(SHOP_OPTIONS_OPEN_KEY) === 'true')
+  const [filtersOpen, setFiltersOpen] = useState(() => localStorage.getItem(SHOP_FILTERS_OPEN_KEY) === 'true')
+  const [groupBy, setGroupBy] = useState(() => localStorage.getItem(SHOP_GROUP_BY_KEY) || 'category')
+  const [sourceFilter, setSourceFilter] = useState(() => localStorage.getItem(SHOP_SOURCE_FILTER_KEY) || 'all')
+
+  const filteredItems = useMemo(() => {
+    if (sourceFilter === 'all') return items || []
+    return (items || []).filter((item) => String(item.source || 'manual').toLowerCase() === sourceFilter)
+  }, [items, sourceFilter])
 
   const displayGroups = useMemo(() => {
+    if (groupBy === 'none') {
+      return {
+        all: filteredItems.map((item) => ({ ...item, __itemKey: item.id })),
+      }
+    }
+
     return CATEGORY_ORDER.reduce((acc, category) => {
-      const grouped = (items || [])
+      const grouped = filteredItems
         .map((item) => ({ ...item, __itemKey: item.id }))
         .filter((item) => (item.category || 'other') === category)
       if (grouped.length) acc[category] = grouped
       return acc
     }, {})
-  }, [items])
+  }, [filteredItems, groupBy])
 
   useEffect(() => {
     if (!selectedListId && shoppingList?.id) {
@@ -81,7 +101,23 @@ export function ShopPage() {
   }, [selectedListId, setSearchParams, shoppingList?.id])
 
   useEffect(() => {
-    const categoriesWithItems = CATEGORY_ORDER.filter((category) => displayGroups[category]?.length)
+    localStorage.setItem(SHOP_OPTIONS_OPEN_KEY, String(optionsOpen))
+  }, [optionsOpen])
+
+  useEffect(() => {
+    localStorage.setItem(SHOP_FILTERS_OPEN_KEY, String(filtersOpen))
+  }, [filtersOpen])
+
+  useEffect(() => {
+    localStorage.setItem(SHOP_GROUP_BY_KEY, groupBy)
+  }, [groupBy])
+
+  useEffect(() => {
+    localStorage.setItem(SHOP_SOURCE_FILTER_KEY, sourceFilter)
+  }, [sourceFilter])
+
+  useEffect(() => {
+    const categoriesWithItems = Object.keys(displayGroups)
     if (!categoriesWithItems.length) {
       setOpenCategories({})
       return
@@ -108,7 +144,16 @@ export function ShopPage() {
 
   const clearAllChecks = async () => {
     await clearChecked()
-    toast.success('Checked items cleared')
+    toast.success('Check marks cleared')
+  }
+
+  const deleteCheckedItems = async () => {
+    const checkedIds = (items || []).filter((item) => item.checked).map((item) => item.id)
+    if (!checkedIds.length) return
+    const count = checkedIds.length
+    if (!window.confirm(`Delete ${count} checked item${count === 1 ? '' : 's'}?`)) return
+    await deleteItems(checkedIds)
+    toast.success(`${count} checked item${count === 1 ? '' : 's'} removed`)
   }
 
   const handleAddItem = async (event) => {
@@ -318,55 +363,90 @@ export function ShopPage() {
           <div>
             <div className="h-1 w-12 rounded-full bg-gradient-to-r from-primary-400 via-teal-400 to-purple-400 mb-2"></div>
             <h1 className="font-display text-2xl md:text-3xl text-text-primary">{listLabel}</h1>
-            <p className="text-sm text-text-muted">Planner items and manual items merge in the same list. Share by copy, native share, or email.</p>
           </div>
-          <button
-            type="button"
-            onClick={handleShare}
-            className="text-sm text-primary-500 hover:bg-primary-50 rounded-lg px-3 py-1.5 transition-all duration-150 active:scale-[0.97]"
-          >
-            Share
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((current) => !current)}
+              className="rounded-lg px-3 py-1.5 text-sm text-text-secondary transition-all duration-150 hover:bg-primary-50"
+            >
+              Filters
+            </button>
+            <button
+              type="button"
+              onClick={() => setOptionsOpen((current) => !current)}
+              className="rounded-lg px-3 py-1.5 text-sm text-text-secondary transition-all duration-150 hover:bg-primary-50"
+            >
+              List options
+            </button>
+            <button
+              type="button"
+              onClick={handleShare}
+              className="text-sm text-primary-500 hover:bg-primary-50 rounded-lg px-3 py-1.5 transition-all duration-150 active:scale-[0.97]"
+            >
+              Share
+            </button>
+          </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+        {filtersOpen ? (
           <div className="rounded-2xl border border-divider bg-white p-3 shadow-sm">
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Current list</label>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <select className="input flex-1" value={shoppingList?.id || ''} onChange={handleSelectList}>
-                {availableLists.map((list) => (
-                  <option key={list.id} value={list.id}>{list.name}{list.is_default ? ' • default' : ''}</option>
-                ))}
+            <div className="grid gap-2 sm:grid-cols-2">
+              <select className="input w-full" value={groupBy} onChange={(e) => setGroupBy(e.target.value)}>
+                <option value="category">Group by category</option>
+                <option value="none">No grouping</option>
               </select>
-              <button type="button" onClick={handleMakeDefault} className="btn-secondary whitespace-nowrap" disabled={shoppingList?.is_default}>
-                {shoppingList?.is_default ? 'Default list' : 'Set default'}
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteList}
-                disabled={deletingList}
-                className="rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 whitespace-nowrap"
-              >
-                {deletingList ? 'Deleting…' : 'Delete list'}
-              </button>
+              <select className="input w-full" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+                <option value="all">All items</option>
+                <option value="planner">Planner only</option>
+                <option value="manual">Manual only</option>
+                <option value="tonight">Tonight only</option>
+                <option value="mixed">Mixed only</option>
+              </select>
             </div>
           </div>
+        ) : null}
 
-          <form onSubmit={handleCreateList} className="rounded-2xl border border-divider bg-white p-3 shadow-sm">
-            <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">New list</label>
-            <div className="flex gap-2">
-              <input
-                value={newListName}
-                onChange={(e) => setNewListName(e.target.value)}
-                className="input min-w-0"
-                placeholder="Weekly groceries"
-              />
-              <button type="submit" className="btn-primary whitespace-nowrap" disabled={creatingList}>
-                {creatingList ? 'Creating…' : 'Create'}
-              </button>
+        {optionsOpen ? (
+          <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+            <div className="rounded-2xl border border-divider bg-white p-3 shadow-sm">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Current list</label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <select className="input flex-1" value={shoppingList?.id || ''} onChange={handleSelectList}>
+                  {availableLists.map((list) => (
+                    <option key={list.id} value={list.id}>{list.name}{list.is_default ? ' • default' : ''}</option>
+                  ))}
+                </select>
+                <button type="button" onClick={handleMakeDefault} className="btn-secondary whitespace-nowrap" disabled={shoppingList?.is_default}>
+                  {shoppingList?.is_default ? 'Default list' : 'Set default'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteList}
+                  disabled={deletingList}
+                  className="rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {deletingList ? 'Deleting…' : 'Delete list'}
+                </button>
+              </div>
             </div>
-          </form>
-        </div>
+
+            <form onSubmit={handleCreateList} className="rounded-2xl border border-divider bg-white p-3 shadow-sm">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">New list</label>
+              <div className="flex gap-2">
+                <input
+                  value={newListName}
+                  onChange={(e) => setNewListName(e.target.value)}
+                  className="input min-w-0"
+                  placeholder="Weekly groceries"
+                />
+                <button type="submit" className="btn-primary whitespace-nowrap" disabled={creatingList}>
+                  {creatingList ? 'Creating…' : 'Create'}
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : null}
       </div>
 
       <div className="card p-4 mb-3 shadow-sm hover:shadow-md transition-shadow duration-200">
@@ -391,13 +471,23 @@ export function ShopPage() {
               {progress.label}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={clearAllChecks}
-            className="rounded-full border border-divider bg-white px-3 py-1.5 text-sm font-medium text-text-secondary transition-colors hover:bg-warm-50"
-          >
-            Clear checked
-          </button>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              onClick={clearAllChecks}
+              className="rounded-full border border-divider bg-white px-3 py-1.5 text-sm font-medium text-text-secondary transition-colors hover:bg-warm-50"
+            >
+              Clear checked
+            </button>
+            <button
+              type="button"
+              onClick={deleteCheckedItems}
+              disabled={!progress.checked}
+              className="rounded-full border border-red-200 bg-white px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+            >
+              Delete checked
+            </button>
+          </div>
         </div>
         <div className="flex justify-between text-sm mb-2">
           <span className="text-text-secondary font-medium">{progress.checked} of {progress.total} checked</span>
@@ -440,11 +530,11 @@ export function ShopPage() {
         </div>
       )}
 
-      {!items?.length ? (
+      {!filteredItems?.length ? (
         <div className="card p-6 text-sm text-text-muted">
           This list is empty. Planner meals can flow here, and manual items can be added anytime.
         </div>
-      ) : CATEGORY_ORDER.filter((category) => displayGroups[category]?.length).map((category) => {
+      ) : Object.keys(displayGroups).map((category) => {
         const categoryItems = displayGroups[category]
         const colors = categoryColors[category] || categoryColors.other
         const isOpen = openCategories[category] !== false
@@ -459,7 +549,7 @@ export function ShopPage() {
               style={{ borderLeft: `4px solid ${colors.border}` }}
             >
               <div className="flex items-center gap-2">
-                <span className="font-bold text-base text-text-primary">{CATEGORY_LABELS[category] || 'Other'}</span>
+                <span className="font-bold text-base text-text-primary">{category === 'all' ? 'All items' : (CATEGORY_LABELS[category] || 'Other')}</span>
                 <span className="bg-green-100 text-green-700 rounded-full px-2 py-0.5 text-xs font-semibold">
                   {categoryItems.length}
                 </span>
@@ -570,15 +660,6 @@ export function ShopPage() {
           <AdSlot size="banner" position="shop_bottom" />
         </div>
       )}
-
-      <div className="mt-6 rounded-3xl border border-divider bg-surface-card p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-text-primary">What’s next</h2>
-        <ul className="mt-3 space-y-2 text-sm text-text-secondary">
-          <li>• Planner destination picker, so meals can be sent to a chosen list before sync</li>
-          <li>• List-sharing with household members, instead of copy or email only</li>
-          <li>• Shared plan collaboration built on the same household permissions model</li>
-        </ul>
-      </div>
 
       <UpgradePrompt
         feature={upgradeFeature}
