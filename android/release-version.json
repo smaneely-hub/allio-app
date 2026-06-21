@@ -1,0 +1,5 @@
+{
+  "lastReleasedVersionCode": 4,
+  "lastReleasedVersionName": "1.0.3",
+  "notes": "Update this file after a build is uploaded or otherwise becomes the last released Android artifact. The guard requires android/app/build.gradle versionCode to be greater than this value before a new release build."
+}

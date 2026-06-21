@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "bootstrap:browser": "bash scripts/bootstrap-browser.sh",
     "smoke": "node scripts/smoke-test.js",
-    "test:lib": "node --test src/lib/aggregateShoppingList.test.js && node src/lib/nutritionTargets.test.js"
+    "test:lib": "node --test src/lib/aggregateShoppingList.test.js && node src/lib/nutritionTargets.test.js",
+    "check:android-version": "node scripts/check-android-version.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.100.0",
