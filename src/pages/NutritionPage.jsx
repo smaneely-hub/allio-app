@@ -23,6 +23,13 @@ const SLOT_LABELS = {
   snack: 'Snacks',
 }
 
+const SLOT_COLORS = {
+  breakfast: '#F97316',
+  lunch: '#14B8A6',
+  dinner: '#7B8CF6',
+  snack: '#EC4899',
+}
+
 export function NutritionPage() {
   useDocumentTitle('Nutrition | Allio')
   const { user } = useAuth()
@@ -159,6 +166,15 @@ export function NutritionPage() {
 
   const grouped = useMemo(() => SLOT_ORDER.reduce((acc, slot) => ({ ...acc, [slot]: entries.filter((entry) => entry.meal_slot === slot) }), {}), [entries])
   const slotsWithEntries = useMemo(() => SLOT_ORDER.filter((slot) => (grouped[slot] || []).length > 0), [grouped])
+  const dailyMealContributions = useMemo(() => slotsWithEntries.map((slot) => ({
+    key: slot,
+    label: SLOT_LABELS[slot],
+    color: SLOT_COLORS[slot],
+    calories: (grouped[slot] || []).reduce((sum, item) => sum + Number(item.calories || 0), 0),
+    protein_g: Math.round((grouped[slot] || []).reduce((sum, item) => sum + Number(item.protein_g || 0), 0) * 10) / 10,
+    carbs_g: Math.round((grouped[slot] || []).reduce((sum, item) => sum + Number(item.carbs_g || 0), 0) * 10) / 10,
+    fat_g: Math.round((grouped[slot] || []).reduce((sum, item) => sum + Number(item.fat_g || 0), 0) * 10) / 10,
+  })), [grouped, slotsWithEntries])
 
   const openAdd = (slot) => {
     setSelectedSlot(slot)
@@ -312,17 +328,17 @@ export function NutritionPage() {
                   {totals.calories.toLocaleString()} kcal, {slotsWithEntries.length} meal section{slotsWithEntries.length === 1 ? '' : 's'} logged
                 </p>
               </div>
-              <span className="text-sm text-text-muted">{mealsExpanded ? '▲' : '▼'}</span>
+              <span className="text-sm text-text-muted">{mealsExpanded ? '▼' : '▲'}</span>
             </button>
 
             <div className="mt-4">
-              <MacroBars totals={totals} targets={targets || {}} />
+              <MacroBars totals={totals} targets={targets || {}} mealContributions={dailyMealContributions} />
             </div>
 
             {mealsExpanded ? (
               <div className="mt-4 grid gap-4">
                 {SLOT_ORDER.map((slot) => (
-                  <MealSlotGroup key={slot} title={SLOT_LABELS[slot]} items={grouped[slot] || []} onAdd={() => openFoodPicker(slot)} onAddFood={() => openFoodPicker(slot)} onEdit={openEdit} />
+                  <MealSlotGroup key={slot} title={SLOT_LABELS[slot]} items={grouped[slot] || []} onAdd={() => openFoodPicker(slot)} onAddFood={() => openFoodPicker(slot)} onEdit={openEdit} targets={targets || {}} contributionColor={SLOT_COLORS[slot]} />
                 ))}
               </div>
             ) : null}

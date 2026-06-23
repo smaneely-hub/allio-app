@@ -36,12 +36,44 @@ export function applyGoalDelta(tdee, goal) {
   return Math.min(4500, Math.max(1200, tdee + delta))
 }
 
-export function splitMacros(calories, split = { protein: 0.30, carbs: 0.40, fat: 0.30 }) {
+export function poundsFromKg(valueKg) {
+  const kg = Number(valueKg)
+  if (!kg) return null
+  return kg * 2.20462
+}
+
+export function calculateProteinTarget({ weight_kg, target_weight_kg, goal_type }) {
+  const goalWeightKg = Number(target_weight_kg || 0)
+  const currentWeightKg = Number(weight_kg || 0)
+  const effectiveKg = goal_type && goal_type !== 'maintain'
+    ? (goalWeightKg || currentWeightKg)
+    : (currentWeightKg || goalWeightKg)
+
+  const effectiveLbs = poundsFromKg(effectiveKg)
+  if (!effectiveLbs) return null
+  return Math.round(effectiveLbs)
+}
+
+export function splitMacros(calories, profile = {}, split = { carbs: 0.40 }) {
   if (!calories) return null
+  const protein_g = calculateProteinTarget(profile)
+  if (!protein_g) {
+    return {
+      protein_g: Math.round((calories * 0.30) / 4),
+      carbs_g: Math.round((calories * split.carbs) / 4),
+      fat_g: Math.round((calories * 0.30) / 9),
+    }
+  }
+
+  const proteinCalories = protein_g * 4
+  const remainingCalories = Math.max(0, calories - proteinCalories)
+  const carbs_g = Math.round((remainingCalories * split.carbs) / 4)
+  const fat_g = Math.round((remainingCalories * (1 - split.carbs)) / 9)
+
   return {
-    protein_g: Math.round((calories * split.protein) / 4),
-    carbs_g: Math.round((calories * split.carbs) / 4),
-    fat_g: Math.round((calories * split.fat) / 9),
+    protein_g,
+    carbs_g,
+    fat_g,
   }
 }
 
@@ -54,6 +86,7 @@ function normalizeProfile(row) {
     weight_kg: row.weight_kg,
     activity_level: row.activity_level || 'moderate',
     goal_type: row.goal_type || 'maintain',
+    target_weight_kg: row.target_weight_kg,
     nutrition_mode: row.nutrition_mode || 'auto',
     calories_target: row.calories_target,
     protein_target_g: row.protein_target_g,
@@ -68,7 +101,7 @@ export async function getDailyTargets(userId) {
     const { supabase } = await import('./supabase')
     const { data, error } = await supabase
       .from('user_preferences')
-      .select('sex, age_years, height_cm, weight_kg, activity_level, goal_type, nutrition_mode, calories_target, protein_target_g, carbs_target_g, fat_target_g')
+      .select('sex, age_years, height_cm, weight_kg, activity_level, goal_type, target_weight_kg, nutrition_mode, calories_target, protein_target_g, carbs_target_g, fat_target_g')
       .eq('user_id', userId)
       .maybeSingle()
 
@@ -93,7 +126,7 @@ export async function getDailyTargets(userId) {
     const bmr = computeBMR(profile)
     const tdee = applyActivityMultiplier(bmr, profile.activity_level)
     const calories = applyGoalDelta(tdee, profile.goal_type)
-    const macros = splitMacros(calories)
+    const macros = splitMacros(calories, profile)
 
     if (!calories || !macros) return DEFAULT_DAILY_TARGETS
 
