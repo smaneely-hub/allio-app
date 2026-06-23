@@ -29,7 +29,7 @@ export function MealSlotGroup({ title, items, onAdd, onAddFood, onEdit, targets,
         >
           <div className="flex items-center gap-2">
             <h3 className="font-display text-lg text-text-primary">{title}</h3>
-            <span className="text-xs text-text-muted">{expanded ? '▼' : '▲'}</span>
+            <span className="text-xs text-text-muted">{expanded ? '▲' : '▼'}</span>
           </div>
           <p className="mt-1 text-sm text-text-secondary">{subtotal} kcal • P {protein}g • C {carbs}g • F {fat}g</p>
         </button>

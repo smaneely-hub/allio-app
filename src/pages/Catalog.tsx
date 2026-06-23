@@ -276,7 +276,7 @@ export function Catalog() {
             onClick={() => setFiltersOpen((current) => !current)}
             className="text-sm font-medium text-text-primary"
           >
-            Filters {filtersOpen ? '▼' : '▲'}
+            Filters {filtersOpen ? '▲' : '▼'}
           </button>
           {hasActiveFilters && (
             <button

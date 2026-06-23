@@ -328,7 +328,7 @@ export function NutritionPage() {
                   {totals.calories.toLocaleString()} kcal, {slotsWithEntries.length} meal section{slotsWithEntries.length === 1 ? '' : 's'} logged
                 </p>
               </div>
-              <span className="text-sm text-text-muted">{mealsExpanded ? '▼' : '▲'}</span>
+              <span className="text-sm text-text-muted">{mealsExpanded ? '▲' : '▼'}</span>
             </button>
 
             <div className="mt-4">
