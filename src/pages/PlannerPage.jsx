@@ -778,6 +778,28 @@ export function PlannerPage() {
           </>
         )}
 
+        <div className="mt-4 rounded-2xl border border-divider bg-surface-card p-3 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setOptionsOpen((current) => !current)}
+              className="text-sm font-medium text-text-primary"
+            >
+              Plan options {optionsOpen ? '▲' : '▼'}
+            </button>
+          </div>
+
+          {optionsOpen ? (
+            <>
+              <div className="mt-3">
+                {members.length === 0 ? <MemberEmptyState onOpen={() => setShowMembersModal(true)} /> : <MemberSummary members={members} onOpen={() => setShowMembersModal(true)} />}
+              </div>
+
+              {members.length === 0 ? <div className="mt-3 text-sm text-ink-secondary">Meal generation stays disabled until you add at least one household member.</div> : <div className="mt-3 text-sm text-ink-secondary">Generate meals one slot at a time from each day card, or add meals manually.</div>}
+            </>
+          ) : null}
+        </div>
+
         {loading ? <ScheduleSkeleton /> : (
           <MealPlanWorkspace
             meals={planMeals}
@@ -800,28 +822,6 @@ export function PlannerPage() {
             generatingSlotKey={generatingSlotKey}
           />
         )}
-
-        <div className="mt-4 rounded-2xl border border-divider bg-surface-card p-3 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setOptionsOpen((current) => !current)}
-              className="text-sm font-medium text-text-primary"
-            >
-              Plan options {optionsOpen ? '▲' : '▼'}
-            </button>
-          </div>
-
-          {optionsOpen ? (
-            <>
-              <div className="mt-3">
-                {members.length === 0 ? <MemberEmptyState onOpen={() => setShowMembersModal(true)} /> : <MemberSummary members={members} onOpen={() => setShowMembersModal(true)} />}
-              </div>
-
-              {members.length === 0 ? <div className="mt-3 text-sm text-ink-secondary">Meal generation stays disabled until you add at least one household member.</div> : <div className="mt-3 text-sm text-ink-secondary">Generate meals one slot at a time from each day card, or add meals manually.</div>}
-            </>
-          ) : null}
-        </div>
 
         {false && linkedHousehold && linkedPlan && (
           <>

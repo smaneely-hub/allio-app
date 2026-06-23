@@ -8,7 +8,6 @@ import { addManualMealLog, addPlannedMealLog, deleteMealLog, updateMealLog } fro
 import { addNutritionLogToPlanner } from '../lib/plannerSync'
 import { formatIsoLocalDate, getStartOfWeek, normalizeDayName } from '../lib/planner'
 import { normalizeMealRecord } from '../lib/mealSchema'
-import { TodayProgressCard } from '../components/nutrition/TodayProgressCard'
 import { MacroBars } from '../components/nutrition/MacroBars'
 import { MealSlotGroup } from '../components/nutrition/MealSlotGroup'
 import { EmptyState } from '../components/nutrition/EmptyState'
@@ -37,6 +36,7 @@ export function NutritionPage() {
   const [saving, setSaving] = useState(false)
   const [hydratingPlan, setHydratingPlan] = useState(false)
   const [foodModalOpen, setFoodModalOpen] = useState(false)
+  const [mealsExpanded, setMealsExpanded] = useState(false)
   const today = new Date().toISOString().slice(0, 10)
 
   const getTodayPlannedMeals = (mealPlan) => {
@@ -158,6 +158,7 @@ export function NutritionPage() {
   }
 
   const grouped = useMemo(() => SLOT_ORDER.reduce((acc, slot) => ({ ...acc, [slot]: entries.filter((entry) => entry.meal_slot === slot) }), {}), [entries])
+  const slotsWithEntries = useMemo(() => SLOT_ORDER.filter((slot) => (grouped[slot] || []).length > 0), [grouped])
 
   const openAdd = (slot) => {
     setSelectedSlot(slot)
@@ -298,16 +299,35 @@ export function NutritionPage() {
           <p className="mt-2 text-sm text-text-secondary">Track what you cooked, what you logged, and where today stands.</p>
         </div>
 
-        <TodayProgressCard totalCalories={totals.calories} targets={targets} />
-        <MacroBars totals={totals} targets={targets || {}} />
+        {entries.length === 0 ? <EmptyState onAdd={() => openAdd('breakfast')} /> : (
+          <section className="rounded-3xl border border-divider bg-white p-4 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setMealsExpanded((current) => !current)}
+              className="flex w-full items-center justify-between gap-3 text-left"
+            >
+              <div>
+                <h2 className="font-display text-xl text-text-primary">Today’s macros</h2>
+                <p className="mt-1 text-sm text-text-secondary">
+                  {totals.calories.toLocaleString()} kcal, {slotsWithEntries.length} meal section{slotsWithEntries.length === 1 ? '' : 's'} logged
+                </p>
+              </div>
+              <span className="text-sm text-text-muted">{mealsExpanded ? '▲' : '▼'}</span>
+            </button>
 
-        {entries.length === 0 ? <EmptyState onAdd={() => openAdd('breakfast')} /> : null}
+            <div className="mt-4">
+              <MacroBars totals={totals} targets={targets || {}} />
+            </div>
 
-        <div className="grid gap-4">
-          {SLOT_ORDER.map((slot) => (
-            <MealSlotGroup key={slot} title={SLOT_LABELS[slot]} items={grouped[slot] || []} onAdd={() => openFoodPicker(slot)} onAddFood={() => openFoodPicker(slot)} onEdit={openEdit} />
-          ))}
-        </div>
+            {mealsExpanded ? (
+              <div className="mt-4 grid gap-4">
+                {SLOT_ORDER.map((slot) => (
+                  <MealSlotGroup key={slot} title={SLOT_LABELS[slot]} items={grouped[slot] || []} onAdd={() => openFoodPicker(slot)} onAddFood={() => openFoodPicker(slot)} onEdit={openEdit} />
+                ))}
+              </div>
+            ) : null}
+          </section>
+        )}
 
         <NutritionTrendsSection userId={user?.id} />
       </div>
