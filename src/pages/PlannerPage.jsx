@@ -785,7 +785,7 @@ export function PlannerPage() {
               onClick={() => setOptionsOpen((current) => !current)}
               className="text-sm font-medium text-text-primary"
             >
-              Plan options {optionsOpen ? '▲' : '▼'}
+              Plan options {optionsOpen ? '▼' : '▲'}
             </button>
           </div>
 
