@@ -7,6 +7,9 @@ export function AdminUsersPage() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [subscriptionFilter, setSubscriptionFilter] = useState('all')
+  const [onboardingFilter, setOnboardingFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('created_desc')
 
   useEffect(() => {
     let active = true
@@ -39,6 +42,29 @@ export function AdminUsersPage() {
     return 'No users returned.'
   }, [loading, query])
 
+  const visibleUsers = useMemo(() => {
+    let next = [...users]
+
+    if (subscriptionFilter !== 'all') {
+      next = next.filter((user) => String(user.subscription || 'free') === subscriptionFilter)
+    }
+
+    if (onboardingFilter !== 'all') {
+      next = next.filter((user) => String(user.onboarding || 'not started') === onboardingFilter)
+    }
+
+    next.sort((a, b) => {
+      if (sortBy === 'created_asc') return new Date(a.created_at || 0) - new Date(b.created_at || 0)
+      if (sortBy === 'created_desc') return new Date(b.created_at || 0) - new Date(a.created_at || 0)
+      if (sortBy === 'last_sign_in_desc') return new Date(b.last_sign_in_at || 0) - new Date(a.last_sign_in_at || 0)
+      if (sortBy === 'email_asc') return String(a.email || '').localeCompare(String(b.email || ''))
+      if (sortBy === 'email_desc') return String(b.email || '').localeCompare(String(a.email || ''))
+      return 0
+    })
+
+    return next
+  }, [users, subscriptionFilter, onboardingFilter, sortBy])
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 pb-24 md:px-6">
       <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -60,7 +86,23 @@ export function AdminUsersPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <div className="input flex items-center text-sm text-text-muted md:col-span-3">Read-only first pass, backend-backed admin search</div>
+          <select className="input" value={subscriptionFilter} onChange={(e) => setSubscriptionFilter(e.target.value)}>
+            <option value="all">All subscriptions</option>
+            <option value="free">Free</option>
+            <option value="premium">Premium</option>
+          </select>
+          <select className="input" value={onboardingFilter} onChange={(e) => setOnboardingFilter(e.target.value)}>
+            <option value="all">All onboarding</option>
+            <option value="started">Started</option>
+            <option value="not started">Not started</option>
+          </select>
+          <select className="input" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+            <option value="created_desc">Newest first</option>
+            <option value="created_asc">Oldest first</option>
+            <option value="last_sign_in_desc">Recent sign-in</option>
+            <option value="email_asc">Email A-Z</option>
+            <option value="email_desc">Email Z-A</option>
+          </select>
         </div>
       </div>
 
@@ -84,7 +126,7 @@ export function AdminUsersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-divider">
-              {users.length ? users.map((user) => (
+              {visibleUsers.length ? visibleUsers.map((user) => (
                 <tr key={user.id}>
                   <td className="px-4 py-4">
                     <div className="font-medium text-text-primary">{user.email || 'No email'}</div>

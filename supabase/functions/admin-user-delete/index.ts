@@ -8,8 +8,13 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '
 
 const TABLES = [
   { table: 'usage_tracking', column: 'user_id' },
+  { table: 'health_metric_logs', column: 'user_id' },
+  { table: 'daily_nutrition_logs', column: 'user_id' },
+  { table: 'meal_nutrition_logs', column: 'user_id' },
+  { table: 'saved_meals', column: 'user_id' },
   { table: 'user_preferences', column: 'user_id' },
   { table: 'meal_plans', column: 'user_id' },
+  { table: 'weekly_schedules', column: 'user_id' },
   { table: 'recipes', column: 'user_id' },
   { table: 'shopping_list_items', column: 'user_id' },
   { table: 'shopping_lists', column: 'user_id' },
@@ -42,19 +47,24 @@ serve(async (req) => {
 
     const supabase = createServiceClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
+    const failures: string[] = []
+
     for (const { table, column } of TABLES) {
       const { error } = await supabase.from(table).delete().eq(column, userId)
       if (error && !error.message?.includes('does not exist') && !error.message?.includes('relation')) {
         console.error(`[admin-user-delete] failed to delete from ${table}:`, error.message)
+        failures.push(`${table}: ${error.message}`)
       }
     }
 
+    await supabase.from('household_members').update({ linked_user_id: null }).eq('linked_user_id', userId)
+
     const { error: deleteError } = await supabase.auth.admin.deleteUser(userId)
     if (deleteError) {
-      return new Response(JSON.stringify({ error: deleteError.message || 'Failed to delete user' }), { status: 500, headers })
+      return new Response(JSON.stringify({ error: deleteError.message || 'Failed to delete user', cleanupFailures: failures }), { status: 500, headers })
     }
 
-    return new Response(JSON.stringify({ success: true, userId }), { status: 200, headers })
+    return new Response(JSON.stringify({ success: true, userId, cleanupFailures: failures }), { status: 200, headers })
   } catch (error) {
     console.error('[admin-user-delete] unexpected error:', error)
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Admin user delete failed' }), {
