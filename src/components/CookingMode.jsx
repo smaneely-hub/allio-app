@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { normalizeRecipe } from '../lib/recipeSchema'
 import { InstructionText, TimerTrayOverlay } from './TimerChip'
+import { formatIngredientAmount } from '../utils/formatFractions'
 
 // Screen wake lock — prevents device from sleeping while cooking.
 // Fails silently on unsupported browsers or if permission is denied.
@@ -78,7 +79,6 @@ export function CookingMode({ meal, onExit }) {
 
   const [checkedSteps, setCheckedSteps] = useState(new Set())
   const [checkedIngredients, setCheckedIngredients] = useState({})
-  const [showIngredients, setShowIngredients] = useState(false)
 
   const toggleStep = (i) => setCheckedSteps(prev => {
     const next = new Set(prev)
@@ -107,12 +107,12 @@ export function CookingMode({ meal, onExit }) {
 
   return (
     <div className="flex w-full max-w-full flex-col overflow-x-hidden" style={{ boxSizing: 'border-box' }}>
-      <div className="sticky top-0 z-10 bg-white pb-3 border-b border-divider">
-          <div className="flex items-center justify-between mb-2">
+      <div className="sticky top-0 z-10 border-b border-divider bg-bg-soft/95 px-4 pb-3 pt-3 backdrop-blur-sm">
+          <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 mb-2">
             <button
               type="button"
               onClick={onExit}
-              className="rounded-full border border-divider bg-white px-3 py-1.5 text-xs font-semibold text-text-secondary transition hover:bg-warm-50"
+              className="rounded-full border border-divider bg-surface-card px-3 py-1.5 text-xs font-semibold text-text-secondary transition hover:bg-warm-50"
             >
               ← Exit
             </button>
@@ -132,57 +132,67 @@ export function CookingMode({ meal, onExit }) {
           </div>
         </div>
 
-      <div className="space-y-5 py-4" style={{ paddingBottom: '96px', boxSizing: 'border-box' }}>
-          {/* Ingredients accordion */}
-          <div className="rounded-2xl border border-divider overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setShowIngredients(s => !s)}
-              className="flex w-full items-center justify-between px-4 py-3 bg-warm-50 hover:bg-warm-100 transition text-left"
-            >
-              <span className="text-sm font-semibold text-text-primary">Ingredients</span>
-              <span className="text-xs text-text-muted">{showIngredients ? '▲ Hide' : '▼ Show'}</span>
-            </button>
-            {showIngredients && (
-              <div className="p-4 space-y-4">
-                {recipe.ingredientGroups.map((group, gi) => (
-                  <div key={`${group.label || 'ig'}-${gi}`}>
-                    {group.label && (
-                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">{group.label}</div>
-                    )}
-                    <ul className="space-y-1">
-                      {group.ingredients.map((ing, idx) => {
-                        const key = `${gi}-${idx}`
-                        const checked = Boolean(checkedIngredients[key])
-                        return (
-                          <li key={key}>
-                            <button
-                              type="button"
-                              onClick={() => toggleIngredient(key)}
-                              className={`flex w-full items-start gap-3 rounded-xl px-2 py-1.5 text-left transition ${checked ? 'opacity-40' : 'hover:bg-warm-50'}`}
-                            >
-                              <span className={`mt-0.5 h-4 w-4 shrink-0 rounded-full border-2 transition ${checked ? 'border-primary-500 bg-primary-500' : 'border-divider'}`} />
-                              <span className={`break-words text-sm [overflow-wrap:anywhere] ${checked ? 'line-through text-text-muted' : 'text-text-primary'}`}>
-                                <strong>{[ing.amount, ing.unit].filter(Boolean).join(' ')}</strong>
-                                {(ing.amount || ing.unit) && ' '}
-                                {ing.item}
-                                {ing.note && <span className="text-text-secondary"> ({ing.note})</span>}
-                              </span>
-                            </button>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  </div>
-                ))}
+      <div className="mx-auto max-w-2xl space-y-5 px-4 py-5" style={{ paddingBottom: '96px', boxSizing: 'border-box' }}>
+          <header className="rounded-[28px] bg-surface-card px-5 py-5 shadow-lg">
+            {recipe.imageUrl ? (
+              <div className="mb-4 overflow-hidden rounded-2xl">
+                <img src={recipe.imageUrl} alt={recipe.title} className="h-56 w-full object-cover" loading="lazy" />
               </div>
-            )}
-          </div>
+            ) : null}
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-text-muted">Cooking mode</div>
+            <h1 className="mt-2 font-display text-3xl leading-tight text-text-primary sm:text-4xl">{recipe.title}</h1>
+            {recipe.description ? <p className="mt-3 text-[15px] leading-7 text-text-secondary">{recipe.description}</p> : null}
 
-          {/* All instructions — continuous scroll, checkable */}
-          <div>
-            <div className="mb-3 text-sm font-semibold text-text-primary">Instructions</div>
-            <div className="space-y-2">
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-text-secondary">
+              <span className="rounded-full bg-warm-100 px-3 py-1.5">Prep {recipe.prepTime || 0} min</span>
+              <span className="rounded-full bg-warm-100 px-3 py-1.5">Cook {recipe.cookTime || 0} min</span>
+              <span className="rounded-full bg-warm-100 px-3 py-1.5">Total {recipe.totalTime || (recipe.prepTime + recipe.cookTime)} min</span>
+              {recipe.yield ? <span className="rounded-full bg-warm-100 px-3 py-1.5">{recipe.yield}</span> : null}
+              <span className="rounded-full border border-primary-100 bg-primary-50 px-3 py-1.5 font-semibold text-primary-700">{recipe.difficulty}</span>
+            </div>
+          </header>
+
+          <section className="rounded-[24px] border border-divider bg-surface-card px-5 py-5 shadow-sm">
+            <h2 className="mb-4 font-display text-xl text-text-primary">Ingredients</h2>
+            <div className="space-y-5">
+              {recipe.ingredientGroups.map((group, gi) => (
+                <div key={`${group.label || 'ig'}-${gi}`}>
+                  {group.label ? (
+                    <div className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-text-muted">{group.label}</div>
+                  ) : null}
+                  <ul className="space-y-3">
+                    {group.ingredients.map((ing, idx) => {
+                      const key = `${gi}-${idx}`
+                      const checked = Boolean(checkedIngredients[key])
+                      const amountText = formatIngredientAmount(ing.amount)
+                      return (
+                        <li key={key}>
+                          <button
+                            type="button"
+                            onClick={() => toggleIngredient(key)}
+                            className={`flex w-full items-start gap-3 rounded-2xl px-1 py-1 text-left transition ${checked ? 'opacity-45' : 'opacity-100'}`}
+                          >
+                            <span className={`mt-1 h-5 w-5 shrink-0 rounded-full border ${checked ? 'border-primary-500 bg-primary-500' : 'border-divider bg-surface-card'}`} />
+                            <span className={`block text-[15px] leading-7 ${checked ? 'line-through' : ''}`}>
+                              <strong className="font-semibold text-text-primary">{[amountText, ing.unit].filter(Boolean).join(' ')}</strong>
+                              {amountText || ing.unit ? ' ' : ''}
+                              <span className="text-text-primary">{ing.item}</span>
+                              {ing.note ? <span className="text-text-secondary"> ({ing.note})</span> : null}
+                              {ing.optional ? <span className="text-text-muted"> (optional)</span> : null}
+                            </span>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-[24px] border border-divider bg-surface-card px-5 py-5 shadow-sm">
+            <h2 className="mb-4 font-display text-xl text-text-primary">Instructions</h2>
+            <div className="space-y-6">
               {allSteps.map((step, i) => {
                 const checked = checkedSteps.has(i)
                 const showGroupLabel = step.groupLabel &&
@@ -190,31 +200,31 @@ export function CookingMode({ meal, onExit }) {
                 return (
                   <div key={i}>
                     {showGroupLabel && (
-                      <div className={`mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted ${i > 0 ? 'mt-4' : ''}`}>
+                      <div className={`mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-text-muted ${i > 0 ? 'mt-6' : ''}`}>
                         {step.groupLabel}
                       </div>
                     )}
-                    <div className={`w-full max-w-full overflow-x-hidden rounded-xl border transition-colors ${checked ? 'border-primary-100 bg-primary-50' : 'border-divider bg-white'}`} style={{ boxSizing: 'border-box' }}>
+                    <div className={`flex gap-4 rounded-2xl px-1 py-1 transition ${checked ? 'opacity-55' : 'opacity-100'}`} style={{ boxSizing: 'border-box' }}>
                       <button
                         type="button"
                         onClick={() => toggleStep(i)}
-                        className="flex w-full items-start gap-3 p-4 text-left"
+                        className="flex w-full items-start gap-4 text-left"
                       >
-                        <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition ${
+                        <span className={`mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold transition ${
                           checked
-                            ? 'border-primary-500 bg-primary-500 text-white'
-                            : 'border-divider bg-white text-text-muted'
+                            ? 'bg-primary-500 text-white'
+                            : 'bg-warm-100 text-text-primary'
                         }`}>
                           {checked ? '✓' : i + 1}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className={`break-words text-sm leading-6 [overflow-wrap:anywhere] ${checked ? 'line-through text-text-muted' : 'text-text-primary'}`}>
+                          <p className={`break-words text-[15px] leading-7 [overflow-wrap:anywhere] ${checked ? 'line-through text-text-muted' : 'text-text-primary'}`}>
                             <InstructionText text={step.text} contextKey={`cook-${meal.id || meal.name}-${i}`} />
                           </p>
                           {step.tip && !checked && (
-                            <div className="mt-2 rounded-lg bg-primary-50 px-3 py-2">
-                              <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">Tip · </span>
-                              <span className="text-xs text-primary-800">{step.tip}</span>
+                            <div className="mt-3 rounded-2xl bg-warm-100 px-4 py-3 text-sm leading-6 text-text-secondary">
+                              <div className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">Tip</div>
+                              {step.tip}
                             </div>
                           )}
                         </div>
@@ -224,9 +234,8 @@ export function CookingMode({ meal, onExit }) {
                 )
               })}
             </div>
-          </div>
+          </section>
 
-          {/* Sign-up nudge */}
           <div className="rounded-2xl border border-primary-100 bg-primary-50 px-4 py-3">
             <p className="text-xs text-primary-800">
               Want this saved to your meal plan?{' '}
