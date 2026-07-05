@@ -102,11 +102,8 @@ export function CookingMode({ meal, onExit }) {
     )
   }
 
-  const doneCount = checkedSteps.size
-  const totalCount = allSteps.length
-
   return (
-    <div className="flex min-h-screen w-full max-w-full flex-col overflow-x-hidden" style={{ boxSizing: 'border-box' }}>
+    <div className="flex w-full max-w-full flex-col overflow-x-hidden" style={{ boxSizing: 'border-box' }}>
       <div className="sticky top-0 z-10 border-b border-divider bg-bg-soft/95 px-4 pb-3 pt-3 backdrop-blur-sm">
           <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 mb-2">
             <button
@@ -120,15 +117,7 @@ export function CookingMode({ meal, onExit }) {
               <div className="text-xs font-semibold uppercase tracking-wide text-primary-700">Now cooking</div>
               <div className="truncate text-sm font-semibold text-text-primary">{recipe.title}</div>
             </div>
-            <span className="shrink-0 text-xs font-medium text-text-muted tabular-nums">
-              {doneCount}/{totalCount}
-            </span>
-          </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-warm-100">
-            <div
-              className="h-full rounded-full bg-primary-400 transition-all duration-500"
-              style={{ width: `${totalCount > 0 ? (doneCount / totalCount) * 100 : 0}%` }}
-            />
+            <div className="w-12" />
           </div>
         </div>
 
