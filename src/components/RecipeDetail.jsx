@@ -152,7 +152,7 @@ export function RecipeDetail({ meal, onClose, onSaved }) {
   return (
     <div className="min-h-screen bg-bg-soft text-text-primary">
       {cookingMode ? createPortal(
-        <div className="fixed inset-0 z-[200] bg-bg-soft">
+        <div className="fixed inset-0 z-[200] overflow-y-auto bg-bg-soft px-4 pb-24 pt-0">
           <CookingMode meal={recipe} onExit={() => setCookingMode(false)} />
         </div>,
         document.body,

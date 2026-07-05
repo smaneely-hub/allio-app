@@ -106,7 +106,7 @@ export function CookingMode({ meal, onExit }) {
   const totalCount = allSteps.length
 
   return (
-    <div className="flex w-full max-w-full flex-col overflow-x-hidden" style={{ boxSizing: 'border-box' }}>
+    <div className="flex min-h-screen w-full max-w-full flex-col overflow-x-hidden" style={{ boxSizing: 'border-box' }}>
       <div className="sticky top-0 z-10 border-b border-divider bg-bg-soft/95 px-4 pb-3 pt-3 backdrop-blur-sm">
           <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 mb-2">
             <button
