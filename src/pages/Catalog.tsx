@@ -49,6 +49,13 @@ const RECIPE_FILTERS_STORAGE_KEY = 'recipes.filters.v1'
 
 type SortOption = 'newest' | 'rating' | 'favorites' | 'most_cooked' | 'az'
 
+function firstNonEmpty(...values: any[]) {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return ''
+}
+
 export function Catalog() {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -111,8 +118,6 @@ export function Catalog() {
     setLoading(true)
     listUserRecipes({
       userId: user?.id,
-      cuisine: cuisine || undefined,
-      mealType: mealType || undefined,
       minRating: minRating ? Number(minRating) : undefined,
       favoritesOnly,
       sortBy,
@@ -124,7 +129,7 @@ export function Catalog() {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [user?.id, cuisine, mealType, minRating, favoritesOnly, sortBy, refreshKey])
+  }, [user?.id, minRating, favoritesOnly, sortBy, refreshKey])
 
   const normalized = useMemo(() => recipes.map((recipeRow) => normalizeRecipe({
     ...recipeRow,
@@ -151,9 +156,19 @@ export function Catalog() {
   })), [recipes])
 
   const filteredRecipes = useMemo(() => {
-    if (!search) return normalized
-    const needle = search.toLowerCase()
-    return normalized.filter((recipe) => {
+    const normalizedCuisine = cuisine.trim().toLowerCase()
+    const normalizedMealType = mealType.trim().toLowerCase()
+    const needle = search.trim().toLowerCase()
+
+    return normalized.filter((recipe: any) => {
+      const recipeCuisine = firstNonEmpty(recipe.tags?.cuisine, recipe.cuisine).toLowerCase()
+      const recipeMealType = firstNonEmpty(recipe.tags?.mealType, recipe.mealType, recipe.meal_type).toLowerCase()
+
+      if (normalizedCuisine && recipeCuisine !== normalizedCuisine) return false
+      if (normalizedMealType && recipeMealType !== normalizedMealType) return false
+
+      if (!needle) return true
+
       const titleMatch = String(recipe.title || '').toLowerCase().includes(needle)
       const ingredientMatch = (recipe.ingredientGroups || []).some((group: any) =>
         (group.ingredients || []).some((ingredient: any) =>
@@ -162,10 +177,10 @@ export function Catalog() {
       )
       return titleMatch || ingredientMatch
     })
-  }, [normalized, search])
+  }, [normalized, search, cuisine, mealType])
 
-  const cuisines = useMemo(() => Array.from(new Set(normalized.map((r: any) => r.cuisine).filter(Boolean))).sort() as string[], [normalized])
-  const mealTypes = useMemo(() => Array.from(new Set(normalized.map((r: any) => r.tags?.mealType).filter(Boolean))).sort() as string[], [normalized])
+  const cuisines = useMemo(() => Array.from(new Set(normalized.map((r: any) => firstNonEmpty(r.tags?.cuisine, r.cuisine)).filter(Boolean))).sort((a, b) => a.localeCompare(b)) as string[], [normalized])
+  const mealTypes = useMemo(() => Array.from(new Set(normalized.map((r: any) => firstNonEmpty(r.tags?.mealType, r.mealType, r.meal_type)).filter(Boolean))).sort((a, b) => a.localeCompare(b)) as string[], [normalized])
   const availableMealTypes = useMemo(() => {
     const set = new Set(mealTypes.map((entry) => String(entry).toLowerCase()))
     return CORE_MEAL_TYPE_CHIPS.filter((chip) => set.has(chip.value))
