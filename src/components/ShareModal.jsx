@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import toast from 'react-hot-toast'
 import {
+  buildMailtoShareUrl,
   canNativeShare,
   copyToClipboard,
   createFavoritesShare,
@@ -31,6 +32,15 @@ function ShareIcon() {
   )
 }
 
+function MailIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 6h16v12H4z" />
+      <path d="m4 7 8 6 8-6" />
+    </svg>
+  )
+}
+
 function XIcon() {
   return (
     <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -51,8 +61,6 @@ export function ShareModal({ recipe, favorites, onClose }) {
   const [status, setStatus] = useState('creating') // creating | ready | error
   const [shareUrl, setShareUrl] = useState(null)
   const [copied, setCopied] = useState(false)
-  const [publishPublicly, setPublishPublicly] = useState(false)
-  const [caption, setCaption] = useState('')
 
   const isRecipe = Boolean(recipe)
   const title = isRecipe
@@ -64,8 +72,8 @@ export function ShareModal({ recipe, favorites, onClose }) {
     async function create() {
       try {
         const token = isRecipe
-          ? await createRecipeShare(recipe, { publish: publishPublicly, caption })
-          : await createFavoritesShare(favorites, { publish: publishPublicly, caption })
+          ? await createRecipeShare(recipe)
+          : await createFavoritesShare(favorites)
         if (!cancelled) {
           setShareUrl(getShareUrl(token))
           setStatus('ready')
@@ -79,7 +87,7 @@ export function ShareModal({ recipe, favorites, onClose }) {
     }
     create()
     return () => { cancelled = true }
-  }, [])
+  }, [isRecipe, recipe, favorites])
 
   async function handleCopy() {
     if (!shareUrl) return
@@ -100,6 +108,11 @@ export function ShareModal({ recipe, favorites, onClose }) {
     } catch (err) {
       if (err?.name !== 'AbortError') toast.error('Could not open share sheet')
     }
+  }
+
+  function handleEmailShare() {
+    if (!shareUrl) return
+    window.location.href = buildMailtoShareUrl(shareUrl, title, !isRecipe)
   }
 
   return createPortal(
@@ -159,21 +172,6 @@ export function ShareModal({ recipe, favorites, onClose }) {
                 {shareUrl}
               </span>
             </div>
-            <div className="space-y-3">
-              <label className="flex items-center gap-2 text-sm text-text-secondary">
-                <input type="checkbox" checked={publishPublicly} onChange={(e) => setPublishPublicly(e.target.checked)} />
-                Also publish to public feed
-              </label>
-              {publishPublicly ? (
-                <textarea
-                  value={caption}
-                  onChange={(e) => setCaption(e.target.value)}
-                  placeholder="Add a short caption"
-                  className="w-full rounded-2xl border border-divider bg-bg-soft px-4 py-3 text-sm text-text-primary"
-                  rows={3}
-                />
-              ) : null}
-            </div>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -182,6 +180,14 @@ export function ShareModal({ recipe, favorites, onClose }) {
               >
                 <LinkIcon />
                 {copied ? 'Copied!' : 'Copy link'}
+              </button>
+              <button
+                type="button"
+                onClick={handleEmailShare}
+                className="flex flex-1 items-center justify-center gap-2 rounded-full border border-divider bg-surface-card px-4 py-2.5 text-sm font-medium text-text-primary transition hover:bg-warm-100"
+              >
+                <MailIcon />
+                Email link
               </button>
               {canNativeShare() ? (
                 <button
@@ -196,6 +202,9 @@ export function ShareModal({ recipe, favorites, onClose }) {
             </div>
             <p className="text-center text-xs text-text-muted">
               Anyone with this link can view {isRecipe ? 'this recipe' : 'these recipes'}. No login required.
+            </p>
+            <p className="text-center text-xs text-text-muted">
+              Public feed posting can come next, but this share flow now stays focused on reliable link sharing.
             </p>
           </div>
         )}

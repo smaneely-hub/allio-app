@@ -40,6 +40,14 @@ export function getShareUrl(token) {
   return `${window.location.origin}/share/${token}`
 }
 
+export function buildMailtoShareUrl(shareUrl, title, isFavorites = false) {
+  const subject = encodeURIComponent(isFavorites ? `${title} from Allio` : `${title} recipe from Allio`)
+  const body = encodeURIComponent(
+    `${isFavorites ? 'I wanted to share these recipes with you' : 'I wanted to share this recipe with you'}:\n\n${shareUrl}\n\nShared from Allio.`,
+  )
+  return `mailto:?subject=${subject}&body=${body}`
+}
+
 export async function createRecipeShare(recipe, { publish = false, caption = '' } = {}) {
   const userId = await getAuthUserId()
   const snapshot = {
