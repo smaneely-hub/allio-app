@@ -202,6 +202,11 @@ export function NutritionPage() {
       const totalProtein = Math.round(Number(form.protein_g || 0) * servings * 10) / 10
       const totalCarbs = Math.round(Number(form.carbs_g || 0) * servings * 10) / 10
       const totalFat = Math.round(Number(form.fat_g || 0) * servings * 10) / 10
+      const servingLabel = String(form.servingLabel || '').trim()
+      const noteParts = []
+      if (servingLabel) noteParts.push(`Serving: ${servingLabel}`)
+      if (form.notes?.trim()) noteParts.push(form.notes.trim())
+      const combinedNotes = noteParts.join(' • ') || null
 
       let savedEntry = null
       if (editingItem) {
@@ -213,7 +218,7 @@ export function NutritionPage() {
           protein_g: totalProtein,
           carbs_g: totalCarbs,
           fat_g: totalFat,
-          notes: form.notes,
+          notes: combinedNotes,
           servings,
         })
         toast.success('Meal log updated')
@@ -227,7 +232,7 @@ export function NutritionPage() {
           protein_g: totalProtein,
           carbs_g: totalCarbs,
           fat_g: totalFat,
-          notes: form.notes,
+          notes: combinedNotes,
           serving_count: servings,
         })
         toast.success('Meal logged')

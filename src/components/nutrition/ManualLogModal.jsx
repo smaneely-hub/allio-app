@@ -4,6 +4,7 @@ const DEFAULT_FORM = {
   meal_slot: 'breakfast',
   log_date: '',
   name: '',
+  servingLabel: '',
   calories: '',
   protein_g: '',
   carbs_g: '',
@@ -32,6 +33,7 @@ export function ManualLogModal({ open, initialSlot = 'breakfast', initialName = 
         meal_slot: item.meal_slot || 'breakfast',
         log_date: item.log_date || '',
         name: item.entry_name || '',
+        servingLabel: item.notes?.match(/Serving: ([^•\n]+)/)?.[1]?.trim() || '',
         calories: item.calories != null ? Math.round(Number(item.calories) / divBy) : '',
         protein_g: item.protein_g != null ? Math.round(Number(item.protein_g) / divBy * 10) / 10 : '',
         carbs_g: item.carbs_g != null ? Math.round(Number(item.carbs_g) / divBy * 10) / 10 : '',
@@ -79,7 +81,19 @@ export function ManualLogModal({ open, initialSlot = 'breakfast', initialName = 
           </div>
           <div className="sm:col-span-2">
             <label className="mb-1 block text-sm font-medium text-text-primary">Servings</label>
-            <input type="number" min="0.5" step="0.5" className="input w-32" value={form.servings} onChange={(e) => setForm((c) => ({ ...c, servings: e.target.value }))} />
+            <div className="flex flex-wrap items-end gap-3">
+              <input type="number" min="0.5" step="0.5" className="input w-32" value={form.servings} onChange={(e) => setForm((c) => ({ ...c, servings: e.target.value }))} />
+              <div className="min-w-[180px] flex-1">
+                <label className="mb-1 block text-xs font-medium text-text-muted">Unit of measure</label>
+                <input
+                  className="input w-full"
+                  value={form.servingLabel}
+                  onChange={(e) => setForm((c) => ({ ...c, servingLabel: e.target.value }))}
+                  placeholder="e.g. bowl, cup, scoop, plate, grams"
+                />
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-text-muted">Enter macros per serving, then name what one serving means.</p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-text-primary">
