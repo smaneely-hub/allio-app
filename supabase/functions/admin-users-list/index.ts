@@ -6,6 +6,25 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || ''
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 
+async function listAllAuthUsers(supabase: ReturnType<typeof createServiceClient>) {
+  const users = []
+  let page = 1
+  const perPage = 200
+
+  while (true) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage })
+    if (error) throw error
+
+    const batch = data?.users || []
+    users.push(...batch)
+
+    if (batch.length < perPage) break
+    page += 1
+  }
+
+  return users
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return handleCorsPreflight(req)
 
@@ -23,10 +42,7 @@ serve(async (req) => {
     const query = String(body?.query || '').trim().toLowerCase()
     const supabase = createServiceClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-    const { data: usersData, error: usersError } = await supabase.auth.admin.listUsers({ page: 1, perPage: 200 })
-    if (usersError) throw usersError
-
-    const allUsers = usersData?.users || []
+    const allUsers = await listAllAuthUsers(supabase)
     const filteredUsers = query
       ? allUsers.filter((user) => {
           const email = String(user.email || '').toLowerCase()
