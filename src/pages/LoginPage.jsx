@@ -3,6 +3,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
+import { getAuthRedirectUrl, signInWithGoogle } from '../lib/nativeAuth'
 import { useAuth } from '../hooks/useAuth'
 import { Logo } from '../components/Logo'
 
@@ -60,7 +61,7 @@ export function LoginPage() {
           email,
           password,
           options: {
-            emailRedirectTo: window.location.origin
+            emailRedirectTo: getAuthRedirectUrl(),
           }
         })
         
@@ -113,14 +114,8 @@ export function LoginPage() {
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true)
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
-      if (error) throw error
-      // Browser will redirect to Google; no further action needed
+      await signInWithGoogle()
+      // Browser redirect or native callback takes over from here.
     } catch (err) {
       toast.error(err.message)
       setGoogleLoading(false)
