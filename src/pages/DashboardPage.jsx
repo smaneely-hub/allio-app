@@ -339,8 +339,8 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 pb-24 pt-4 md:px-6 md:pt-6">
-      <div className="space-y-6">
+    <div className="mx-auto max-w-6xl px-4 pb-28 pt-5 md:px-6 md:pb-24 md:pt-6">
+      <div className="space-y-7 md:space-y-6">
 
         {/* Header */}
         <section>
@@ -376,7 +376,7 @@ export function DashboardPage() {
             </button>
           </div>
 
-          <div className="mt-4 space-y-2">
+          <div className="mt-4 space-y-2.5 md:space-y-2">
             {planMeals.length > 0 ? planMeals.map((meal, idx) => {
               const eaten = eatenKeys.has(planMealKey(meal))
               const slotLabel = MEAL_SLOT_LABELS[meal.meal] || meal.meal || 'Meal'
@@ -433,7 +433,7 @@ export function DashboardPage() {
         </section>
 
         {/* Shopping + Weight/Macros */}
-        <section className="grid gap-4 lg:grid-cols-2">
+        <section className="grid gap-5 lg:grid-cols-2 lg:gap-4">
 
           {/* Shopping */}
           <div className="card p-5">
@@ -467,7 +467,7 @@ export function DashboardPage() {
               </button>
             </form>
 
-            <div className="mt-3 space-y-1.5">
+            <div className="mt-3 space-y-2 md:space-y-1.5">
               {uncheckedShopItems.slice(0, 6).map((item) => (
                 <div key={item.id} className="flex items-center gap-2 rounded-xl border border-divider bg-white px-3 py-2 text-sm">
                   <span className="h-2 w-2 flex-shrink-0 rounded-full bg-primary-300" />
@@ -489,7 +489,7 @@ export function DashboardPage() {
           </div>
 
           {/* Weight + Macros */}
-          <div className="space-y-4">
+          <div className="space-y-5 md:space-y-4">
             <WeightTrendCard
               entries={weightHistory || []}
               targetWeightKg={nutProfile?.target_weight_kg ? Number(nutProfile.target_weight_kg) : null}
@@ -509,7 +509,7 @@ export function DashboardPage() {
               </h3>
               <Link to="/planner" className="text-xs text-primary-500">Edit plan</Link>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-2">
               {tomorrowMeals.length > 0 ? tomorrowMeals.map((meal, idx) => (
                 <div key={meal.id || idx} className="rounded-2xl border border-divider bg-surface px-3 py-3">
                   <div className="text-xs uppercase tracking-wide text-text-muted">

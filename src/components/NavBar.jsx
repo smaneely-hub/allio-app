@@ -83,7 +83,7 @@ const desktopLinks = [
 
 const mobileLinks = [
   { to: '/dashboard', label: 'Home', icon: HomeIcon, aliases: ['/dashboard'] },
-  { to: '/tonight', label: 'Quick Meal', icon: SparklesIcon, aliases: ['/tonight', '/cook', '/cooking'] },
+  { to: '/tonight', label: 'Quick', icon: SparklesIcon, aliases: ['/tonight', '/cook', '/cooking'] },
   { to: '/planner', label: 'Planner', icon: CalendarDaysIcon, aliases: ['/planner'] },
   { to: '/nutrition', label: 'Nutrition', icon: ChartIcon, aliases: ['/nutrition'] },
   { to: '/recipes', label: 'Recipes', icon: BookIcon, aliases: ['/recipes', '/search', '/find'] },
@@ -149,14 +149,14 @@ export function NavBar() {
           className="fixed left-0 right-0 z-50 border-t border-surface-muted bg-surface-card"
           style={{ bottom: 'env(safe-area-inset-bottom, 0px)' }}
         >
-          <div className="mx-auto flex h-16 max-w-xl items-center justify-around">
+          <div className="mx-auto flex h-16 max-w-xl items-stretch justify-around px-1">
             {mobileLinks.map((link) => {
               const Icon = link.icon
               const active = isActive(link)
               return (
-                <Link key={link.to} to={link.to} className={`flex flex-col items-center justify-center ${active ? 'text-accent-blue' : 'text-ink-tertiary'}`}>
+                <Link key={link.to} to={link.to} className={`flex flex-1 flex-col items-center justify-center gap-1 px-0.5 py-2 ${active ? 'text-accent-blue' : 'text-ink-tertiary'}`}>
                   <Icon className="h-5 w-5" />
-                  <span className="mt-0.5 text-xs">{link.label}</span>
+                  <span className="text-[11px] leading-none whitespace-nowrap">{link.label}</span>
                 </Link>
               )
             })}
