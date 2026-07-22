@@ -356,6 +356,10 @@ export function SettingsPage() {
           <h2 className="mb-4 font-display text-xl text-text-primary">Account</h2>
           <div className="space-y-3">
             <Link to="/household" className="block text-sm font-medium text-text-primary underline underline-offset-2">Household</Link>
+            <div className="flex gap-4">
+              <Link to="/terms" className="text-sm font-medium text-text-secondary underline underline-offset-2">Terms & Conditions</Link>
+              <Link to="/privacy" className="text-sm font-medium text-text-secondary underline underline-offset-2">Privacy Policy</Link>
+            </div>
             <button type="button" onClick={signOut} className="text-sm font-medium text-red-500">Sign out</button>
             <div className="border-t border-divider pt-3">
               {!showDeleteConfirm ? (

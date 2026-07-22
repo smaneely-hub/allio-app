@@ -270,8 +270,16 @@ export function LoginPage() {
           )}
         </div>
 
+        {/* Legal links */}
+        <div className="text-center mt-6 text-xs text-text-muted">
+          By continuing, you agree to our{' '}
+          <a href="/terms" className="underline hover:text-text-secondary">Terms & Conditions</a>
+          {' '}and{' '}
+          <a href="/privacy" className="underline hover:text-text-secondary">Privacy Policy</a>.
+        </div>
+
         {/* Back to home */}
-        <div className="text-center mt-6">
+        <div className="text-center mt-4">
           <a href="/" className="text-sm text-text-muted hover:text-text-secondary hover:underline">
             ← Back to home
           </a>
