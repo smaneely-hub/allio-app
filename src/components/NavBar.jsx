@@ -53,15 +53,6 @@ function ShoppingCartIcon(props) {
   )
 }
 
-function SparklesIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
-      <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3Z" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M19 3v4M21 5h-4M5 17v4M7 19H3" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
 function SettingsIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
@@ -73,7 +64,6 @@ function SettingsIcon(props) {
 
 const desktopLinks = [
   { to: '/dashboard', label: 'Home', icon: HomeIcon, aliases: ['/dashboard'] },
-  { to: '/tonight', label: 'Quick Meal', icon: SparklesIcon, aliases: ['/tonight', '/cook', '/cooking'] },
   { to: '/planner', label: 'Planner', icon: CalendarDaysIcon, aliases: ['/planner'] },
   { to: '/nutrition', label: 'Nutrition', icon: ChartIcon, aliases: ['/nutrition'] },
   { to: '/recipes', label: 'Recipes', icon: BookIcon, aliases: ['/recipes', '/search', '/find'] },
@@ -83,7 +73,6 @@ const desktopLinks = [
 
 const mobileLinks = [
   { to: '/dashboard', label: 'Home', icon: HomeIcon, aliases: ['/dashboard'] },
-  { to: '/tonight', label: 'Quick', icon: SparklesIcon, aliases: ['/tonight', '/cook', '/cooking'] },
   { to: '/planner', label: 'Planner', icon: CalendarDaysIcon, aliases: ['/planner'] },
   { to: '/nutrition', label: 'Nutrition', icon: ChartIcon, aliases: ['/nutrition'] },
   { to: '/recipes', label: 'Recipes', icon: BookIcon, aliases: ['/recipes', '/search', '/find'] },

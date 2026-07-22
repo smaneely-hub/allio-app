@@ -42,7 +42,7 @@ export function LandingPage() {
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-3">
             <Link to="/try" className="btn-primary text-lg">
-              Try a meal right now
+              Get a Quick Meal right now
             </Link>
             <Link to="/login" className="btn-secondary text-lg">
               Plan my week in 30 seconds
