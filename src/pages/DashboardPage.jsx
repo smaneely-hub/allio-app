@@ -354,9 +354,14 @@ export function DashboardPage() {
                 {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
               </p>
             </div>
-            <Link to="/nutrition" className="rounded-full border border-divider bg-white px-4 py-2 text-sm text-text-secondary shadow-sm hover:bg-primary-50">
-              Full nutrition log →
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link to="/tonight" className="rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700">
+                Quick Meal
+              </Link>
+              <Link to="/nutrition" className="rounded-full border border-divider bg-white px-4 py-2 text-sm text-text-secondary shadow-sm hover:bg-primary-50">
+                Full nutrition log →
+              </Link>
+            </div>
           </div>
         </section>
 
