@@ -86,7 +86,7 @@ export async function signInWithGoogle() {
           throw new Error('Google sign-in callback did not include an auth code')
         }
 
-        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(url)
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
         if (exchangeError) throw exchangeError
         await succeed()
       } catch (err) {
