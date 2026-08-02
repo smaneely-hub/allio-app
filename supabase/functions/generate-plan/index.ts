@@ -88,6 +88,7 @@ function buildSystemPrompt(
   const allDietary = [...new Set(members.flatMap((m) => m.dietary_restrictions || []).filter(Boolean))]
   const allFoodPrefs = [...new Set(members.flatMap((m) => m.food_preferences || []).filter(Boolean))]
   const allHealth = [...new Set(members.flatMap((m) => m.health_considerations || []).filter(Boolean))]
+  const hasKids = members.some((m) => ['child', 'toddler', 'teen'].includes(String(m.role || '').toLowerCase()) || (typeof m.age === 'number' && m.age < 18))
   const householdContext = members.map((m, i) => {
     const parts = [
       m.name || m.label || `Member ${i + 1}`,
@@ -127,6 +128,8 @@ function buildSystemPrompt(
 
   return `You are a top-tier recipe developer and editor writing for a publication-quality cooking product. Your job is to create recipes that feel as polished, trustworthy, and cookable as recipes from NYT Cooking, Serious Eats, or a rigorously tested modern food magazine.
 
+${hasKids ? 'KID-FRIENDLY MODE IS ON FOR THIS REQUEST. Default toward meals real kids will willingly eat while still tasting good to adults.' : ''}
+
 You are not writing generic meal ideas. You are writing real recipes that a home cook can confidently make tonight.
 
 HOUSEHOLD TO COOK FOR:
@@ -146,6 +149,8 @@ ${slotDescriptions || '- none'}
 HOW TO USE THE CONTEXT:
 - Dietary restrictions, allergies, household size, cooking skill, time constraints, and taste preferences must SHAPE the recipes themselves, not merely filter ingredients.
 - If the household includes kids or picky eaters, favor familiar structures and flavors while still making the food genuinely delicious.
+- If any attendee is a child, toddler, or teen, you should actively optimize for kid-friendly outcomes by default: familiar flavors, approachable textures, low bitterness, no heat unless explicitly requested, and flexible components when useful.
+- When kid-friendly is implied by the attendee profiles, reflect that in the recipe itself, the notes, and the why_this_works field.
 - If the household is skilled and adventurous, you may use more developed technique, but only when the slot effort level supports it.
 - Honor the schedule. A low-effort Tuesday dinner should not read like a weekend project.
 

@@ -36,9 +36,11 @@ function normalizeMealRecord(meal, fallback = {}) {
 
 function mapMembersForPlanning(members = []) {
   return members.map((member) => ({
+    id: member.id,
     label: member.name || member.label,
     role: member.role,
     age: member.age,
+    date_of_birth: member.date_of_birth || null,
     sex: member.sex || member.gender || '',
     height_inches: member.height_inches ?? null,
     weight_lbs: member.weight_lbs ?? null,
@@ -473,7 +475,7 @@ export function useMealPlan(scheduleId) {
           planning_priorities: household.planning_priorities,
           cooking_comfort: household.cooking_comfort,
         },
-        members: mapMembersForPlanning(members),
+        members: mapMembersForPlanning(attendeeMembers),
         slots: [{ ...normalizedSlot, planning_notes: effectivePlanningNotes }],
         week_notes: [schedule?.week_notes, ...preferenceHints].filter(Boolean).join('; '),
         locked_meals: [],

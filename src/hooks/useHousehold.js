@@ -261,8 +261,14 @@ export function useHousehold() {
           if (updateError) {
             // Some columns may not exist in prod yet; retry without them
             const msg = String(updateError.message || '')
-            const isColumnMissing = msg.includes('date_of_birth') || msg.includes('linked_user_id') || msg.includes('avatar_url')
+            const missingDateOfBirth = msg.includes('date_of_birth')
+            const missingLinkedUser = msg.includes('linked_user_id')
+            const missingAvatarUrl = msg.includes('avatar_url')
+            const isColumnMissing = missingDateOfBirth || missingLinkedUser || missingAvatarUrl
             if (isColumnMissing) {
+              if (missingDateOfBirth) {
+                console.warn('[useHousehold.saveMembers] date_of_birth column missing in household_members, birthday will not persist until migration is applied')
+              }
               const { date_of_birth: _dob, linked_user_id: _lid, avatar_url: _av, ...payloadStripped } = payload
               const { error: retryError } = await supabase
                 .from('household_members')
@@ -285,8 +291,14 @@ export function useHousehold() {
           if (insertError) {
             // Some columns may not exist in prod yet; retry without them
             const msg = String(insertError.message || '')
-            const isColumnMissing = msg.includes('date_of_birth') || msg.includes('linked_user_id') || msg.includes('avatar_url')
+            const missingDateOfBirth = msg.includes('date_of_birth')
+            const missingLinkedUser = msg.includes('linked_user_id')
+            const missingAvatarUrl = msg.includes('avatar_url')
+            const isColumnMissing = missingDateOfBirth || missingLinkedUser || missingAvatarUrl
             if (isColumnMissing) {
+              if (missingDateOfBirth) {
+                console.warn('[useHousehold.saveMembers] date_of_birth column missing in household_members, birthday will not persist until migration is applied')
+              }
               // eslint-disable-next-line no-unused-vars
               const membersStripped = newMembers.map(({ date_of_birth: _dob, linked_user_id: _lid, avatar_url: _av, ...m }) => m)
               const { error: retryError } = await supabase
