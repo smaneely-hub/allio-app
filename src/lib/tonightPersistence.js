@@ -1,5 +1,6 @@
 import { addItemsToShoppingList, buildShoppingItemRows, ensureDefaultShoppingList, getShoppingListItems } from './shoppingLists'
 import { aggregateShoppingList } from './aggregateShoppingList'
+import { parseIsoLocalDate } from './planner'
 
 const PLANNER_SOURCES = new Set(['planner'])
 
@@ -7,13 +8,16 @@ export function buildShoppingItemsFromMeal(meal, staplesOnHand = '') {
   return buildShoppingItemRows(meal, staplesOnHand, 'tonight')
 }
 
-export async function upsertShoppingListForDate({ userId, householdId, weekOf, items, listId = null }) {
+export async function upsertShoppingListForDate({ userId, householdId, weekOf, items, listId = null, prunePastMeals = false }) {
   const targetListId = listId || (await ensureDefaultShoppingList(userId))?.id
   if (!targetListId) return []
 
   const existingItems = await getShoppingListItems(targetListId)
 
   const plannerKeepers = (existingItems || []).filter((item) => !PLANNER_SOURCES.has(String(item.source || '').trim().toLowerCase()))
+  void householdId
+  void weekOf
+  void prunePastMeals
   const nextPlannerItems = (items || []).map((item) => ({
     name: item.name,
     quantity: item.quantity != null ? String(item.quantity).trim() || null : null,
@@ -45,6 +49,14 @@ export async function upsertShoppingListForDate({ userId, householdId, weekOf, i
   })
 }
 
+function getTodayLocalIsoDate() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export async function syncPlannerShoppingList({ userId, listId = null }) {
   if (!userId) return []
 
@@ -70,13 +82,21 @@ export async function syncPlannerShoppingList({ userId, listId = null }) {
   if (!household?.id) return []
 
   const meals = mealPlan?.draft_plan?.meals || mealPlan?.plan?.meals || []
-  const items = aggregateShoppingList({ meals }, household.staples_on_hand || '', {})
+  const todayIso = getTodayLocalIsoDate()
+  const hasPastDatedMeals = meals.some((meal) => {
+    const mealDate = parseIsoLocalDate(meal?.date)
+    if (!mealDate) return false
+    const localIso = `${mealDate.getFullYear()}-${String(mealDate.getMonth() + 1).padStart(2, '0')}-${String(mealDate.getDate()).padStart(2, '0')}`
+    return localIso < todayIso
+  })
+  const items = aggregateShoppingList({ meals }, household.staples_on_hand || '', { referenceDate: parseIsoLocalDate(todayIso) || new Date() })
 
   return upsertShoppingListForDate({
     userId,
     householdId: household.id,
-    weekOf: new Date().toISOString().split('T')[0],
+    weekOf: todayIso,
     items,
     listId,
+    ...(hasPastDatedMeals ? { prunePastMeals: true } : {}),
   })
 }
