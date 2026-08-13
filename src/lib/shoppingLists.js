@@ -363,10 +363,12 @@ export async function addItemsToShoppingList({ userId, listId = null, items = []
 
     if (existing) {
       const mergedSource = mergeSources(existing.source || source, rawItem.source || source)
+      const nextUnit = String(rawItem.unit || existing.unit || '').trim()
       const { error } = await withTransientRetry('shopping_list_items update merge', () => supabase
         .from('shopping_list_items')
         .update({
           quantity: mergeQuantities(existing.quantity, rawItem.quantity),
+          unit: nextUnit || null,
           category: rawItem.category || existing.category,
           source: mergedSource,
         })
@@ -384,6 +386,7 @@ export async function addItemsToShoppingList({ userId, listId = null, items = []
         user_id: userId,
         name,
         quantity: String(rawItem.quantity || '').trim() || null,
+        unit: String(rawItem.unit || '').trim() || null,
         category: rawItem.category || 'other',
         checked: Boolean(rawItem.checked),
         source: normalizeSource(rawItem.source || source),
