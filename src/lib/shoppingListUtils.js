@@ -35,7 +35,6 @@ const synonymMap = {
   'baby cucumber': 'cucumbers',
   'baby cucumbers': 'cucumbers',
   cilantro: 'cilantro',
-  'fresh cilantro': 'cilantro',
   celery: 'celery',
   'celery stalk': 'celery',
   'celery stalks': 'celery',
@@ -44,6 +43,20 @@ const synonymMap = {
   'ground turkey': 'ground meat',
   'ground beef': 'ground meat',
 }
+
+const DESCRIPTOR_WORDS = new Set([
+  'fresh', 'ripe', 'packed', 'loosely', 'large', 'small', 'medium', 'extra-large', 'extra',
+  'boneless', 'skinless', 'lean', 'low-fat', 'room', 'temperature', 'divided', 'additional',
+  'grated', 'chopped', 'minced', 'diced', 'sliced', 'shredded', 'crushed', 'peeled', 'seeded',
+  'pitted', 'scooped', 'out', 'cut', 'into', 'sticks', 'rounds', 'wedges', 'pieces', 'halved',
+  'thinly', 'roughly', 'finely', 'for', 'serving', 'to', 'serve', 'plus', 'more', 'about',
+])
+
+const NOUN_HINTS = [
+  /\b(avocados?|cilantro|cucumbers?|celery|lemons?|limes?|onions?|garlic|potatoes?|carrots?|broccoli|spinach|lettuce|peppers?|mushrooms?|parsley|basil|ginger|berries|grapes|mangoes?|peaches?|pears?|cabbage|zucchini|squash|asparagus|green beans?|corn|peas?|leeks?|shallots?|beets?|radishes?|arugula|kale|chard|cauliflower)\b/g,
+  /\b(eggs?|yolks?|whites?|chicken breasts?|chicken thighs?|ground meat|beef|pork|salmon|tuna|shrimp|tofu|tempeh|turkey|bacon|sausage|ham|steak)\b/g,
+  /\b(spaghetti|pasta|rice|noodles?|flour|sugar|oil|vinegar|stock|broth|beans?|lentils?|chickpeas?|oats?|cereal|honey|syrup|salt|pepper|cumin|paprika|cilantro|parmesan|pecorino|cheddar|mozzarella|yogurt|cream)\b/g,
+]
 
 function fractionToNumber(value = '') {
   const text = String(value).trim()
@@ -90,6 +103,28 @@ function cleanupIngredientDisplayName(name = '') {
     .trim()
 }
 
+function canonicalizeIngredientBase(name = '') {
+  const cleaned = cleanupIngredientDisplayName(name)
+  const lowered = cleaned.toLowerCase()
+
+  for (const pattern of NOUN_HINTS) {
+    const matches = [...lowered.matchAll(pattern)].map((match) => match[1] || match[0]).filter(Boolean)
+    if (matches.length > 0) {
+      const selected = matches[matches.length - 1].trim()
+      return synonymMap[selected] || selected
+    }
+  }
+
+  const tokens = lowered
+    .split(/\s+/)
+    .map((token) => token.replace(/^[^a-z]+|[^a-z]+$/g, ''))
+    .filter(Boolean)
+    .filter((token) => !DESCRIPTOR_WORDS.has(token))
+
+  const fallback = tokens.slice(-2).join(' ') || lowered
+  return synonymMap[fallback] || synonymMap[tokens.at(-1)] || fallback
+}
+
 function shouldHideUnit(unit = '', quantity = null) {
   const normalized = String(unit || '').trim().toLowerCase()
   if (!normalized) return true
@@ -100,20 +135,7 @@ function shouldHideUnit(unit = '', quantity = null) {
 
 /** Normalize ingredient names for matching and grouping. */
 export function normalizeIngredientName(name = '') {
-  const base = String(name)
-    .toLowerCase()
-    .trim()
-    .replace(/\([^)]*\)/g, ' ')
-    .replace(/^(fresh|ripe|large|small|medium|extra[- ]large|boneless|skinless|lean|low[- ]fat|packed|loosely packed)\s+/g, '')
-    .replace(/,\s*(packed|loosely packed|room temperature|divided|plus more.*|plus additional.*|for serving|to serve)\b.*$/gi, '')
-    .replace(/,\s*(diced|halved|chopped|minced|grated|sliced|shredded|crushed|thinly sliced|roughly chopped|finely chopped|cut into sticks|cut into rounds|cut into wedges|cut into pieces|peeled|seeded|pitted|scooped out)\b.*$/gi, '')
-    .replace(/\b(and|or)\s+(thinly sliced|roughly chopped|finely chopped|cut into sticks|cut into rounds|cut into wedges|cut into pieces|peeled|seeded|pitted|scooped out)\b.*$/gi, '')
-    .replace(/\binto\s+(rounds|sticks|wedges|pieces)\b.*$/gi, '')
-    .replace(/\s+/g, ' ')
-    .replace(/[;,]+$/g, '')
-    .trim()
-
-  return synonymMap[base] || base
+  return canonicalizeIngredientBase(name)
 }
 
 /** Map an ingredient name to a shopping aisle category. */
@@ -167,13 +189,14 @@ export function parseIngredient(rawIngredient) {
     .trim())
 
   const normalizedName = normalizeIngredientName(cleanedName)
+  const displayName = synonymMap[normalizedName] ? synonymMap[normalizedName] : cleanedName
   if (!cleanedName || cleanedName.length < 2) return null
   if (/^(ingredient|ingredients|item|items|see recipe|to serve|optional)$/i.test(cleanedName)) return null
   if (/^[^A-Za-z]+$/.test(cleanedName)) return null
 
   return {
     source,
-    name: cleanedName,
+    name: displayName,
     normalizedName,
     quantity,
     quantityText: formatQuantity(quantity),

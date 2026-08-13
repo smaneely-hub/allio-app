@@ -141,9 +141,9 @@ test('buildGroupedShoppingItems prefers structured ingredientGroups over degrade
   }, '')
 
   assert.equal(rows.some((item) => item.normalizedName === 'size florets'), false)
-  assert.equal(rows.some((item) => item.normalizedName.includes('broccoli')), true)
-  assert.equal(rows.some((item) => item.normalizedName.includes('lemons')), true)
-  assert.equal(rows.some((item) => item.normalizedName === 'red pepper flakes'), true)
+  assert.equal(rows.some((item) => item.normalizedName === 'broccoli'), true)
+  assert.equal(rows.some((item) => item.normalizedName === 'lemons'), true)
+  assert.equal(rows.some((item) => item.name === 'red pepper flakes'), true)
 })
 
 test('aggregate shopping list sums repeated count ingredients into one total', () => {
