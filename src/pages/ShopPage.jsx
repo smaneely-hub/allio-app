@@ -613,9 +613,9 @@ export function ShopPage() {
                             </>
                           )}
                         </div>
-                        {!isEditing && (item.quantity || '').trim() ? (
+                        {!isEditing && ((item.quantity || '').trim() || (item.unit || '').trim()) ? (
                           <div className="text-sm text-warm-500 bg-warm-100 rounded-full px-2 flex-shrink-0">
-                            {item.quantity}
+                            {[String(item.quantity || '').trim(), String(item.unit || '').trim()].filter(Boolean).join(' ')}
                           </div>
                         ) : null}
                       </div>
