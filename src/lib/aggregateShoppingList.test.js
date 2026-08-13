@@ -219,3 +219,46 @@ test('aggregate shopping list normalizes prep descriptors before merging produce
   assert.equal(avocados.quantity, 3)
   assert.equal(avocados.unit, '')
 })
+
+test('aggregate shopping list clusters near-equivalent ingredient variants', () => {
+  const rows = aggregateShoppingList({
+    meals: [
+      {
+        ingredients: [
+          { item: 'ground cumin', quantity: 1, unit: 'tsp' },
+          { item: 'smoked paprika', quantity: 0.5, unit: 'tsp' },
+          { item: 'pickled jalapeños', quantity: 2, unit: 'tbsp' },
+          { item: 'plain Greek yogurt', quantity: 0.5, unit: 'cup' },
+        ],
+      },
+      {
+        ingredients: [
+          { item: 'cumin', quantity: 0.25, unit: 'tsp' },
+          { item: 'paprika', quantity: 0.5, unit: 'tsp' },
+          { item: 'jalapeño', quantity: 1, unit: '' },
+          { item: 'yogurt', quantity: 0.5, unit: 'cup' },
+        ],
+      },
+    ],
+  }, '')
+
+  const cumin = rows.find((item) => item.normalizedName === 'cumin')
+  const paprika = rows.find((item) => item.normalizedName === 'paprika')
+  const jalapeno = rows.find((item) => item.normalizedName === 'jalapeño')
+  const yogurt = rows.find((item) => item.normalizedName === 'yogurt')
+
+  assert.ok(cumin)
+  assert.equal(cumin.quantity, 1.25)
+  assert.equal(cumin.unit, 'tsp')
+
+  assert.ok(paprika)
+  assert.equal(paprika.quantity, 1)
+  assert.equal(paprika.unit, 'tsp')
+
+  assert.ok(jalapeno)
+  assert.equal(jalapeno.name, 'jalapeño')
+
+  assert.ok(yogurt)
+  assert.equal(yogurt.quantity, 1)
+  assert.equal(yogurt.unit, 'cup')
+})

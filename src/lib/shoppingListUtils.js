@@ -28,21 +28,47 @@ const synonymMap = {
   scallions: 'green onions',
   'green onion': 'green onions',
   cucumber: 'cucumbers',
+  cucumbers: 'cucumbers',
   'persian cucumber': 'cucumbers',
   'persian cucumbers': 'cucumbers',
   'english cucumber': 'cucumbers',
   'english cucumbers': 'cucumbers',
   'baby cucumber': 'cucumbers',
   'baby cucumbers': 'cucumbers',
+  jalapeno: 'jalapeño',
+  jalapeños: 'jalapeño',
+  'pickled jalapeños': 'jalapeño',
   cilantro: 'cilantro',
+  chives: 'chives',
   celery: 'celery',
   'celery stalk': 'celery',
   'celery stalks': 'celery',
+  cumin: 'cumin',
+  'ground cumin': 'cumin',
+  paprika: 'paprika',
+  'smoked paprika': 'paprika',
+  yogurt: 'yogurt',
+  'greek yogurt': 'yogurt',
+  'plain greek yogurt': 'yogurt',
+  sourcream: 'sour cream',
+  'sour cream': 'sour cream',
+  parmesan: 'parmesan',
+  'pecorino romano': 'pecorino romano',
   'chicken breast': 'chicken breasts',
   'chicken thigh': 'chicken thighs',
   'ground turkey': 'ground meat',
   'ground beef': 'ground meat',
 }
+
+const COMPOUND_EQUIVALENTS = [
+  { pattern: /plain greek yogurt|greek yogurt/i, canonical: 'yogurt' },
+  { pattern: /pickled jalapeñ?os?|jalapeñ?os?/i, canonical: 'jalapeño' },
+  { pattern: /ground cumin|cumin/i, canonical: 'cumin' },
+  { pattern: /smoked paprika|paprika/i, canonical: 'paprika' },
+  { pattern: /sour cream/i, canonical: 'sour cream' },
+  { pattern: /parmesan/i, canonical: 'parmesan' },
+  { pattern: /pecorino romano/i, canonical: 'pecorino romano' },
+]
 
 const DESCRIPTOR_WORDS = new Set([
   'fresh', 'ripe', 'packed', 'loosely', 'large', 'small', 'medium', 'extra-large', 'extra',
@@ -106,6 +132,10 @@ function cleanupIngredientDisplayName(name = '') {
 function canonicalizeIngredientBase(name = '') {
   const cleaned = cleanupIngredientDisplayName(name)
   const lowered = cleaned.toLowerCase()
+
+  for (const rule of COMPOUND_EQUIVALENTS) {
+    if (rule.pattern.test(lowered)) return rule.canonical
+  }
 
   for (const pattern of NOUN_HINTS) {
     const matches = [...lowered.matchAll(pattern)].map((match) => match[1] || match[0]).filter(Boolean)
