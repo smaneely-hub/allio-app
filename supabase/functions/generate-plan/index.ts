@@ -77,13 +77,6 @@ function buildSystemPrompt(
   } | null,
   recentMealNames: string[] = []
 ) {
-    calories_target?: number | null;
-    protein_target_g?: number | null;
-    carbs_target_g?: number | null;
-    fat_target_g?: number | null;
-    foods_to_avoid?: string[];
-  } | null
-) {
   const slotDescriptions = slots
     .filter((s) => s.meal !== 'prep_block' && s.meal !== 'prep')
     .map((s) => {
