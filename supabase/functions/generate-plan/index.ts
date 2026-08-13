@@ -74,6 +74,14 @@ function buildSystemPrompt(
     carbs_target_g?: number | null;
     fat_target_g?: number | null;
     foods_to_avoid?: string[];
+  } | null,
+  recentMealNames: string[] = []
+) {
+    calories_target?: number | null;
+    protein_target_g?: number | null;
+    carbs_target_g?: number | null;
+    fat_target_g?: number | null;
+    foods_to_avoid?: string[];
   } | null
 ) {
   const slotDescriptions = slots
@@ -117,6 +125,9 @@ function buildSystemPrompt(
   const nutritionContext = nutritionLines.length > 0
     ? `\nNUTRITION TARGETS:\n${nutritionLines.join('\n')}\n`
     : ''
+  const recentMealsContext = recentMealNames.length > 0
+    ? `\nAVOID REPEATS:\n- Do not repeat these recent or already-used meals: ${recentMealNames.join(', ')}\n- If two candidate meals are too similar in title, protein, format, or flavor profile, choose a more distinct option.\n- Variety is mandatory across the returned plan.\n`
+    : ''
 
   const cookingComplexity: Record<string, string> = {
     'takeout or frozen': 'Keep the technique extremely simple, 15 minutes or less, minimal dishes.',
@@ -139,6 +150,7 @@ HOUSEHOLD TO COOK FOR:
 - Staples already on hand and not needed in shopping list: ${staplesOnHand}
 ${suggestion ? `- User request to actively shape the meal: ${suggestion}` : ''}
 ${weekNotes ? `- Week context: ${weekNotes}` : ''}
+${recentMealsContext}
 ${nutritionContext}
 MEMBER CONTEXT:
 ${householdContext || '- No detailed member context provided.'}
@@ -378,7 +390,7 @@ function scoreMealQuality(meal: Record<string, unknown>, slot: Record<string, un
   return { qualityScore, checks, valid: passed === Object.keys(checks).length }
 }
 
-function validatePlan(plan: unknown, scheduledSlots: Array<Record<string, unknown>> = []) {
+function validatePlan(plan: unknown, scheduledSlots: Array<Record<string, unknown>> = [], recentMealNames: string[] = []) {
   const normalized = transformLlmOutput(plan, scheduledSlots)
   const meals = normalized.meals || []
   const failures: string[] = []
@@ -388,9 +400,18 @@ function validatePlan(plan: unknown, scheduledSlots: Array<Record<string, unknow
     return { valid: false, meals, failures }
   }
 
+  const seenNames = new Set<string>()
+  const recentNormalized = new Set(recentMealNames.map((name) => String(name || '').trim().toLowerCase()).filter(Boolean))
+
   meals.forEach((meal) => {
     const slot = scheduledSlots.find((candidate) => candidate.day === meal.day && candidate.meal === meal.meal) || {}
     const assessment = scoreMealQuality(meal, slot)
+    const mealName = String(meal.name || meal.title || '').trim().toLowerCase()
+    if (mealName) {
+      if (seenNames.has(mealName)) failures.push(`${String(meal.name || 'Meal')}: duplicate meal name in returned plan`)
+      if (recentNormalized.has(mealName)) failures.push(`${String(meal.name || 'Meal')}: repeats a recent meal`)
+      seenNames.add(mealName)
+    }
     if (!assessment.valid) {
       const failedChecks = Object.entries(assessment.checks)
         .filter(([, value]) => !value)
@@ -678,7 +699,7 @@ serve(async (req) => {
 
 
     const messages = [
-      { role: 'system', content: buildSystemPrompt(payload.slots, payload.members, payload.household, payload.replace_slot?.suggestion, payload.week_notes, payload.nutrition_profile) },
+      { role: 'system', content: buildSystemPrompt(payload.slots, payload.members, payload.household, payload.replace_slot?.suggestion, payload.week_notes, payload.nutrition_profile, payload.recent_meal_names || []) },
       { role: 'user', content: JSON.stringify(payload) },
     ]
 
@@ -704,14 +725,14 @@ serve(async (req) => {
       console.error('[generate-plan] JSON parse failed, content length:', rawContent.length, 'error:', parseError)
       throw new Error(`LLM returned invalid JSON (content length: ${rawContent.length}, tokens may be truncated)`)
     }
-    let validation = validatePlan(parsedPlan, payload.slots)
+    let validation = validatePlan(parsedPlan, payload.slots, payload.recent_meal_names || [])
 
     let retryCount = 0
     while (!validation.valid && retryCount < MAX_VALIDATION_RETRIES) {
       retryCount += 1
       console.warn(`[generate-plan] LLM validation failed, retrying (${retryCount}/${MAX_VALIDATION_RETRIES}):`, validation.failures)
       const retryMessages = [
-        { role: 'system', content: buildRetryPrompt(buildSystemPrompt(payload.slots, payload.members, payload.household, payload.replace_slot?.suggestion, payload.week_notes, payload.nutrition_profile), validation.failures) },
+        { role: 'system', content: buildRetryPrompt(buildSystemPrompt(payload.slots, payload.members, payload.household, payload.replace_slot?.suggestion, payload.week_notes, payload.nutrition_profile, payload.recent_meal_names || []), validation.failures) },
         { role: 'user', content: JSON.stringify(payload) },
       ]
       llmJson = await callLlm(retryMessages, dynamicMaxTokens)
@@ -723,7 +744,7 @@ serve(async (req) => {
         console.error('[generate-plan] retry JSON parse failed:', retryParseError)
         break
       }
-      validation = validatePlan(parsedPlan, payload.slots)
+      validation = validatePlan(parsedPlan, payload.slots, payload.recent_meal_names || [])
     }
 
     if (!validation.valid) {
