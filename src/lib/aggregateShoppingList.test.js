@@ -145,3 +145,28 @@ test('buildGroupedShoppingItems prefers structured ingredientGroups over degrade
   assert.equal(rows.some((item) => item.normalizedName === 'lemons, 1 thinly sliced and 1 cut into wedges'), true)
   assert.equal(rows.some((item) => item.normalizedName === 'red pepper flakes'), true)
 })
+
+test('aggregate shopping list sums repeated count ingredients into one total', () => {
+  const rows = aggregateShoppingList({
+    meals: [
+      {
+        name: 'Meal A',
+        ingredients: [
+          { item: 'eggs', quantity: 3, unit: '' },
+        ],
+      },
+      {
+        name: 'Meal B',
+        ingredients: [
+          { item: 'eggs', quantity: 1, unit: '' },
+        ],
+      },
+    ],
+  }, '')
+
+  const eggs = rows.find((item) => item.normalizedName === 'eggs')
+  assert.ok(eggs)
+  assert.equal(eggs.quantity, 4)
+  assert.equal(eggs.unit, '')
+  assert.equal(eggs.name, 'eggs')
+})

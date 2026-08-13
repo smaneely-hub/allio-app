@@ -56,6 +56,12 @@ const UNIT_ALIASES = {
   'fluid ounces': 'fl oz',
   piece: 'whole',
   pieces: 'whole',
+  egg: 'whole',
+  eggs: 'whole',
+  yolk: 'whole',
+  yolks: 'whole',
+  white: 'whole',
+  whites: 'whole',
 }
 
 /** Normalize a unit string to its canonical form. Empty/missing → 'whole'. */
