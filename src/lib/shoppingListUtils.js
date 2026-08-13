@@ -80,11 +80,11 @@ function cleanupIngredientDisplayName(name = '') {
   return String(name)
     .replace(/\([^)]*\)/g, ' ')
     .replace(/,\s*(packed|loosely packed|room temperature|divided|plus more.*|plus additional.*|for serving|to serve)\b.*$/gi, '')
-    .replace(/,\s*(diced|halved|chopped|minced|grated|sliced|shredded|crushed|thinly sliced|roughly chopped|finely chopped|cut into sticks|cut into rounds|cut into wedges|cut into pieces|peeled|seeded)\b.*$/gi, '')
-    .replace(/\b(and|or)\s+(thinly sliced|roughly chopped|finely chopped|cut into sticks|cut into rounds|cut into wedges|cut into pieces|peeled|seeded)\b.*$/gi, '')
+    .replace(/,\s*(diced|halved|chopped|minced|grated|sliced|shredded|crushed|thinly sliced|roughly chopped|finely chopped|cut into sticks|cut into rounds|cut into wedges|cut into pieces|peeled|seeded|pitted|scooped out)\b.*$/gi, '')
+    .replace(/\b(and|or)\s+(thinly sliced|roughly chopped|finely chopped|cut into sticks|cut into rounds|cut into wedges|cut into pieces|peeled|seeded|pitted|scooped out)\b.*$/gi, '')
+    .replace(/\binto\s+(rounds|sticks|wedges|pieces)\b.*$/gi, '')
     .replace(/^grated\s+/i, '')
-    .replace(/^fresh\s+/i, '')
-    .replace(/^packed\s+/i, '')
+    .replace(/^(fresh|ripe|packed)\s+/i, '')
     .replace(/\s+/g, ' ')
     .replace(/[;,]+$/g, '')
     .trim()
@@ -104,10 +104,11 @@ export function normalizeIngredientName(name = '') {
     .toLowerCase()
     .trim()
     .replace(/\([^)]*\)/g, ' ')
-    .replace(/^(fresh|large|small|medium|extra[- ]large|boneless|skinless|lean|low[- ]fat|packed|loosely packed)\s+/g, '')
+    .replace(/^(fresh|ripe|large|small|medium|extra[- ]large|boneless|skinless|lean|low[- ]fat|packed|loosely packed)\s+/g, '')
     .replace(/,\s*(packed|loosely packed|room temperature|divided|plus more.*|plus additional.*|for serving|to serve)\b.*$/gi, '')
-    .replace(/,\s*(diced|halved|chopped|minced|grated|sliced|shredded|crushed|thinly sliced|roughly chopped|finely chopped|cut into sticks|cut into rounds|cut into wedges|cut into pieces|peeled|seeded)\b.*$/gi, '')
-    .replace(/\b(and|or)\s+(thinly sliced|roughly chopped|finely chopped|cut into sticks|cut into rounds|cut into wedges|cut into pieces|peeled|seeded)\b.*$/gi, '')
+    .replace(/,\s*(diced|halved|chopped|minced|grated|sliced|shredded|crushed|thinly sliced|roughly chopped|finely chopped|cut into sticks|cut into rounds|cut into wedges|cut into pieces|peeled|seeded|pitted|scooped out)\b.*$/gi, '')
+    .replace(/\b(and|or)\s+(thinly sliced|roughly chopped|finely chopped|cut into sticks|cut into rounds|cut into wedges|cut into pieces|peeled|seeded|pitted|scooped out)\b.*$/gi, '')
+    .replace(/\binto\s+(rounds|sticks|wedges|pieces)\b.*$/gi, '')
     .replace(/\s+/g, ' ')
     .replace(/[;,]+$/g, '')
     .trim()
@@ -222,11 +223,12 @@ export function buildGroupedShoppingItems(meals = [], staplesOnHand = '') {
       if (!parsed) continue
       if (staples.some((staple) => parsed.normalizedName.includes(staple))) continue
 
+      const normalizedUnit = normalizeUnit(parsed.unit)
       allIngredients.push({
         name: parsed.name,
         normalizedName: parsed.normalizedName,
         quantity: parsed.quantity * servingsScale,
-        unit: normalizeUnit(parsed.unit),
+        unit: shouldHideUnit(normalizedUnit, parsed.quantity) ? '' : normalizedUnit,
         category: parsed.category,
         usageKey,
       })

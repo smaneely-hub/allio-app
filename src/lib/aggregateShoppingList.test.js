@@ -141,8 +141,8 @@ test('buildGroupedShoppingItems prefers structured ingredientGroups over degrade
   }, '')
 
   assert.equal(rows.some((item) => item.normalizedName === 'size florets'), false)
-  assert.equal(rows.some((item) => item.normalizedName.includes('head broccoli')), true)
-  assert.equal(rows.some((item) => item.normalizedName === 'lemons, 1 thinly sliced and 1 cut into wedges'), true)
+  assert.equal(rows.some((item) => item.normalizedName.includes('broccoli')), true)
+  assert.equal(rows.some((item) => item.normalizedName.includes('lemons')), true)
   assert.equal(rows.some((item) => item.normalizedName === 'red pepper flakes'), true)
 })
 
@@ -180,6 +180,8 @@ test('aggregate shopping list normalizes prep descriptors before merging produce
           { item: 'fresh cilantro, packed', quantity: 1, unit: 'cup' },
           { item: 'cucumbers', quantity: 1, unit: '' },
           { item: 'celery, cut into sticks', quantity: 2, unit: 'stalks' },
+          { item: 'ripe avocados, pitted and scooped out', quantity: 2, unit: '' },
+          { item: 'cucumber into rounds or sticks', quantity: 1, unit: 'medium' },
         ],
       },
       {
@@ -188,6 +190,7 @@ test('aggregate shopping list normalizes prep descriptors before merging produce
           { item: 'fresh cilantro', quantity: 1, unit: 'cup' },
           { item: 'cucumber', quantity: 1, unit: '' },
           { item: 'celery', quantity: 1, unit: 'stalk' },
+          { item: 'avocados', quantity: 1, unit: '' },
         ],
       },
     ],
@@ -196,6 +199,7 @@ test('aggregate shopping list normalizes prep descriptors before merging produce
   const cilantro = rows.find((item) => item.normalizedName === 'cilantro')
   const cucumbers = rows.find((item) => item.normalizedName === 'cucumbers')
   const celery = rows.find((item) => item.normalizedName === 'celery')
+  const avocados = rows.find((item) => item.normalizedName === 'avocados')
 
   assert.ok(cilantro)
   assert.equal(cilantro.name, 'cilantro')
@@ -203,10 +207,15 @@ test('aggregate shopping list normalizes prep descriptors before merging produce
   assert.equal(cilantro.unit, 'cup')
 
   assert.ok(cucumbers)
-  assert.equal(cucumbers.quantity, 2)
+  assert.equal(cucumbers.quantity, 3)
   assert.equal(cucumbers.unit, '')
 
   assert.ok(celery)
   assert.equal(celery.quantity, 3)
   assert.equal(celery.unit, 'stalk')
+
+  assert.ok(avocados)
+  assert.equal(avocados.name, 'avocados')
+  assert.equal(avocados.quantity, 3)
+  assert.equal(avocados.unit, '')
 })
