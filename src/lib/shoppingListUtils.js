@@ -23,9 +23,22 @@ const CATEGORY_LABELS = {
 
 const synonymMap = {
   tomatoes: 'tomato',
+  'cherry tomatoes': 'tomato',
   scallion: 'green onions',
   scallions: 'green onions',
   'green onion': 'green onions',
+  cucumber: 'cucumbers',
+  'persian cucumber': 'cucumbers',
+  'persian cucumbers': 'cucumbers',
+  'english cucumber': 'cucumbers',
+  'english cucumbers': 'cucumbers',
+  'baby cucumber': 'cucumbers',
+  'baby cucumbers': 'cucumbers',
+  cilantro: 'cilantro',
+  'fresh cilantro': 'cilantro',
+  celery: 'celery',
+  'celery stalk': 'celery',
+  'celery stalks': 'celery',
   'chicken breast': 'chicken breasts',
   'chicken thigh': 'chicken thighs',
   'ground turkey': 'ground meat',
@@ -65,9 +78,15 @@ function formatQuantity(value) {
 
 function cleanupIngredientDisplayName(name = '') {
   return String(name)
-    .replace(/,\s*(diced|halved|chopped|minced|grated|sliced|shredded|crushed)\b/gi, '')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/,\s*(packed|loosely packed|room temperature|divided|plus more.*|plus additional.*|for serving|to serve)\b.*$/gi, '')
+    .replace(/,\s*(diced|halved|chopped|minced|grated|sliced|shredded|crushed|thinly sliced|roughly chopped|finely chopped|cut into sticks|cut into rounds|cut into wedges|cut into pieces|peeled|seeded)\b.*$/gi, '')
+    .replace(/\b(and|or)\s+(thinly sliced|roughly chopped|finely chopped|cut into sticks|cut into rounds|cut into wedges|cut into pieces|peeled|seeded)\b.*$/gi, '')
     .replace(/^grated\s+/i, '')
+    .replace(/^fresh\s+/i, '')
+    .replace(/^packed\s+/i, '')
     .replace(/\s+/g, ' ')
+    .replace(/[;,]+$/g, '')
     .trim()
 }
 
@@ -84,8 +103,14 @@ export function normalizeIngredientName(name = '') {
   const base = String(name)
     .toLowerCase()
     .trim()
-    .replace(/^(fresh|large|small|medium|extra[- ]large|boneless|skinless|lean|low[- ]fat)\s+/g, '')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/^(fresh|large|small|medium|extra[- ]large|boneless|skinless|lean|low[- ]fat|packed|loosely packed)\s+/g, '')
+    .replace(/,\s*(packed|loosely packed|room temperature|divided|plus more.*|plus additional.*|for serving|to serve)\b.*$/gi, '')
+    .replace(/,\s*(diced|halved|chopped|minced|grated|sliced|shredded|crushed|thinly sliced|roughly chopped|finely chopped|cut into sticks|cut into rounds|cut into wedges|cut into pieces|peeled|seeded)\b.*$/gi, '')
+    .replace(/\b(and|or)\s+(thinly sliced|roughly chopped|finely chopped|cut into sticks|cut into rounds|cut into wedges|cut into pieces|peeled|seeded)\b.*$/gi, '')
     .replace(/\s+/g, ' ')
+    .replace(/[;,]+$/g, '')
+    .trim()
 
   return synonymMap[base] || base
 }

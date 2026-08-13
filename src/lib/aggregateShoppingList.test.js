@@ -170,3 +170,43 @@ test('aggregate shopping list sums repeated count ingredients into one total', (
   assert.equal(eggs.unit, '')
   assert.equal(eggs.name, 'eggs')
 })
+
+test('aggregate shopping list normalizes prep descriptors before merging produce', () => {
+  const rows = aggregateShoppingList({
+    meals: [
+      {
+        name: 'Meal A',
+        ingredients: [
+          { item: 'fresh cilantro, packed', quantity: 1, unit: 'cup' },
+          { item: 'cucumbers', quantity: 1, unit: '' },
+          { item: 'celery, cut into sticks', quantity: 2, unit: 'stalks' },
+        ],
+      },
+      {
+        name: 'Meal B',
+        ingredients: [
+          { item: 'fresh cilantro', quantity: 1, unit: 'cup' },
+          { item: 'cucumber', quantity: 1, unit: '' },
+          { item: 'celery', quantity: 1, unit: 'stalk' },
+        ],
+      },
+    ],
+  }, '')
+
+  const cilantro = rows.find((item) => item.normalizedName === 'cilantro')
+  const cucumbers = rows.find((item) => item.normalizedName === 'cucumbers')
+  const celery = rows.find((item) => item.normalizedName === 'celery')
+
+  assert.ok(cilantro)
+  assert.equal(cilantro.name, 'cilantro')
+  assert.equal(cilantro.quantity, 2)
+  assert.equal(cilantro.unit, 'cup')
+
+  assert.ok(cucumbers)
+  assert.equal(cucumbers.quantity, 2)
+  assert.equal(cucumbers.unit, '')
+
+  assert.ok(celery)
+  assert.equal(celery.quantity, 3)
+  assert.equal(celery.unit, 'stalk')
+})

@@ -54,6 +54,8 @@ const UNIT_ALIASES = {
   gal: 'gallon',
   'fluid ounce': 'fl oz',
   'fluid ounces': 'fl oz',
+  stalk: 'stalk',
+  stalks: 'stalk',
   piece: 'whole',
   pieces: 'whole',
   egg: 'whole',
@@ -267,9 +269,16 @@ export function mergeIngredients(ingredients) {
       let displayQty
 
       if (family.table) {
-        const best = bestDisplay(baseTotal, family.name)
-        displayUnit = best.unit
-        displayQty = best.quantity
+        const preferredUnit = items[0].normUnit
+        const allSameUnit = items.every((item) => item.normUnit === preferredUnit)
+        if (allSameUnit && preferredUnit && preferredUnit !== 'whole') {
+          displayUnit = preferredUnit
+          displayQty = baseTotal / (family.table[preferredUnit] || 1)
+        } else {
+          const best = bestDisplay(baseTotal, family.name)
+          displayUnit = best.unit
+          displayQty = best.quantity
+        }
       } else {
         // 'whole' or unrecognized — no conversion; display unit is empty for 'whole'
         displayUnit = items[0].normUnit === 'whole' ? '' : items[0].normUnit
