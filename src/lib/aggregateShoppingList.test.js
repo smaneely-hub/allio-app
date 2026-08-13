@@ -262,3 +262,18 @@ test('aggregate shopping list clusters near-equivalent ingredient variants', () 
   assert.equal(yogurt.quantity, 1)
   assert.equal(yogurt.unit, 'cup')
 })
+
+test('aggregate shopping list preserves compound dairy nouns like cream cheese', () => {
+  const rows = aggregateShoppingList({
+    meals: [
+      { ingredients: [{ item: 'cream cheese, softened', quantity: 4, unit: 'oz' }] },
+      { ingredients: [{ item: 'cream cheese', quantity: 4, unit: 'oz' }] },
+    ],
+  }, '')
+
+  const creamCheese = rows.find((item) => item.normalizedName === 'cream cheese')
+  assert.ok(creamCheese)
+  assert.equal(creamCheese.name, 'cream cheese')
+  assert.equal(creamCheese.quantity, 8)
+  assert.equal(creamCheese.unit, 'oz')
+})

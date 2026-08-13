@@ -61,11 +61,12 @@ const synonymMap = {
 }
 
 const COMPOUND_EQUIVALENTS = [
+  { pattern: /cream cheese/i, canonical: 'cream cheese' },
+  { pattern: /sour cream/i, canonical: 'sour cream' },
   { pattern: /plain greek yogurt|greek yogurt/i, canonical: 'yogurt' },
   { pattern: /pickled jalapeñ?os?|jalapeñ?os?/i, canonical: 'jalapeño' },
   { pattern: /ground cumin|cumin/i, canonical: 'cumin' },
   { pattern: /smoked paprika|paprika/i, canonical: 'paprika' },
-  { pattern: /sour cream/i, canonical: 'sour cream' },
   { pattern: /parmesan/i, canonical: 'parmesan' },
   { pattern: /pecorino romano/i, canonical: 'pecorino romano' },
 ]
@@ -81,7 +82,7 @@ const DESCRIPTOR_WORDS = new Set([
 const NOUN_HINTS = [
   /\b(avocados?|cilantro|cucumbers?|celery|lemons?|limes?|onions?|garlic|potatoes?|carrots?|broccoli|spinach|lettuce|peppers?|mushrooms?|parsley|basil|ginger|berries|grapes|mangoes?|peaches?|pears?|cabbage|zucchini|squash|asparagus|green beans?|corn|peas?|leeks?|shallots?|beets?|radishes?|arugula|kale|chard|cauliflower)\b/g,
   /\b(eggs?|yolks?|whites?|chicken breasts?|chicken thighs?|ground meat|beef|pork|salmon|tuna|shrimp|tofu|tempeh|turkey|bacon|sausage|ham|steak)\b/g,
-  /\b(spaghetti|pasta|rice|noodles?|flour|sugar|oil|vinegar|stock|broth|beans?|lentils?|chickpeas?|oats?|cereal|honey|syrup|salt|pepper|cumin|paprika|cilantro|parmesan|pecorino|cheddar|mozzarella|yogurt|cream)\b/g,
+  /\b(spaghetti|pasta|rice|noodles?|flour|sugar|oil|vinegar|stock|broth|beans?|lentils?|chickpeas?|oats?|cereal|honey|syrup|salt|pepper|cumin|paprika|cilantro|parmesan|pecorino|cheddar|mozzarella|yogurt|cream cheese|sour cream|cream)\b/g,
 ]
 
 function fractionToNumber(value = '') {
