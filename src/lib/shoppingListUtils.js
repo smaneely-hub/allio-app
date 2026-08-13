@@ -121,7 +121,7 @@ export function parseIngredient(rawIngredient) {
     unit = rawIngredient.unit || 'piece'
     name = String(rawIngredient.item || rawIngredient.name).trim()
   } else {
-    const match = source.match(/^(\d+(?:\.\d+)?(?:\s+\d+\/\d+)?|\d+\/\d+)\s+([A-Za-z]+)?\s+(.+)$/)
+    const match = source.match(/^((?:\d+(?:\.\d+)?)|(?:\d+\/\d+)|(?:\d+\s+\d+\/\d+))\s+([A-Za-z]+)?\s+(.+)$/)
     if (match) {
       quantity = fractionToNumber(match[1])
       const maybeUnit = (match[2] || '').toLowerCase()
