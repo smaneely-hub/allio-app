@@ -236,6 +236,16 @@ export function useMealPlan(scheduleId) {
       const slotKey = (s) => `${String(s?.day || '').trim()}-${String(s?.meal || '').trim()}`
       const currentSlotKeys = new Set(slots.map(slotKey))
       const validLockedMeals = lockedMeals.filter((m) => currentSlotKeys.has(`${m.day}-${m.meal}`))
+      const [preferenceSignals, recentMealNamesFromDB] = await Promise.all([
+        loadPlannerPreferenceSignals(user.id),
+        loadRecentPlanMealNames(user.id),
+      ])
+      const currentPlanMealNames = (mealPlan?.draft_plan?.meals || []).map((meal) => meal?.name).filter(Boolean)
+      const preferenceHints = [
+        ...preferenceSignals.favoriteMeals.map((name) => `favorite: ${name}`),
+        ...preferenceSignals.likedMeals.map((name) => `liked: ${name}`),
+        ...preferenceSignals.refinementNotes.map((note) => `feedback note: ${note}`),
+      ].slice(0, 10)
 
       const payload = {
         household: {
@@ -257,8 +267,16 @@ export function useMealPlan(scheduleId) {
           is_leftover: slot?.is_leftover,
           leftover_source: slot?.leftover_source,
         })).filter((slot) => slot.day && slot.meal),
-        week_notes: schedule?.week_notes || '',
+        week_notes: [schedule?.week_notes, ...preferenceHints].filter(Boolean).join('; '),
         locked_meals: validLockedMeals,
+        existing_plan: mealPlan?.draft_plan || null,
+        recent_meal_names: [...new Set([...recentMealNamesFromDB, ...currentPlanMealNames, ...recentSwappedMealNames, ...preferenceSignals.strongAvoidSignals])],
+        preference_signals: {
+          favorites: preferenceSignals.favoriteMeals,
+          liked_meals: preferenceSignals.likedMeals,
+          disliked_meals: preferenceSignals.dislikedMeals,
+          refinement_notes: preferenceSignals.refinementNotes,
+        },
         nutrition_profile: buildNutritionPayload(nutritionProfile, nutritionTargets),
       }
 
